@@ -1,0 +1,56 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio de Sesión</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/accounts/miestilo.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <img src="{% static 'img/login/LOGOSSU.png' %}" alt="Logo" class="logo">
+            <h1>¡¡Bienvenido nuevamente!!</h1>
+            <p>Por favor Inicia Sesión con tus datos</p>
+        </div>
+
+        <div class="right-panel">
+            <h2>Iniciar Sesión</h2>
+            {% if messages %}
+            <div class="messages" style="color: red; margin-bottom: 15px; text-align: center;">
+                {% for message in messages %}
+                <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <form method="POST" action="{% url 'login_home' %}">
+                {% csrf_token %}
+        <div class="input-group">
+            <span class="icon"><i class="material-symbols-outlined">person</i></span>
+            <input type="text" name="username" placeholder="Usuario" required>
+        </div> 
+
+
+                <div class="input-group">
+                    <span class="icon"><i class="material-symbols-outlined">lock</i></span>
+                    <input type="password" name="password" placeholder="Contraseña" required>
+                </div>
+
+                <button type="submit">Iniciar Sesión</button>
+            </form>
+        </div>
+    </div>
+    <script src="{% static 'js/accounts/movimiento.js' %}"></script>
+    <script src="{% static 'js/shared/notifications.js' %}"></script>
+</body>
+</html>
+
+
+
+
+
+

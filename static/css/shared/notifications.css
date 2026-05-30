@@ -1,0 +1,137 @@
+:root {
+    --dialog-bg: var(--color-white-solid, #ffffff);
+    --dialog-text: var(--color-purple-dark, #271447);
+    --dialog-accent: var(--color-pink-dark, #720035);
+    --dialog-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+    --dialog-overlay: rgba(0, 0, 0, 0.35);
+}
+
+.app-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--dialog-overlay);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 9999;
+    padding: 20px;
+}
+
+.app-dialog-overlay.is-visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.app-dialog {
+    width: min(560px, 100%);
+    background: var(--dialog-bg);
+    border-radius: 22px;
+    box-shadow: var(--dialog-shadow);
+    padding: 26px 28px 22px;
+    color: var(--dialog-text);
+    transform: translateY(10px);
+    transition: transform 0.2s ease;
+}
+
+.app-dialog-overlay.is-visible .app-dialog {
+    transform: translateY(0);
+}
+
+.app-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--dialog-accent);
+}
+
+.app-dialog-icon {
+    font-size: 1.7em;
+    color: var(--dialog-text);
+}
+
+.app-dialog-title {
+    margin: 0;
+    font-size: 1.35em;
+    font-weight: 700;
+}
+
+.app-dialog-body {
+    margin: 18px 0 22px;
+    font-size: 1em;
+    line-height: 1.5;
+    color: var(--dialog-text);
+    white-space: pre-line;
+}
+
+.app-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.app-dialog-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 10px 22px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.app-dialog-btn:focus {
+    outline: 2px solid rgba(39, 20, 71, 0.35);
+    outline-offset: 2px;
+}
+
+.app-dialog-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(39, 20, 71, 0.18);
+}
+
+.app-dialog-btn-cancel {
+    background: var(--dialog-text);
+    color: #ffffff;
+}
+
+.app-dialog-btn-confirm {
+    background: var(--dialog-accent);
+    color: #ffffff;
+}
+
+.app-dialog--danger .app-dialog-header {
+    border-bottom-color: var(--dialog-accent);
+}
+
+.app-dialog--danger .app-dialog-btn-confirm {
+    background: var(--dialog-accent);
+}
+
+.app-dialog--info .app-dialog-btn-confirm {
+    background: var(--dialog-text);
+}
+
+.app-dialog--success .app-dialog-btn-confirm {
+    background: #1f7a48;
+}
+
+@media (max-width: 480px) {
+    .app-dialog {
+        padding: 20px 20px 18px;
+    }
+
+    .app-dialog-title {
+        font-size: 1.2em;
+    }
+
+    .app-dialog-actions {
+        justify-content: center;
+    }
+}

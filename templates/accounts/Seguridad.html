@@ -1,0 +1,165 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cambio de Contraseña</title>
+
+    <meta name="csrf-token"           content="{{ csrf_token }}">
+    <meta name="cambio-contrasena-url" content="{% url 'contrasena' %}">
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/accounts/Seguridad.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+
+<body>
+
+<a href="/Index_Principal.html" class="back-to-menu">
+    <i class="material-symbols-outlined">arrow_back</i>
+    Volver
+</a>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>
+                {% comment %} <i class="material-symbols-outlined">lock</i>  {% endcomment %}
+                Cambio de Contraseña
+            </h1>
+            <p>Actualiza tu contraseña de forma segura</p>
+        </div>
+
+        <!-- Formulario -->
+        <div class="form-card">
+            <!-- Alerta de éxito -->
+            <div class="alert alert-success" id="alertSuccess" style="display: none;">
+                <i class="material-symbols-outlined">check_circle</i>
+                <span>¡Contraseña actualizada exitosamente!</span>
+            </div>
+
+            <!-- Alerta de error -->
+            <div class="alert alert-error" id="alertError" style="display: none;">
+                <i class="material-symbols-outlined">error</i>
+                <span id="errorMessage">Error al cambiar la contraseña</span>
+            </div>
+
+            <form id="cambioContrasenaForm">
+                <!-- Contraseña Actual -->
+                <div class="form-group">
+                    <label for="contrasenaActual">
+                        <i class="material-symbols-outlined">key</i> Contraseña Actual
+                    </label>
+                    <div class="input-wrapper">
+                        <i class="material-symbols-outlined input-icon">lock</i>
+                        <input 
+                            type="password" 
+                            id="contrasenaActual" 
+                            placeholder="Ingresa tu contraseña actual"
+                            required
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePassword('contrasenaActual')">
+                            <i class="material-symbols-outlined" id="icon-contrasenaActual">visibility</i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Nueva Contraseña -->
+                <div class="form-group">
+                    <label for="contrasenaNueva">
+                        <i class="material-symbols-outlined">shield</i> Nueva Contraseña
+                    </label>
+                    <div class="input-wrapper">
+                        <i class="material-symbols-outlined input-icon">lock</i>
+                        <input 
+                            type="password" 
+                            id="contrasenaNueva" 
+                            placeholder="Ingresa tu nueva contraseña"
+                            required
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePassword('contrasenaNueva')">
+                            <i class="material-symbols-outlined" id="icon-contrasenaNueva">visibility</i>
+                        </button>
+                    </div>
+                    
+                    <!-- Indicador de fortaleza -->
+                    <div class="password-strength" id="passwordStrength" style="display: none;">
+                        <div class="strength-bar">
+                            <div class="strength-fill" id="strengthFill"></div>
+                        </div>
+                        <span class="strength-text" id="strengthText">Débil</span>
+                    </div>
+                </div>
+
+                <!-- Confirmar Contraseña -->
+                <div class="form-group">
+                    <label for="contrasenaConfirmar">
+                        <i class="material-symbols-outlined">verified_user</i> Confirmar Nueva Contraseña
+                    </label>
+                    <div class="input-wrapper">
+                        <i class="material-symbols-outlined input-icon">lock_open</i>
+                        <input 
+                            type="password" 
+                            id="contrasenaConfirmar" 
+                            placeholder="Confirma tu nueva contraseña"
+                            required
+                        >
+                        <button type="button" class="toggle-password" onclick="togglePassword('contrasenaConfirmar')">
+                            <i class="material-symbols-outlined" id="icon-contrasenaConfirmar">visibility</i>
+                        </button>
+                    </div>
+                    <small class="match-indicator" id="matchIndicator"></small>
+                </div>
+
+                <!-- Requisitos de Contraseña -->
+                <div class="requirements-section">
+                    <h3 class="requirements-title">
+                        <i class="material-symbols-outlined">checklist</i> Requisitos de la contraseña:
+                    </h3>
+                    <ul class="requirements-list">
+                        <li id="req-length">
+                            <i class="material-symbols-outlined">cancel</i>
+                            Al menos 8 caracteres
+                        </li>
+                        <li id="req-uppercase">
+                            <i class="material-symbols-outlined">cancel</i>
+                            Una letra mayúscula
+                        </li>
+                        <li id="req-lowercase">
+                            <i class="material-symbols-outlined">cancel</i>
+                            Una letra minúscula
+                        </li>
+                        <li id="req-number">
+                            <i class="material-symbols-outlined">cancel</i>
+                            Un número
+                        </li>
+                        <li id="req-special">
+                            <i class="material-symbols-outlined">cancel</i>
+                            Un carácter especial (@$!%*?&#)
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" onclick="cancelar()">
+                        <i class="material-symbols-outlined">close</i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="material-symbols-outlined">save</i> Cambiar Contraseña
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{% static 'js/shared/notifications.js' %}"></script>
+    <script src="{% static 'js/accounts/Seguridad.js' %}"></script>
+</body>
+</html>
+
+
+
+

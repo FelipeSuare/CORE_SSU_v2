@@ -1,0 +1,496 @@
+// ══════════════════════════════════════════════════════════════
+//  CONFIGURACIÓN Y CONSTANTES
+// ══════════════════════════════════════════════════════════════
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+
+const URL_DATOS       = '/api/vacaciones/datos/';
+const URL_RETORNO     = '/api/vacaciones/calcular-retorno/';
+const URL_CREAR       = '/api/vacaciones/crear/';
+const URL_SEGUIMIENTO = '/api/vacaciones/seguimiento/';
+
+// ══════════════════════════════════════════════════════════════
+//  ELEMENTOS DEL DOM
+// ══════════════════════════════════════════════════════════════
+const tipoContratoInput   = document.getElementById('tipoContrato');
+const funcionarioInput    = document.getElementById('funcionario');
+const fechaIngresoInput   = document.getElementById('fechaIngreso');
+const fechaSolicitudInput = document.getElementById('fechaSolicitud');
+const fechaSalidaInput    = document.getElementById('fechaSalida');
+const diasTomarInput      = document.getElementById('diasTomar');
+const fechaRetornoInput   = document.getElementById('fechaRetorno');
+const motivoVacacionTextarea = document.getElementById('motivoVacacion');
+const saldosContainer     = document.getElementById('saldosContainer');
+const notificationMessage = document.getElementById('notificationMessage');
+const vacationRequestForm = document.getElementById('vacationRequestForm');
+const summaryModal        = document.getElementById('summaryModal');
+const cancelModalBtn      = document.getElementById('cancelModalBtn');
+const confirmModalBtn     = document.getElementById('confirmModalBtn');
+const btnTracking         = document.getElementById('btnTracking');
+const trackingPanel       = document.getElementById('trackingPanel');
+const closeTracking       = document.getElementById('closeTracking');
+const trackingContent     = document.getElementById('trackingContent');
+// ══════════════════════════════════════════════════════════════
+//  ESTADO DEL MÓDULO
+// ══════════════════════════════════════════════════════════════
+let datosFormulario  = null;   // respuesta de /api/vacaciones/datos/
+let retornoData      = null;   // respuesta de /api/vacaciones/calcular-retorno/
+let calcularTimeout  = null;   // debounce para el cálculo de retorno
+
+// ══════════════════════════════════════════════════════════════
+//  INICIALIZACIÓN
+// ══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+    const hoy = new Date().toISOString().split('T')[0];
+    fechaSolicitudInput.value = hoy;
+    // Los roles y el perfil visual se inicializan tras cargar datos del backend
+    await cargarDatosFormulario();
+});
+
+// ══════════════════════════════════════════════════════════════
+//  CARGA DE DATOS DEL FUNCIONARIO AUTENTICADO
+// ══════════════════════════════════════════════════════════════
+async function cargarDatosFormulario() {
+    try {
+        const resp = await fetch(URL_DATOS, { headers: { 'X-CSRFToken': CSRF_TOKEN } });
+        const data = await resp.json();
+
+        if (data.error) {
+            AppDialog.alert(data.error);
+            return;
+        }
+
+        datosFormulario = data;
+
+        // Renderizar roles reales desde BD en el profile-switcher
+        renderizarRoles(data.roles || ['Funcionario'], data.nombre_completo);
+
+        // Prellenar campos de solo lectura
+        tipoContratoInput.value  = data.tipo_contrato || '—';
+        funcionarioInput.value   = data.nombre_completo;
+        fechaIngresoInput.value  = data.fecha_ingreso;
+        fechaSolicitudInput.value = data.fecha_solicitud;
+        document.getElementById('requestIdDisplay').textContent = data.siguiente_codigo;
+
+        // Renderizar saldos
+        renderizarSaldos(data.saldos, data.gestiones_con_saldo);
+
+        // Notificación de gestiones acumuladas
+        const n = data.gestiones_con_saldo;
+        if (n >= 4) {
+            mostrarNotificacion(
+                `¡URGENTE! Tiene ${n} gestiones acumuladas sin tomar. La normativa no permite acumular más de 4 gestiones.`,
+                'urgente'
+            );
+        } else if (n >= 3) {
+            mostrarNotificacion(
+                `Tiene ${n} gestiones acumuladas. Se recomienda coordinar sus vacaciones pendientes.`,
+                'advertencia'
+            );
+        } else {
+            mostrarNotificacion('No hay alertas de vacaciones acumuladas.', 'normal');
+        }
+
+        if (!data.puede_solicitar) {
+            const msg = data.saldos.dias_adeudados <= 0
+                ? 'No tiene días de vacación disponibles.'
+                : 'Aún no cumple 1 año de antigüedad para solicitar vacaciones.';
+            AppDialog.alert(msg);
+            vacationRequestForm.querySelector('button[type="submit"]').disabled = true;
+        }
+
+        // Cargar seguimiento al inicializar
+        await cargarSeguimiento();
+
+    } catch (err) {
+        console.error('Error al cargar datos del formulario:', err);
+        AppDialog.alert('No se pudieron cargar los datos del formulario. Verifique su conexión.');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDERIZADO DE SALDOS
+// ══════════════════════════════════════════════════════════════
+let gestionesExpandidas = false;
+
+function renderizarSaldos(saldos, gestionesConSaldo) {
+    const { gestiones, dias_negados, dias_adeudados } = saldos;
+
+    if (!gestiones || gestiones.length === 0) {
+        saldosContainer.innerHTML = `
+            <div class="saldo-card">
+                <div class="saldo-label">SIN GESTIONES</div>
+                <div class="saldo-value">0 <span>días</span></div>
+            </div>`;
+        return;
+    }
+
+    let html = '';
+    gestiones.forEach((g, i) => {
+        const oculta = i >= 2 ? 'saldo-card-extra' : '';
+        html += `
+        <div class="saldo-card ${oculta}" style="${i >= 2 ? 'display:none' : ''}">
+            <div class="saldo-label">${g.label}</div>
+            <div class="saldo-value">${g.dias} <span>días</span></div>
+        </div>`;
+    });
+
+    if (dias_negados > 0) {
+        html += `
+        <div class="saldo-card saldo-card-negados">
+            <div class="saldo-label">DÍAS NEGADOS</div>
+            <div class="saldo-value">${dias_negados} <span>días</span></div>
+        </div>`;
+    }
+
+    html += `
+    <div class="saldo-card saldo-card-total">
+        <div class="saldo-label">TOTAL ADEUDADO</div>
+        <div class="saldo-value">${dias_adeudados} <span>días</span></div>
+    </div>`;
+
+    if (gestiones.length > 2) {
+        html += `
+        <button type="button" class="btn-ver-mas" id="btnVerMas" onclick="toggleGestiones()">
+            <i class="material-symbols-outlined" id="iconVerMas">expand_more</i> Ver gestiones anteriores
+        </button>`;
+    }
+
+    saldosContainer.innerHTML = html;
+    gestionesExpandidas = false;
+}
+
+function toggleGestiones() {
+    gestionesExpandidas = !gestionesExpandidas;
+    document.querySelectorAll('.saldo-card-extra').forEach(el => {
+        el.style.display = gestionesExpandidas ? 'block' : 'none';
+    });
+    const btn = document.getElementById('btnVerMas');
+    if (btn) {
+        btn.innerHTML = gestionesExpandidas
+            ? '<i class="material-symbols-outlined" id="iconVerMas">expand_less</i> Ver menos'
+            : '<i class="material-symbols-outlined" id="iconVerMas">expand_more</i> Ver gestiones anteriores';
+    }
+}
+
+function mostrarNotificacion(texto, tipo = 'normal') {
+    const estilos = {
+        urgente:     { bg: 'linear-gradient(135deg, rgba(255,200,200,0.6), rgba(255,255,255,0.9))', borde: '4px solid #D32F2F' },
+        advertencia: { bg: 'linear-gradient(135deg, rgba(255,230,200,0.6), rgba(255,255,255,0.9))', borde: '4px solid #E65100' },
+        normal:      { bg: 'linear-gradient(135deg, rgba(249,201,201,0.5), rgba(255,255,255,0.9))', borde: '4px solid rgb(114,0,53)' },
+    };
+    const s = estilos[tipo] || estilos.normal;
+    notificationMessage.textContent = texto;
+    notificationMessage.style.background   = s.bg;
+    notificationMessage.style.borderLeft   = s.borde;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CÁLCULO DE FECHA DE RETORNO (con debounce)
+// ══════════════════════════════════════════════════════════════
+fechaSalidaInput.addEventListener('change', triggerCalculo);
+diasTomarInput.addEventListener('input',  triggerCalculo);
+
+function triggerCalculo() {
+    clearTimeout(calcularTimeout);
+    calcularTimeout = setTimeout(calcularFechaRetorno, 400);
+}
+
+async function calcularFechaRetorno() {
+    const fechaSalida = fechaSalidaInput.value;
+    const diasTomar   = diasTomarInput.value;
+
+    if (!fechaSalida || !diasTomar || parseFloat(diasTomar) <= 0) {
+        fechaRetornoInput.value = '';
+        retornoData = null;
+        return;
+    }
+
+    try {
+        const resp = await fetch(URL_RETORNO, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN,
+            },
+            body: JSON.stringify({
+                fecha_salida: fechaSalida,
+                dias_solicitados: diasTomar,
+                cod_funcionario: datosFormulario?.cod_funcionario || '',
+            }),
+        });
+
+        const data = await resp.json();
+        if (data.error) {
+            fechaRetornoInput.value = '';
+            return;
+        }
+
+        retornoData = data;
+        fechaRetornoInput.value = data.fecha_retorno;
+
+    } catch (err) {
+        console.error('Error al calcular retorno:', err);
+        // Fallback: cálculo local básico (sin feriados ni cumpleaños)
+        calcularRetornoLocal(fechaSalida, parseInt(diasTomar));
+    }
+}
+
+function calcularRetornoLocal(fechaSalida, diasTomar) {
+    let fecha = new Date(fechaSalida + 'T00:00:00');
+    let habiles = 0;
+    while (habiles < diasTomar) {
+        fecha.setDate(fecha.getDate() + 1);
+        if (fecha.getDay() !== 0 && fecha.getDay() !== 6) habiles++;
+    }
+    fechaRetornoInput.value = fecha.toISOString().split('T')[0];
+}
+
+// ══════════════════════════════════════════════════════════════
+//  VALIDACIÓN Y MODAL DE RESUMEN
+// ══════════════════════════════════════════════════════════════
+vacationRequestForm.addEventListener('submit', e => {
+    e.preventDefault();
+
+    if (!datosFormulario) {
+        AppDialog.alert('Los datos del formulario no están disponibles. Recargue la página.');
+        return;
+    }
+
+    const motivo = motivoVacacionTextarea.value.trim();
+    if (!motivo || motivo.length < 10) {
+        AppDialog.alert('Ingrese un motivo válido para la vacación (mínimo 10 caracteres).');
+        motivoVacacionTextarea.focus();
+        return;
+    }
+
+    const diasTomar    = parseFloat(diasTomarInput.value);
+    const saldoTotal   = datosFormulario.saldos.dias_adeudados;
+
+    if (isNaN(diasTomar) || diasTomar <= 0) {
+        AppDialog.alert('Ingrese una cantidad válida de días a tomar.');
+        return;
+    }
+
+    if (diasTomar > saldoTotal) {
+        AppDialog.alert(`No tiene suficiente saldo. Disponible: ${saldoTotal} días.`);
+        return;
+    }
+
+    if (!fechaRetornoInput.value) {
+        AppDialog.alert('Seleccione la fecha de salida e ingrese los días a tomar para calcular el retorno.');
+        return;
+    }
+
+    poblarModal(diasTomar, saldoTotal, motivo);
+    mostrarModal();
+});
+
+function poblarModal(diasTomar, saldoTotal, motivo) {
+    const rd = retornoData || {};
+    const saldoRestante = (saldoTotal - diasTomar).toFixed(1);
+
+    document.getElementById('summaryDiasNoHabiles').textContent =
+        rd.dias_no_habiles !== undefined ? rd.dias_no_habiles : '—';
+    document.getElementById('summaryDiasCumpleanos').textContent =
+        rd.dias_cumpleanos !== undefined ? rd.dias_cumpleanos : '—';
+    document.getElementById('summaryDiasFestivos').textContent =
+        rd.dias_feriados !== undefined ? rd.dias_feriados : '—';
+
+    if (rd.fecha_conclusion) {
+        document.getElementById('summaryFechaConclusión').textContent =
+            formatearFecha(rd.fecha_conclusion);
+    } else {
+        // Fallback: día anterior a fecha_retorno
+        const retorno = fechaRetornoInput.value;
+        if (retorno) {
+            const d = new Date(retorno + 'T00:00:00');
+            d.setDate(d.getDate() - 1);
+            document.getElementById('summaryFechaConclusión').textContent = formatearFecha(d);
+        } else {
+            document.getElementById('summaryFechaConclusión').textContent = '--/--/----';
+        }
+    }
+
+    document.getElementById('summarySaldoDias').textContent = `${saldoRestante} días`;
+    document.getElementById('summaryMotivo').textContent = motivo;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ENVÍO DE SOLICITUD
+// ══════════════════════════════════════════════════════════════
+confirmModalBtn.addEventListener('click', async () => {
+    confirmModalBtn.disabled = true;
+
+    try {
+        const resp = await fetch(URL_CREAR, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN,
+            },
+            body: JSON.stringify({
+                fecha_salida:      fechaSalidaInput.value,
+                fecha_retorno:     fechaRetornoInput.value,
+                dias_solicitados:  parseFloat(diasTomarInput.value),
+                motivo_vacacion:   motivoVacacionTextarea.value.trim(),
+            }),
+        });
+
+        const data = await resp.json();
+        ocultarModal();
+
+        if (!resp.ok || data.error) {
+            AppDialog.alert(data.error || 'Error al enviar la solicitud.');
+            return;
+        }
+
+        AppDialog.alert(
+            `Solicitud ${data.codigo} registrada exitosamente. Será notificado cuando avance el proceso de aprobación.`,
+            { title: 'Solicitud registrada', icon: 'check_circle', variant: 'success' }
+        );
+
+        // Recargar para actualizar saldos y seguimiento
+        setTimeout(() => location.reload(), 1800);
+
+    } catch (err) {
+        console.error('Error al crear solicitud:', err);
+        AppDialog.alert('Error de conexión al enviar la solicitud. Intente nuevamente.');
+    } finally {
+        confirmModalBtn.disabled = false;
+    }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  SEGUIMIENTO DE SOLICITUD
+// ══════════════════════════════════════════════════════════════
+btnTracking.addEventListener('click', () => {
+    trackingPanel.classList.toggle('show');
+    if (trackingPanel.classList.contains('show')) {
+        document.getElementById('profilePanel')?.classList.remove('show');
+        cargarSeguimiento();
+    }
+});
+
+closeTracking.addEventListener('click', () => trackingPanel.classList.remove('show'));
+
+async function cargarSeguimiento() {
+    trackingContent.innerHTML = `
+        <div class="no-request-message">
+            <i class="material-symbols-outlined">hourglass_top</i>
+            <p>Cargando seguimiento…</p>
+        </div>`;
+
+    try {
+        const resp = await fetch(URL_SEGUIMIENTO, { headers: { 'X-CSRFToken': CSRF_TOKEN } });
+        const data = await resp.json();
+
+        if (!data.tiene_solicitud) {
+            trackingContent.innerHTML = `
+                <div class="no-request-message">
+                    <i class="material-symbols-outlined">beach_access</i>
+                    <p>No tiene solicitudes de vacación registradas.</p>
+                </div>`;
+            return;
+        }
+
+        let html = `<p style="font-size:0.82em;color:#720035;font-weight:700;margin-bottom:8px">
+                        ${data.codigo} — <span style="font-weight:500">${data.estado}</span>
+                    </p>
+                    <ul class="timeline">`;
+
+        data.timeline.forEach(paso => {
+            const iconMap = { approved: 'check', rejected: 'close', pending: 'autorenew', sent: 'check', inactive: 'more_horiz' };
+            const statusText = { approved: 'APROBADO', rejected: 'RECHAZADO', pending: 'PENDIENTE', sent: 'ENVIADO', inactive: 'Esperando' };
+
+            const icon   = iconMap[paso.estado] || 'more_horiz';
+            const text   = statusText[paso.estado] || paso.estado.toUpperCase();
+            const coment = paso.comentarios
+                ? `<p class="timeline-comments">${paso.comentarios}</p>`
+                : '';
+
+            html += `
+            <li class="timeline-item">
+                <div class="timeline-icon ${paso.estado}">
+                    <i class="material-symbols-outlined">${icon}</i>
+                </div>
+                <div class="timeline-content ${paso.estado}">
+                    <p class="timeline-role">${paso.nivel}</p>
+                    <p class="timeline-name">${paso.responsable}</p>
+                    <span class="timeline-status ${paso.estado}">${text}</span>
+                    <p class="timeline-date">${paso.fecha ? formatearFecha(paso.fecha) : '--/--/----'}</p>
+                    ${coment}
+                </div>
+            </li>`;
+        });
+
+        html += '</ul>';
+        trackingContent.innerHTML = html;
+
+    } catch (err) {
+        console.error('Error al cargar seguimiento:', err);
+        trackingContent.innerHTML = `
+            <div class="no-request-message">
+                <i class="material-symbols-outlined">error</i>
+                <p>Error al cargar el seguimiento.</p>
+            </div>`;
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CAMBIO DE PERFIL — delega al componente compartido
+// ══════════════════════════════════════════════════════════════
+
+function renderizarRoles(roles, nombreCompleto) {
+    // El toggle de este módulo lo maneja el listener de btnProfile de abajo
+    // (también cierra el panel de seguimiento), así que no se llama setupProfileToggle
+    window.initProfileSwitcher?.({ roles, nombre: nombreCompleto });
+}
+
+// Toggle del perfil — cierra el panel de seguimiento si está abierto
+document.getElementById('btnProfile')?.addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('profilePanel')?.classList.toggle('show');
+    trackingPanel.classList.remove('show');
+});
+
+document.addEventListener('click', e => {
+    if (!document.querySelector('.tracking-button-container')?.contains(e.target))
+        trackingPanel.classList.remove('show');
+    if (!document.querySelector('.profile-switcher-container')?.contains(e.target))
+        document.getElementById('profilePanel')?.classList.remove('show');
+});
+
+// ══════════════════════════════════════════════════════════════
+//  MODAL — abrir / cerrar
+// ══════════════════════════════════════════════════════════════
+function mostrarModal() {
+    summaryModal.classList.add('active');
+    setTimeout(() => document.querySelector('.form-modal').classList.add('active'), 10);
+}
+
+function ocultarModal() {
+    document.querySelector('.form-modal').classList.remove('active');
+    setTimeout(() => summaryModal.classList.remove('active'), 300);
+}
+
+cancelModalBtn.addEventListener('click', ocultarModal);
+summaryModal.addEventListener('click', e => { if (e.target === summaryModal) ocultarModal(); });
+
+// ══════════════════════════════════════════════════════════════
+//  FORMATO DE FECHA
+// ══════════════════════════════════════════════════════════════
+function formatearFecha(fecha) {
+    if (!fecha) return '--/--/----';
+    let d;
+    if (typeof fecha === 'string') {
+        d = new Date(fecha + 'T00:00:00');
+    } else if (fecha instanceof Date) {
+        d = fecha;
+    } else {
+        return '--/--/----';
+    }
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = d.getFullYear();
+    return `${dd}/${mm}/${yy}`;
+}

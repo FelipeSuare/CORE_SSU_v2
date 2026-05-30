@@ -1,0 +1,127 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Solicitudes de Vacación</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/shared/profile-switcher.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vacations/Frm_Solicitud.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+<body>
+
+
+
+    <div class="main-container">
+        <div class="header-wrapper">
+            <header class="module-header">
+                <i class="material-symbols-outlined">format_list_bulleted</i>
+                <div>
+                    <h1 class="module-title">Historial de Solicitudes de Vacación</h1>
+                    <p class="module-subtitle">Revisa el estado de las solicitudes registradas</p>
+                </div>
+            </header>
+            <div class="header-actions">
+                <a href="/Index_Principal.html" class="back-to-menu">
+                    <spam><i class="material-symbols-outlined">arrow_back</i></spam>
+                    Volver
+                </a>
+
+                <div class="profile-switcher-container">
+                    <button class="btn-profile-trigger" id="btnProfile">
+                        <i class="material-symbols-outlined">account_circle</i>
+                        <span id="currentProfileText">—</span>
+                        <i class="material-symbols-outlined">expand_more</i>
+                    </button>
+                    <div class="profile-panel" id="profilePanel">
+                        <div class="profile-info">
+                            <i class="material-symbols-outlined profile-icon">account_circle</i>
+                            <div class="profile-text">
+                                <span class="profile-name" id="profileNamePanel">—</span>
+                                <span class="profile-role" id="currentRolePanel">—</span>
+                            </div>
+                        </div>
+                        <ul class="role-list" id="roleList">
+                            <!-- Roles cargados dinámicamente -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="filters-container">
+            <div class="filter-group">
+                <label for="unidadOrg">Unidad Organizacional</label>
+                <div class="select-wrapper">
+                    <select id="unidadOrg">
+                        <option value="todos">Todos</option>
+                        <option value="administrativa">Administrativa</option>
+                        <option value="salud">Salud</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label for="tipoContrato">Tipo de Contrato</label>
+                <div class="select-wrapper">
+                    <select id="tipoContrato">
+                        <option value="todos">Todos</option>
+                        <option value="item">Item</option>
+                        <option value="indefinido">Indefinido</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label for="funcionarioFilter">Funcionario</label>
+                <div class="input-wrapper">
+                    <input type="text" id="funcionarioFilter" placeholder="Buscar Funcionario...">
+                </div>
+            </div>
+
+            <div class="filter-actions">
+                <button class="btn btn-primary btn-search" id="btnFilter">
+                    <i class="material-symbols-outlined">search</i> Filtrar
+                </button>
+                <button class="btn btn-secondary btn-clear" id="btnClear">
+                    <i class="material-symbols-outlined">refresh</i> Limpiar
+                </button>
+            </div>
+        </div>
+        
+        <div class="table-card">
+            <h2 class="card-title">Solicitudes Registradas</h2>
+            
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cargo</th>
+                            <th>Fecha Solicitud</th>
+                            <th>Fecha Inicio</th>
+                            <th>Días Solicitados</th>
+                            <th>Fecha Final</th>
+                            <th>Saldo de Días Adeudados</th>
+                            <th>PDF</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vacationTableBody">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/shared/profile-switcher.js' %}"></script>
+    <script src="{% static 'js/vacations/Frm_Solicitud.js' %}"></script>
+    <script src="{% static 'js/shared/notifications.js' %}"></script>
+</body>
+</html>
+
+
+
+

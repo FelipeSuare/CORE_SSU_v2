@@ -1,0 +1,273 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aprobación de Solicitudes de Vacación</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/shared/profile-switcher.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vacations/Aprobación_Rechazo.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="header-wrapper">
+            <header class="module-header">
+                <h1 class="module-title">
+                    <i class="material-symbols-outlined">check_circle</i>
+                    Aprobación de Solicitudes de Vacación
+                </h1>
+                <!-- <p class="module-subtitle">Gestión de aprobaciones y rechazos de solicitudes vacacionales</p> -->
+            </header>
+
+            <!-- Panel de Perfil y Roles -->
+            <div class="header-actions">
+                <a href="/Index_Principal.html" class="back-to-menu">
+                    <i class="material-symbols-outlined">arrow_back</i>
+                    Volver
+                </a>
+                <div class="profile-switcher-container">
+                    <button class="btn-profile-trigger" id="btnProfile">
+                        <i class="material-symbols-outlined">account_circle</i>
+                        <span id="currentProfileText">—</span>
+                        <i class="material-symbols-outlined">expand_more</i>
+                    </button>
+                    <div class="profile-panel" id="profilePanel">
+                        <div class="profile-info">
+                            <i class="material-symbols-outlined profile-icon">account_circle</i>
+                            <div class="profile-text">
+                                <span class="profile-name" id="profileNamePanel">—</span>
+                                <span class="profile-role" id="currentRolePanel">—</span>
+                            </div>
+                        </div>
+                        <ul class="role-list" id="roleList">
+                            <!-- Roles cargados dinámicamente -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Filtros -->
+        <div class="filters-container">
+            <div class="filter-group">
+                <label for="funcionarioFilter">Funcionario</label>
+                <div class="input-wrapper">
+                    <input type="text" id="funcionarioFilter" placeholder="Buscar por nombre...">
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label for="fechaDesde">Fecha Desde</label>
+                <div class="input-wrapper">
+                    <input type="date" id="fechaDesde">
+                </div>
+            </div>
+
+            <div class="filter-actions">
+                <button class="btn btn-primary" id="btnFiltrar">
+                    <i class="material-symbols-outlined">filter_alt</i> Filtrar
+                </button>
+                <button class="btn btn-secondary" id="btnLimpiar">
+                    <i class="material-symbols-outlined">refresh</i> Limpiar
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabla de Solicitudes -->
+        <div class="table-card">
+            <div class="card-header-flex">
+                <h2 class="card-title">Solicitudes Pendientes de Aprobación</h2>
+                <div class="stats-badges">
+                    <span class="stat-badge stat-pending">
+                        <i class="material-symbols-outlined">schedule</i>
+                        <span id="countPendientes">0</span> Pendientes
+                    </span>
+                    <span class="stat-badge stat-approved">
+                        <i class="material-symbols-outlined">check_circle</i>
+                        <span id="countAprobadas">0</span> Aprobadas
+                    </span>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Funcionario</th>
+                            <th>Cargo</th>
+                            <th>Fecha Solicitud</th>
+                            <th>Período Vacacional</th>
+                            <th>Días</th>
+                            <th>Estado</th>
+                            <th>Flujo</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="solicitudesTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Modal de Aprobación/Rechazo -->
+        <div id="modalAprobacion" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>
+                        <i class="material-symbols-outlined">task</i>
+                        Revisar Solicitud de Vacación
+                    </h2>
+                    <button class="close-modal" id="btnCerrarModal">
+                        <i class="material-symbols-outlined">close</i>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Información del Funcionario -->
+                    <div class="info-section">
+                        <h3 class="subsection-title">Datos del Funcionario</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Funcionario:</span>
+                                <span class="info-value" id="modalFuncionario">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Cargo:</span>
+                                <span class="info-value" id="modalCargo">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Unidad Organizacional:</span>
+                                <span class="info-value" id="modalUnidad">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Tipo de Contrato:</span>
+                                <span class="info-value" id="modalContrato">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Información de la Solicitud -->
+                    <div class="info-section">
+                        <h3 class="subsection-title">Detalles de la Solicitud</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Fecha de Solicitud:</span>
+                                <span class="info-value" id="modalFechaSolicitud">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Fecha de Inicio:</span>
+                                <span class="info-value" id="modalFechaInicio">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Fecha de Final:</span>
+                                <span class="info-value" id="modalFechaFinal">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Días Solicitados:</span>
+                                <span class="info-value highlight" id="modalDias">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Saldo Disponible:</span>
+                                <span class="info-value" id="modalSaldo">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Saldo Después:</span>
+                                <span class="info-value" id="modalSaldoDespues">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Flujo de Aprobación -->
+                    <div class="info-section">
+                        <h3 class="subsection-title">Flujo de Aprobación</h3>
+                        <div class="approval-flow" id="flujoAprobacion">
+                            <!-- Se llena dinámicamente -->
+                        </div>
+                    </div>
+
+                    <!-- Observaciones del Solicitante -->
+                    <div class="info-section">
+                        <h3 class="subsection-title">Observaciones del Solicitante</h3>
+                        <div class="observation-box">
+                            <p id="modalObservaciones">Sin observaciones</p>
+                        </div>
+                    </div>
+
+                    <!-- Formulario de Decisión -->
+                    <div class="form-section decision-section">
+                        <h3 class="subsection-title">Tu Decisión</h3>
+                        
+                        <div class="decision-buttons">
+                            <button class="btn-decision btn-approve" id="btnAprobar">
+                                <i class="material-symbols-outlined">check_circle</i>
+                                <span>Aprobar Solicitud</span>
+                            </button>
+                            <button class="btn-decision btn-reject" id="btnRechazar">
+                                <i class="material-symbols-outlined">cancel</i>
+                                <span>Rechazar Solicitud</span>
+                            </button>
+                        </div>
+
+                        <div class="form-group" id="comentariosGroup">
+                            <label for="comentarios">Comentarios <span class="optional">(Opcional para aprobación, Obligatorio para rechazo)</span></label>
+                            <div class="textarea-wrapper">
+                                <textarea id="comentarios" rows="4" placeholder="Ingrese comentarios sobre su decisión..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="btnCancelar">
+                        <i class="material-symbols-outlined">close</i> Cancelar
+                    </button>
+                    <button class="btn btn-success" id="btnConfirmarAprobacion" style="display: none;">
+                        <i class="material-symbols-outlined">check</i> Confirmar Aprobación
+                    </button>
+                    <button class="btn btn-danger" id="btnConfirmarRechazo" style="display: none;">
+                        <i class="material-symbols-outlined">block</i> Confirmar Rechazo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Confirmación -->
+        <div id="modalConfirmacion" class="modal">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2 id="confirmTitulo">
+                        <i class="material-symbols-outlined">help</i>
+                        Confirmar Acción
+                    </h2>
+                </div>
+                <div class="modal-body">
+                    <p class="confirmation-text" id="confirmMensaje">¿Está seguro de realizar esta acción?</p>
+                    <div class="confirmation-details" id="confirmDetalles">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="btnCancelarConfirmacion">
+                        No, cancelar
+                    </button>
+                    <button class="btn btn-primary" id="btnConfirmarFinal">
+                        Sí, confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/shared/profile-switcher.js' %}"></script>
+    <script src="{% static 'js/vacations/Aprobación_Rechazo.js' %}"></script>
+    <script src="{% static 'js/shared/notifications.js' %}"></script>
+</body>
+</html>
+
+
+
+

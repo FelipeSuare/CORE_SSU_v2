@@ -1,0 +1,142 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte General de Vacaciones</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/reports/ReporteG.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+<body>
+
+<a href="/Index_Principal.html" class="back-to-menu">
+    <spam><i class="material-symbols-outlined">arrow_back</i></spam>
+    Volver
+</a>
+
+    <div class="main-container">
+
+        <!-- HEADER -->
+        <header class="module-header">
+            <h1 class="module-title">
+                <i class="material-symbols-outlined">description</i>
+                Reporte General
+            </h1>
+        </header>
+
+        <!-- FILTROS -->
+        <div class="filters-container">
+            <div class="filter-group">
+                <label for="tipoContrato">Tipo Contrato</label>
+                <div class="select-wrapper">
+                    <select id="tipoContrato">
+                        <option value="">Todos</option>
+                        <option value="Item">Ítem</option>
+                        <option value="Indefinido">Contrato Indefinido</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label for="area">Área</label>
+                <div class="select-wrapper">
+                    <select id="area">
+                        <option value="">Todas</option>
+                        <option value="Salud">Salud</option>
+                        <option value="Administrativa">Administrativa</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-group" id="grupoAnioRef">
+                <label for="anioRef">Año de referencia</label>
+                <div class="input-action-wrapper">
+                    <div class="input-wrapper">
+                        <input type="number" id="anioRef" placeholder="Ej: 2022" min="2000" max="2099">
+                    </div>
+                    <button class="btn btn-primary" id="btnAnio" title="Aplicar año">
+                        <i class="material-symbols-outlined">event_available</i>
+                    </button>
+                </div>
+            </div>
+            <div class="filter-group" id="grupoGestionUnica" style="display:none">
+                <label for="anioUnico">Gestión específica</label>
+                <div class="input-action-wrapper">
+                    <div class="input-wrapper">
+                        <input type="number" id="anioUnico" placeholder="Ej: 2024" min="2000" max="2099">
+                    </div>
+                    <button class="btn btn-primary" id="btnAnioUnico" title="Aplicar gestión">
+                        <i class="material-symbols-outlined">event_available</i>
+                    </button>
+                </div>
+            </div>
+            <div class="filter-group wide">
+                <label for="funcionario">Buscar Funcionario</label>
+                <div class="input-action-wrapper">
+                    <div class="input-wrapper">
+                        <input type="text" id="funcionario" placeholder="Buscar por nombre...">
+                    </div>
+                    <button class="btn btn-primary" id="btnBuscar">
+                        <i class="material-symbols-outlined">search</i> BUSCAR
+                    </button>
+                    <button class="btn btn-secondary" id="btnLimpiar" title="Limpiar filtros">
+                        <i class="material-symbols-outlined">refresh</i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLA PRINCIPAL -->
+        <div class="table-card">
+            <div class="table-card-header">
+                <div class="card-title-block">
+                    <h2 class="card-title">Vacación General SSU</h2>
+                    <span class="card-subtitle" id="totalFuncionarios">0 funcionarios</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggleGestionUnica">
+                        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        <span class="toggle-text">Gestión única</span>
+                    </label>
+                    <button class="btn btn-download" id="btnExportarPDF">
+                        <i class="material-symbols-outlined">picture_as_pdf</i> Exportar PDF
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="tablaReporte">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" class="th-fixed">Apellidos y Nombres</th>
+                            <th rowspan="2" class="th-fixed">Cargo</th>
+                            <th rowspan="2" class="th-fixed">Fecha<br>Ingreso</th>
+                            <th rowspan="2" class="th-fixed">Contrato</th>
+                            <th rowspan="2" class="th-fixed">Área</th>
+                            <th colspan="4" class="th-group-label">Días Pendientes por Gestión</th>
+                            <th rowspan="2" class="th-fixed">Días<br>Disponibles</th>
+                        </tr>
+                        <tr>
+                            <th id="thG1" class="th-gestion">—</th>
+                            <th id="thG2" class="th-gestion">—</th>
+                            <th id="thG3" class="th-gestion">—</th>
+                            <th id="thG4" class="th-gestion">—</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/reports/ReporteG.js' %}"></script>
+    <script src="{% static 'js/shared/notifications.js' %}"></script>
+</body>
+</html>
+
+
+
+
+

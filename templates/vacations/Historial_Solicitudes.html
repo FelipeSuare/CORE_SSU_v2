@@ -1,0 +1,131 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Solicitudes de Vacaciones</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/shared/profile-switcher.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vacations/Historial_Solicitudes.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+<body>
+
+    <div class="main-container">
+        <!-- HEADER -->
+        <div class="header-wrapper">
+            <header class="module-header">
+                <h1 class="module-title">
+                    <i class="material-symbols-outlined">description</i>
+                    Mis Solicitudes
+                </h1>
+            </header>
+            <div class="header-actions">
+                <a href="/Index_Principal.html" class="back-to-menu">
+                    <i class="material-symbols-outlined">arrow_back</i>
+                    Volver
+                </a>
+
+                <div class="profile-switcher-container">
+                    <button class="btn-profile-trigger" id="btnProfile">
+                        <i class="material-symbols-outlined">account_circle</i>
+                        <span id="currentProfileText">—</span>
+                        <i class="material-symbols-outlined">expand_more</i>
+                    </button>
+                    <div class="profile-panel" id="profilePanel">
+                        <div class="profile-info">
+                            <i class="material-symbols-outlined profile-icon">account_circle</i>
+                            <div class="profile-text">
+                                <span class="profile-name" id="profileNamePanel">—</span>
+                                <span class="profile-role" id="currentRolePanel">—</span>
+                            </div>
+                        </div>
+                        <ul class="role-list" id="roleList">
+                            <!-- Roles cargados dinámicamente -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD PRINCIPAL -->
+        <div class="table-card">
+
+            <!-- HEADER DEL CARD: título + resumen inline + botón exportar -->
+            <div class="table-card-header">
+                <div class="card-left">
+                    <div class="card-title-block">
+                        <h2 class="card-title">Historial de Solicitudes</h2>
+                        <span class="card-subtitle" id="subtituloResumen">cargando...</span>
+                    </div>
+                </div>
+                <div class="card-right">
+                    <button class="btn btn-download" onclick="generarPlanillaPDF()">
+                        <i class="material-symbols-outlined">picture_as_pdf</i> Exportar PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- TABS -->
+            <div class="tabs-container">
+                <button class="tab active" onclick="cambiarTab(this, 'todas')">
+                    <i class="material-symbols-outlined">list</i> Todas
+                    <span class="tab-badge" id="countTodas">0</span>
+                </button>
+                <button class="tab" onclick="cambiarTab(this, 'aprobada')">
+                    <i class="material-symbols-outlined">check_circle</i> Aprobadas
+                    <span class="tab-badge" id="countAprobadas">0</span>
+                </button>
+                <button class="tab" onclick="cambiarTab(this, 'rechazada')">
+                    <i class="material-symbols-outlined">cancel</i> Rechazadas
+                    <span class="tab-badge" id="countRechazadas">0</span>
+                </button>
+                <button class="tab" onclick="cambiarTab(this, 'pendiente')">
+                    <i class="material-symbols-outlined">schedule</i> Pendientes
+                    <span class="tab-badge" id="countPendientes">0</span>
+                </button>
+
+                <!-- Búsqueda alineada a la derecha dentro de los tabs -->
+                <div class="tabs-search">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Buscar...">
+                        <button class="btn-search"><i class="material-symbols-outlined">search</i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABLA -->
+            <div class="table-responsive">
+                <table id="solicitudesTable">
+                    <thead>
+                        <tr>
+                            <th>Fecha Solicitud</th>
+                            <th>Periodo</th>
+                            <th>Días</th>
+                            <th>Motivo</th>
+                            <th>Estado</th>
+                            <th>Nivel 1<br><small>Jefe de Área</small></th>
+                            <th>Nivel 2<br><small>Gte. Adm./Salud</small></th>
+                            <th>Nivel 3<br><small>Gerente General</small></th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="solicitudesBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/shared/profile-switcher.js' %}"></script>
+    <script src="{% static 'js/vacations/Historial_Solicitudes.js' %}"></script>
+    <script src="{% static 'js/shared/notifications.js' %}"></script>
+</body>
+</html>
+
+
+
+
+

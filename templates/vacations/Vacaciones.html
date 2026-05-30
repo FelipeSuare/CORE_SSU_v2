@@ -1,0 +1,266 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitud de Vacaciones</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/shared/profile-switcher.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vacations/Vacaciones.css' %}">
+    <style>
+        /* Estilos adicionales para el textarea del motivo */
+        .textarea-wrapper {
+            border: 1px solid var(--color-pink-dark);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 0;
+            transition: border-color 0.3s;
+        }
+
+        .textarea-wrapper:focus-within {
+            border-color: var(--color-purple-dark);
+        }
+
+        .textarea-wrapper textarea {
+            border: none;
+            outline: none;
+            width: 100%;
+            padding: 12px 15px;
+            background: transparent;
+            color: var(--color-pink-dark);
+            font-size: 1em;
+            font-weight: 500;
+            font-family: 'Montserrat', sans-serif;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .textarea-wrapper textarea::placeholder {
+            color: rgba(114, 0, 53, 0.5);
+        }
+
+        /* Estilos para el motivo en el resumen del modal */
+        .summary-item.motivo-summary {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .summary-item.motivo-summary label {
+            font-size: 1em;
+        }
+
+        .summary-item.motivo-summary span {
+            text-align: left !important;
+            font-size: 0.95em !important;
+            line-height: 1.5;
+            font-weight: 500 !important;
+            color: var(--color-purple-dark) !important;
+        }
+    </style>
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="header-wrapper">
+            <header class="module-header">
+                <h1 class="module-title">
+                    <i class="material-symbols-outlined">beach_access</i> Solicitud de Vacaciones
+                </h1>
+                <!-- <p class="module-subtitle">Gestiona y registra las solicitudes de vacaciones del personal</p> -->
+            </header>
+
+            <div class="header-actions">
+                <a href="/Index_Principal.html" class="back-to-menu">
+                    <spam><i class="material-symbols-outlined">arrow_back</i></spam>
+                    Volver
+                </a>
+                <div class="profile-switcher-container">
+                    <button class="btn-profile-trigger" id="btnProfile">
+                        <i class="material-symbols-outlined">account_circle</i>
+                        <span id="currentProfileText">—</span>
+                        <i class="material-symbols-outlined">expand_more</i>
+                    </button>
+                    <div class="profile-panel" id="profilePanel">
+                        <div class="profile-info">
+                            <i class="material-symbols-outlined profile-icon">account_circle</i>
+                            <div class="profile-text">
+                                <span class="profile-name" id="profileNamePanel">Cargando…</span>
+                                <span class="profile-role" id="currentRolePanel">—</span>
+                            </div>
+                        </div>
+                        <ul class="role-list" id="roleList">
+                            <!-- Roles cargados dinámicamente según BD -->
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="tracking-button-container">
+                    <button class="btn-tracking" id="btnTracking">
+                        <i class="material-symbols-outlined">route</i> Seguimiento
+                    </button>
+                    <div class="tracking-panel" id="trackingPanel">
+                        <div class="tracking-header">
+                            <h3> <i class="material-symbols-outlined">checklist</i> Progreso de la Solicitud </h3>
+                            <button class="close-tracking" id="closeTracking"> <i class="material-symbols-outlined">close</i> </button>
+                        </div>
+                        <div class="tracking-content" id="trackingContent">
+                            </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="content-wrapper">
+            <div class="new-holiday-card">
+                <h2 class="card-title">Nueva Solicitud</h2>
+                <p class="request-id">Cod. Solicitud / <span id="requestIdDisplay">G001</span></p>
+                <form id="vacationRequestForm">
+                    <div class="form-group">
+                        <label for="tipoContrato">Tipo Contrato</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="tipoContrato" readonly>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="funcionario">Funcionario</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="funcionario" readonly>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fechaIngreso">Fecha Ingreso</label>
+                            <div class="input-wrapper">
+                                <input type="date" id="fechaIngreso" required readonly>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="fechaSolicitud">Fecha Solicitud</label>
+                            <div class="input-wrapper">
+                                <input type="date" id="fechaSolicitud" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fechaSalida">Fecha salida</label>
+                            <div class="input-wrapper">
+                                <input type="date" id="fechaSalida" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="diasTomar">Días a tomar</label>
+                            <div class="input-wrapper">
+                                <input type="number" id="diasTomar" placeholder="0" min="1" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="fechaRetorno">Fecha Retorno</label>
+                        <div class="input-wrapper">
+                            <input type="date" id="fechaRetorno" readonly>
+                        </div>
+                    </div>
+                    
+                    <!-- NUEVO: Campo de Motivo de Vacación -->
+                    <div class="form-group">
+                        <label for="motivoVacacion">
+                            <i class="material-symbols-outlined">comment</i> Motivo de la Vacación
+                        </label>
+                        <div class="textarea-wrapper">
+                            <textarea id="motivoVacacion" rows="3" placeholder="Describa el motivo de su solicitud de vacación..." required></textarea>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full-width height-40">
+                        <i class="material-symbols-outlined">arrow_forward</i> Siguiente
+                    </button>
+                </form>
+            </div>
+            <div class="registered-holidays-card info-panel">
+                <div class="info-section saldos-section">
+                    <h3 class="info-title">
+                        <i class="material-symbols-outlined">event_available</i> Saldos de Vacación
+                    </h3>
+                    <div id="saldosContainer">
+                        <div class="saldo-card">
+                            <div class="saldo-label">GESTIÃ“N 2026</div>
+                            <div class="saldo-value">0 <span>días</span></div>
+                        </div>
+                        <div class="saldo-card">
+                            <div class="saldo-label">GESTIÃ“N 2025</div>
+                            <div class="saldo-value">0 <span>días</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="info-section notification-section">
+                    <h3 class="notification-title">
+                        <i class="material-symbols-outlined">notifications</i> Notificación de Vacaciones
+                    </h3>
+                    <p class="notification-message" id="notificationMessage">
+                        No hay alertas de vacaciones acumuladas.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="summaryModal">
+        <div class="form-modal">
+            <h2 class="modal-title">
+                <i class="material-symbols-outlined">description</i> Resumen de Solicitud
+            </h2>
+            <div class="modal-form-content">
+                <div class="summary-item">
+                    <label>Días no hábiles:</label>
+                    <span id="summaryDiasNoHabiles">0</span>
+                </div>
+                <div class="summary-item">
+                    <label>Días cumpleaños:</label>
+                    <span id="summaryDiasCumpleanos">0</span>
+                </div>
+                <div class="summary-item">
+                    <label>Días festivos:</label>
+                    <span id="summaryDiasFestivos">0</span>
+                </div>
+                <div class="summary-item">
+                    <label>Fecha conclusión de la vacación:</label>
+                    <span id="summaryFechaConclusión">--/--/----</span>
+                </div>
+                <div class="summary-item highlight">
+                    <label>Saldo días:</label>
+                    <span id="summarySaldoDias">0</span>
+                </div>
+                
+                <!-- NUEVO: Mostrar el motivo en el resumen -->
+                <div class="summary-item motivo-summary">
+                    <label>Motivo:</label>
+                    <span id="summaryMotivo" style="text-align: right; font-size: 0.95em; line-height: 1.4;">-</span>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-cancel" id="cancelModalBtn">
+                    <i class="material-symbols-outlined">close</i> Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="confirmModalBtn">
+                    <i class="material-symbols-outlined">send</i> Enviar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/shared/profile-switcher.js' %}"></script>
+    <script src="{% static 'js/vacations/Vacaciones.js' %}"></script>
+    <script src="{% static 'js/shared/notifications.js' %}"></script>
+</body>
+</html>
+
+
+
+

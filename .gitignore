@@ -1,0 +1,41 @@
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# Variables de entorno (contiene credenciales de BD)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# Archivos de sesión Claude (memoria local, no va al repo)
+.claude/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Distribución / empaquetado
+dist/
+build/
+*.egg-info/

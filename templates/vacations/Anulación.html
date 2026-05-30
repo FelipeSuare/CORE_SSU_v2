@@ -1,0 +1,273 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anulación y Ajustes de Vacaciones</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/shared/profile-switcher.css' %}">
+    <link rel="stylesheet" href="{% static 'css/vacations/Anulación.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+<body>
+
+
+
+<div class="main-container">
+    
+        <div class="header-wrapper">
+            <header class="module-header">
+                <h1 class="module-title">
+                    <i class="material-symbols-outlined">block</i>
+                    Anulación y Ajustes de Vacaciones
+                </h1>
+            </header>
+            <div class="header-actions">
+                <a href="/Index_Principal.html" class="back-to-menu">
+                    <i class="material-symbols-outlined">arrow_back</i>
+                    Volver
+                </a>
+
+                <div class="profile-switcher-container">
+                    <button class="btn-profile-trigger" id="btnProfile">
+                        <i class="material-symbols-outlined">account_circle</i>
+                        <span id="currentProfileText">—</span>
+                        <i class="material-symbols-outlined">expand_more</i>
+                    </button>
+                    <div class="profile-panel" id="profilePanel">
+                        <div class="profile-info">
+                            <i class="material-symbols-outlined profile-icon">account_circle</i>
+                            <div class="profile-text">
+                                <span class="profile-name" id="profileNamePanel">—</span>
+                                <span class="profile-role" id="currentRolePanel">—</span>
+                            </div>
+                        </div>
+                        <ul class="role-list" id="roleList">
+                            <!-- Roles cargados dinámicamente -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Búsqueda de Solicitudes -->
+        <div class="search-container">
+            <h2 class="section-title">
+                <i class="material-symbols-outlined">search</i>
+                Buscar Solicitud de Vacación
+            </h2>
+            
+            <div class="search-filters">
+                <div class="filter-group">
+                    <label for="funcionarioSearch">Funcionario</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="funcionarioSearch" placeholder="Nombre del funcionario...">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label for="fechaDesde">Fecha Desde</label>
+                    <div class="input-wrapper">
+                        <input type="date" id="fechaDesde">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label for="fechaHasta">Fecha Hasta</label>
+                    <div class="input-wrapper">
+                        <input type="date" id="fechaHasta">
+                    </div>
+                </div>
+
+                <div class="filter-actions min-height-45">
+                    <button class="btn btn-primary" id="btnBuscar">
+                        <i class="material-symbols-outlined">search</i> Buscar
+                    </button>
+                    <button class="btn btn-secondary" id="btnLimpiarBusqueda">
+                        <i class="material-symbols-outlined">refresh</i> Limpiar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla de Resultados -->
+        <div class="table-card">
+            <h2 class="card-title">Solicitudes Encontradas</h2>
+            
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Funcionario</th>
+                            <th>Cargo</th>
+                            <th>Fecha Inicio</th>
+                            <th>Fecha Final</th>
+                            <th>Días Totales</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="solicitudesTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Modal de Anulación/Ajuste -->
+        <div id="modalAnulacion" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>
+                        <i class="material-symbols-outlined">edit</i>
+                        Anulación y Ajuste de Vacación
+                    </h2>
+                    <button class="close-modal" id="btnCerrarModal">
+                        <i class="material-symbols-outlined">close</i>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Información de la Solicitud -->
+                    <div class="info-section">
+                        <h3 class="subsection-title">Información de la Solicitud</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Funcionario:</span>
+                                <span class="info-value" id="modalFuncionario">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Cargo:</span>
+                                <span class="info-value" id="modalCargo">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Fecha Inicio:</span>
+                                <span class="info-value" id="modalFechaInicio">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Fecha Final:</span>
+                                <span class="info-value" id="modalFechaFinal">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Días Totales:</span>
+                                <span class="info-value" id="modalDiasTotales">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Saldo Actual:</span>
+                                <span class="info-value" id="modalSaldoActual">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Formulario de Anulación -->
+                    <div class="form-section">
+                        <h3 class="subsection-title">Datos de Anulación/Ajuste</h3>
+                        
+                        <div class="form-group">
+                            <label for="tipoAnulacion">Tipo de Anulación *</label>
+                            <div class="select-wrapper">
+                                <select id="tipoAnulacion" required>
+                                    <option value="">Seleccione una opción</option>
+                                    <option value="total">Anulación Total</option>
+                                    <option value="parcial">Anulación Parcial</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="diasAnularGroup" style="display: none;">
+                            <label for="diasAnular">Días a Anular *</label>
+                            <div class="input-wrapper">
+                                <input type="number" id="diasAnular" min="1" placeholder="Número de días">
+                            </div>
+                            <span class="help-text">Máximo: <span id="maxDiasAnular">0</span> días</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="motivoAnulacion">Motivo de la Anulación *</label>
+                            <div class="select-wrapper">
+                                <select id="motivoAnulacion" required>
+                                    <option value="">Seleccione un motivo</option>
+                                    <option value="emergencia_familiar">Emergencia Familiar</option>
+                                    <option value="situacion_laboral">Situación Laboral Urgente</option>
+                                    <option value="emergencia_institucional">Emergencia Institucional</option>
+                                    <option value="solicitud_empleado">Solicitud del Empleado</option>
+                                    <option value="error_registro">Error en Registro</option>
+                                    <option value="otro">Otro</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="observaciones">Observaciones *</label>
+                            <div class="textarea-wrapper">
+                                <textarea id="observaciones" rows="4" placeholder="Describa detalladamente el motivo de la anulación..." required></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Resumen de Ajuste -->
+                        <div class="adjustment-summary">
+                            <h4>Resumen del Ajuste</h4>
+                            <div class="summary-grid">
+                                <div class="summary-item">
+                                    <span class="summary-label">Días a devolver:</span>
+                                    <span class="summary-value highlight" id="diasDevolver">0</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">Nuevo saldo:</span>
+                                    <span class="summary-value highlight-green" id="nuevoSaldo">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-cancel" id="btnCancelar">
+                        <i class="material-symbols-outlined">close</i> Cancelar
+                    </button>
+                    <button class="btn btn-primary-2" id="btnConfirmarAnulacion">
+                        <i class="material-symbols-outlined">check</i> Confirmar Anulación
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Confirmación -->
+        <div id="modalConfirmacion" class="modal">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>
+                        <i class="material-symbols-outlined">warning</i>
+                        Confirmar Operación
+                    </h2>
+                </div>
+                <div class="modal-body">
+                    <p class="confirmation-text">¿Está seguro de realizar esta anulación? Esta acción no se puede deshacer.</p>
+                    <div class="confirmation-details">
+                        <p><strong>Tipo:</strong> <span id="confirmTipo">-</span></p>
+                        <p><strong>Días a devolver:</strong> <span id="confirmDias">-</span></p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="btnCancelarConfirmacion">
+                        No, cancelar
+                    </button>
+                    <button class="btn btn-danger" id="btnConfirmarFinal">
+                        Sí, confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/shared/profile-switcher.js' %}"></script>
+    <script src="{% static 'js/vacations/Anulación.js' %}"></script>
+    <script src="{% static 'js/shared/notifications.js' %}"></script>
+</body>
+</html>
+
+
+
+

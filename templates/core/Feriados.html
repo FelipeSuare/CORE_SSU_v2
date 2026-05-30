@@ -1,0 +1,209 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Feriados</title>
+
+    <!-- URLs y CSRF para el JS del módulo -->
+    <meta name="csrf-token"       content="{{ csrf_token }}">
+    <meta name="url-lista"        content="{% url 'feriados_lista' %}">
+    <meta name="url-agregar"      content="{% url 'feriados_agregar' %}">
+    <meta name="url-base-feriado" content="/feriados/">
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/shared/profile-switcher.css' %}">
+    <link rel="stylesheet" href="{% static 'css/core/Feriados.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+<body>
+
+    
+<div class="main-container">
+
+    <div class="header-wrapper">
+        <header class="module-header">
+            <h1 class="module-title">
+                <i class="material-symbols-outlined">calendar_month</i> Gestión de Feriados
+            </h1>
+        </header>
+        <div class="header-actions">
+            <a href="/Index_Principal.html" class="back-to-menu">
+                <i class="material-symbols-outlined">arrow_back</i>
+                Volver
+            </a>
+            <div class="profile-switcher-container">
+                <button class="btn-profile-trigger" id="btnProfile">
+                    <i class="material-symbols-outlined">account_circle</i>
+                    <span id="currentProfileText">—</span>
+                    <i class="material-symbols-outlined">expand_more</i>
+                </button>
+                <div class="profile-panel" id="profilePanel">
+                    <div class="profile-info">
+                        <i class="material-symbols-outlined profile-icon">account_circle</i>
+                        <div class="profile-text">
+                            <span class="profile-name" id="profileNamePanel">—</span>
+                            <span class="profile-role" id="currentRolePanel">—</span>
+                        </div>
+                    </div>
+                    <ul class="role-list" id="roleList">
+                        <!-- Roles cargados dinámicamente -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-wrapper">
+
+        <!-- ═══ FORMULARIO NUEVO FERIADO ═══ -->
+        <div class="new-holiday-card">
+            <h2 class="card-title">Nuevo Feriado</h2>
+            <form id="newHolidayForm">
+                <div class="form-group">
+                    <label for="holidayDate">Fecha:</label>
+                    <div class="input-wrapper">
+                        <input type="date" id="holidayDate" name="holidayDate" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="holidayDescription">Descripción:</label>
+                    <textarea id="holidayDescription" name="holidayDescription" rows="4"
+                              placeholder="Ej. Año Nuevo, Día del Trabajador" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="holidayType">Tipo:</label>
+                    <div class="input-wrapper select-wrapper">
+                        <select id="holidayType" name="holidayType" required>
+                            <option value="" disabled selected>Seleccione un tipo</option>
+                            {% for tipo in tipos %}
+                            <option value="{{ tipo }}">{{ tipo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full-width border-radius-10">
+                    <i class="material-symbols-outlined">add_circle</i> Agregar Feriado
+                </button>
+            </form>
+        </div>
+
+        <!-- ═══ TABLA FERIADOS REGISTRADOS ═══ -->
+        <div class="registered-holidays-card table-panel">
+            <div class="table-header">
+                <h2 class="card-title">Feriados Registrados</h2>
+            </div>
+
+            <div class="filter-controls">
+                <div class="filter-group">
+                    <label for="searchYear">Año:</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="searchYear"
+                               value="{{ anio_actual }}" min="2000" max="2100">
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label for="searchType">Tipo:</label>
+                    <div class="input-wrapper select-wrapper">
+                        <select id="searchType">
+                            <option value="Todos">Todos</option>
+                            {% for tipo in tipos %}
+                            <option value="{{ tipo }}">{{ tipo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-search" id="btnBuscar">Buscar</button>
+            </div>
+
+            <div class="table-wrapper">
+                <table id="holidaysTable">
+                    <thead>
+                        <tr>
+                            <th>N°</th>
+                            <th>Fecha</th>
+                            <th>Descripción</th>
+                            <th>Tipo</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="holidaysTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ MODAL EDITAR ═══ -->
+<div id="modalOverlay" class="modal-overlay">
+    <div id="formModal" class="form-modal">
+        <h2 class="modal-title">
+            <i class="material-symbols-outlined">event</i> Editar Feriado
+        </h2>
+        <form id="modalForm">
+            <input type="hidden" id="holidayId">
+            <div class="modal-form-content">
+                <div class="form-group">
+                    <label for="modalDate">Fecha:</label>
+                    <div class="input-wrapper">
+                        <i class="material-symbols-outlined">calendar_month</i>
+                        <input type="date" id="modalDate" name="modalDate" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="modalType">Tipo:</label>
+                    <div class="input-wrapper select-wrapper">
+                        <select id="modalType" name="modalType" required>
+                            <option value="" disabled>Seleccione un tipo</option>
+                            {% for tipo in tipos %}
+                            <option value="{{ tipo }}">{{ tipo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="modalDescription">Descripción:</label>
+                    <textarea id="modalDescription" name="modalDescription"
+                              rows="3" placeholder="Ej. Día del niño" required></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-cancel" id="closeModalBtn">
+                    <i class="material-symbols-outlined">close</i> Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary" id="saveModalBtn">
+                    <i class="material-symbols-outlined">save</i> Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ═══ MODAL CONFIRMAR ELIMINACIÓN ═══ -->
+<div id="modalConfirm" class="modal-overlay">
+    <div id="confirmModal" class="form-modal">
+        <h2 class="modal-title">
+            <i class="material-symbols-outlined">help</i> Confirmar Eliminación
+        </h2>
+        <p>¿Está seguro de que desea eliminar este feriado?</p>
+        <div class="form-actions">
+            <button type="button" class="btn btn-cancel" id="cancelDeleteBtn">
+                <i class="material-symbols-outlined">close</i> Cancelar
+            </button>
+            <button type="button" class="btn btn-delete" id="confirmDeleteBtn">
+                <i class="material-symbols-outlined">delete</i> Eliminar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'js/shared/notifications.js' %}"></script>
+<script src="{% static 'js/shared/profile-switcher.js' %}"></script>
+<script src="{% static 'js/core/Feriados.js' %}"></script>
+</body>
+</html>

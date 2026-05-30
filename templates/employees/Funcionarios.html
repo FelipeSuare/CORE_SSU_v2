@@ -1,0 +1,235 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Funcionarios - SSU UAB</title>
+
+    <meta name="csrf-token"            content="{{ csrf_token }}">
+    <meta name="url-lista"             content="{% url 'funcionarios_lista' %}">
+    <meta name="url-aprobadores"       content="{% url 'funcionarios_aprobadores' %}">
+    <meta name="url-nuevo"             content="{% url 'funcionarios_nuevo' %}">
+    <meta name="url-exportar"          content="{% url 'funcionarios_exportar' %}">
+    <meta name="url-base-funcionario"  content="/funcionarios/">
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/employees/Funcionarios.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+<body>
+
+<a href="/Index_Principal.html" class="back-to-menu">
+    <i class="material-symbols-outlined">arrow_back</i>
+    Volver
+</a>
+
+    <div class="main-container">
+        <div class="header">
+            <div class="header-left">
+                <span class="header-icon">
+                    <spam class="material-symbols-outlined">groups</spam>
+                </span>
+                <div class="header-text">
+                    <h1>Gestión de Funcionarios</h1>
+                    <p>Administración integral del personal institucional - SSU UAB</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="exportarDatos()"><i class="material-symbols-outlined">download</i> Exportar</button>
+                <button class="btn btn-primary" onclick="mostrarFormulario()"><i class="material-symbols-outlined">add</i> Nuevo Funcionario</button>
+            </div>
+        </div>
+
+        <div class="content-wrapper">
+            <div class="tabs-container">
+                <button class="tab active" onclick="cambiarTab('activo')">
+                    <i class="material-symbols-outlined">person_check</i> Personal Activo <span class="tab-badge" id="countActivo">0</span>
+                </button>
+                <button class="tab" onclick="cambiarTab('inactivo')">
+                    <i class="material-symbols-outlined">person_off</i> Personal Inactivo <span class="tab-badge" id="countInactivo">0</span>
+                </button>
+            </div>
+            <div class="table-panel">
+                <div class="table-header">
+                    <h2><i class="material-symbols-outlined">list</i> Lista de Funcionarios</h2>
+                    <div class="search-box">
+                        <input type="text" id="searchInput" placeholder="Buscar por nombre, CI o cargo...">
+                        <button class="btn-search" onclick="filtrarTabla()"><i class="material-symbols-outlined">search</i></button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table id="funcionariosTable">
+                        <thead>
+                            <tr>
+                                <th>CI</th>
+                                <th>NOMBRES Y CARGO</th>
+                                <th>UNIDAD</th>
+                                <th>FECHA<br>INGRESO</th>
+                                <th>ANTIGÜEDAD</th>
+                                <th>TIPO DE<br>FUNCIONARIO</th>
+                                <th>ROLES EN<br>EL SISTEMA</th>
+                                <th>ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody id="funcionariosBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="formOverlay">
+        <div class="form-modal" id="formPanel">
+            <button type="button" class="btn btn-cancel position-relative margin-left-a pd-16-20" onclick="cancelarFormulario()">X</button>
+            <div>
+                <h2><i class="material-symbols-outlined">person_add</i> <span id="formTitle">Registrar Funcionario</span></h2>
+            </div>
+            <form id="funcionarioForm">
+                <div class="form-section">
+                    <h3 class="section-title"><i class="material-symbols-outlined">person</i> Datos Personales</h3>
+                    <div class="modal-grid">
+                        <div class="form-group"><label>Carnet de Identidad</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">badge</i><input type="text" id="ci" required></div></div>
+                        <div class="form-group"><label>Apellido Paterno</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">person</i><input type="text" id="apellidoPaterno" required></div></div>
+                        <div class="form-group"><label>Apellido Materno</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">person</i><input type="text" id="apellidoMaterno" required></div></div>
+                        <div class="form-group"><label>Nombres</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">person</i><input type="text" id="nombres" required></div></div>
+                        <div class="form-group"><label>Fecha de Nacimiento</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">cake</i><input type="date" id="fechaNacimiento" required></div></div>
+                        <div class="form-group"><label>Sexo</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">wc</i><select id="sexo" required><option value="">Seleccionar...</option><option value="Masculino">Masculino</option><option value="Femenino">Femenino</option></select></div></div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="section-title"><i class="material-symbols-outlined">work</i> Datos Laborales</h3>
+                    <div class="modal-grid">
+                        <div class="form-group"><label>Cargo</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">work</i><input type="text" id="cargo" required></div></div>
+                        <div class="form-group"><label>Tipo de Contrato</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">description</i><select id="tipoContrato" required><option value="">Seleccionar...</option><option value="Indefinido">Indefinido</option><option value="Item">Item</option></select></div></div>
+                        <div class="form-group"><label>Unidad Organizacional</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">domain</i><select id="unidad" required><option value="">Seleccionar...</option><option value="Administrativa">Administrativa</option><option value="Salud">Salud</option></select></div></div>
+                        <div class="form-group"><label>Fecha de Ingreso</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">calendar_month</i><input type="date" id="fechaIngreso" required></div></div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="section-title"><i class="material-symbols-outlined">shield</i> Roles en el Sistema <span style="font-size:0.8em;font-weight:400;color:var(--color-pink-dark)">(permisos de acceso a módulos)</span></h3>
+                    <div class="roles-selector">
+                        <div class="role-checkbox"><input type="checkbox" id="rolFuncionario" value="Funcionario" checked disabled><label for="rolFuncionario"><i class="material-symbols-outlined">person</i> Funcionario</label></div>
+                        <div class="role-checkbox"><input type="checkbox" id="rolAdmin" value="Administrador"><label for="rolAdmin"><i class="material-symbols-outlined">settings</i> Administrador</label></div>
+                        <div class="role-checkbox"><input type="checkbox" id="rolRRHH" value="RRHH"><label for="rolRRHH"><i class="material-symbols-outlined">groups</i> RRHH</label></div>
+                        <div class="role-checkbox"><input type="checkbox" id="rolAuditoria" value="Auditoria"><label for="rolAuditoria"><i class="material-symbols-outlined">search</i> Auditoría</label></div>
+                        <div class="role-checkbox"><input type="checkbox" id="rolJefeArea" value="Jefe de Area"><label for="rolJefeArea"><i class="material-symbols-outlined">school</i> Jefe de Área</label></div>
+                        <div class="role-checkbox"><input type="checkbox" id="rolGerAdm" value="Gerente Administrativo"><label for="rolGerAdm"><i class="material-symbols-outlined">work</i> Gerente Adm.</label></div>
+                        <div class="role-checkbox"><input type="checkbox" id="rolGerSalud" value="Gerente de Salud"><label for="rolGerSalud"><i class="material-symbols-outlined">add_circle</i> Gerente Salud</label></div>
+                        <div class="role-checkbox"><input type="checkbox" id="rolGerGeneral" value="Gerente General"><label for="rolGerGeneral"><i class="material-symbols-outlined">workspace_premium</i> Gerente General</label></div>
+                    </div>
+                    <p style="font-size:0.78em;color:#999;margin-top:10px;padding-left:4px"><i class="material-symbols-outlined">info</i> El rol <strong>Funcionario</strong> se asigna siempre a todos.</p>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="section-title"><i class="material-symbols-outlined">shield</i> Tipo de Funcionario</h3>
+                    <div class="modal-grid">
+                        <div class="form-group form-group-full">
+                            <label>Tipo de Funcionario <span style="color:var(--color-pink-dark);font-size:0.8em">(define el flujo de aprobación de vacaciones)</span></label>
+                            <div class="input-wrapper">
+                                <i class="material-symbols-outlined input-icon">domain</i>
+                                <select id="tipoFuncionario" required onchange="actualizarJerarquia()">
+                                    <option value="">Seleccionar tipo...</option>
+                                    <option value="SUBORDINADO">Subordinado</option>
+                                    <option value="JEFE_AREA">Jefe de Área</option>
+                                    <option value="DEPENDENCIA_DIRECTA">Dependencia Directa</option>
+                                    <option value="GERENTE_ADMINISTRATIVO">Gerente Administrativo</option>
+                                    <option value="GERENTE_SALUD">Gerente de Salud</option>
+                                    <option value="GERENTE_GENERAL">Gerente General</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- JERARQUÍA DINÁMICA según tipo de funcionario -->
+                <div class="form-section" id="sectionJerarquia" style="display:none">
+                    <h3 class="section-title"><i class="material-symbols-outlined">account_tree</i> Jerarquía de Aprobación de Vacaciones</h3>
+                    <div id="infoJerarquia" style="background:rgba(114,0,53,0.06);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:0.85em;color:var(--color-purple-dark)"></div>
+                    <div class="modal-grid" id="gridJerarquia"></div>
+                </div>
+
+                <div class="form-section" id="sectionGerenteGeneral" style="display:none">
+                    <h3 class="section-title"><i class="material-symbols-outlined">verified_user</i> Jerarquía de Aprobación de Vacaciones</h3>
+                    <div style="background:rgba(39,20,71,0.06);border-radius:10px;padding:14px;font-size:0.88em;color:var(--color-purple-dark);display:flex;align-items:center;gap:10px">
+                        <i class="material-symbols-outlined" style="font-size:1.5em;color:var(--color-pink-dark)">workspace_premium</i>
+                        <span>El <strong>Gerente General</strong> no pasa por niveles de aprobación. Sus solicitudes de vacación se aprueban <strong>automáticamente</strong>.</span>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" onclick="cancelarFormulario()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- ═══ MODAL EXPORTAR ═══ -->
+    <div class="modal-overlay" id="exportOverlay" style="display:none">
+        <div class="form-modal" id="exportPanel" style="max-width:420px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+                <h2 style="margin:0"><i class="material-symbols-outlined">download</i> Exportar Funcionarios</h2>
+                <button type="button" class="btn btn-cancel pd-5-5"  onclick="cerrarModalExportar()">
+                    <i class="material-symbols-outlined">close</i>
+                </button>
+            </div>
+            {% comment %} <p style="font-size:.85em;color:#666;margin-bottom:18px">
+                Selecciona los filtros. Deja en blanco para exportar <strong>todos</strong>.
+            </p> {% endcomment %}
+            <div class="form-section" style="padding:0">
+                <div class="modal-grid">
+
+                    <div class="form-group">
+                        <label>Unidad</label>
+                        <div class="input-wrapper">
+                            <i class="material-symbols-outlined input-icon">domain</i>
+                            <select id="exportUnidad">
+                                <option value="">Todas</option>
+                                <option value="Administrativa">Administrativa</option>
+                                <option value="Salud">Salud</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <div class="input-wrapper">
+                            <i class="material-symbols-outlined input-icon">person_check</i>
+                            <select id="exportEstado">
+                                <option value="">Todos</option>
+                                <option value="ACTIVO">Activo</option>
+                                <option value="INACTIVO">Inactivo</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group form-group-full">
+                        <label>Cargo <span style="font-weight:400;color:#999;font-size:.82em">(búsqueda parcial)</span></label>
+                        <div class="input-wrapper">
+                            <i class="material-symbols-outlined input-icon">work</i>
+                            <input type="text" id="exportCargo" placeholder="Ej. Enfermera, Jefe, Contador...">
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:18px">
+                <button type="button" class="btn btn-cancel" onclick="cerrarModalExportar()">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmarExportar()">
+                    <i class="material-symbols-outlined">open_in_new</i> Exportar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/shared/notifications.js' %}"></script>
+    <script src="{% static 'js/employees/Funcionarios.js' %}"></script>
+</body>
+</html>
+
+
+
+

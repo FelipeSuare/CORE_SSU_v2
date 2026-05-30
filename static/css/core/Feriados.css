@@ -1,0 +1,534 @@
+/* PALETA DE COLORES Y VARIABLES GLOBALES (Final) */
+:root {
+    --color-pink-light: #F9c9c9;       /* Fondo de página */
+    --color-pink-dark: rgb(114, 0, 53);   /* Rosa Oscuro */
+    --color-purple-dark: rgb(39, 20, 71);/* Morado Oscuro */
+    
+    --color-white-transparent: rgba(255, 255, 255, 0.9);
+    --color-white-solid: #ffffff;
+    
+    /* GRADIENTE DE LA CABECERA DE LA TABLA */
+    --color-table-header-gradient: linear-gradient(90deg, var(--color-purple-dark), var(--color-pink-dark));
+    
+    --shadow-heavy: 0 8px 20px rgba(0, 0, 0, 0.2);
+    --shadow-accent: 0 0 15px 6px rgba(39, 20, 71, 0.3); /* Sombra del modal */
+}
+
+/* ========================================
+   ESTILOS BASE Y GENERALES
+   ======================================== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+.gap-10 {gap: 10px !important;}
+.border-radius-10 {border-radius: 10px !important;}
+
+body {
+    font-family: 'Montserrat', sans-serif;
+    background-color: var(--color-pink-light); 
+    padding: 30px 30px;
+    min-height: 100vh;
+}
+
+.main-container {
+    max-width: 1400px; 
+    margin: 0 auto;
+}
+
+.back-to-menu {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--color-pink-dark); 
+    color: var(--color-white-solid); 
+    padding: 10px 15px; 
+    text-decoration: none; 
+    border-radius: 25px; 
+    font-family: sans-serif; 
+    box-shadow: 0 4px 6px var(--shadow-heavy); 
+    font-weight: bold;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.back-to-menu:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0,0,0,.25);
+}
+
+/* --- ENCABEZADO DE MÓDULO --- */
+.module-header {
+    margin-bottom: 25px; 
+    padding: 0 5px; 
+}
+
+.module-title {
+    color: var(--color-purple-dark);
+    font-size: 2.2em;
+    font-weight: 700;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+}
+
+.module-title i {
+    font-size: 1.2em; 
+    margin-right: 15px;
+    color: var(--color-purple-dark);
+}
+
+.module-subtitle {
+    color: var(--color-pink-dark); 
+    font-size: 1em;
+    font-weight: 500;
+    margin-left: 55px; 
+}
+
+.content-wrapper {
+    display: flex;
+    gap: 15px;
+}
+
+/* Estilo base para las tarjetas */
+.new-holiday-card, .registered-holidays-card {
+    background: var(--color-white-solid);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: var(--shadow-heavy);
+    max-height: max-content;
+}
+.new-holiday-card {
+    flex: 0 0 350px;
+}
+
+.registered-holidays-card {
+    flex: 1;
+    background: var(--color-white-transparent);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    padding: 0;
+    /* Importante para que el redondeo de la tabla funcione */
+    overflow: hidden; 
+}
+
+.card-title {
+    color: var(--color-purple-dark);
+    font-size: 1.5em;
+    font-weight: 700;
+    margin-bottom: 25px;
+}
+
+/* ========================================
+   FORMULARIO Y ENTRADAS (INPUTS)
+   ======================================== */
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: var(--color-pink-dark);
+    display: block;
+    margin-bottom: 5px;
+}
+
+.input-wrapper {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 8px;
+    padding: 10px 15px;
+    box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--color-pink-dark);
+    transition: border-color 0.3s;
+}
+.input-wrapper:focus-within {
+    border-color: var(--color-purple-dark);
+}
+.input-wrapper i {
+    color: var(--color-purple-dark);
+    font-size: 1.1em;
+}
+
+.input-wrapper input, .input-wrapper select, textarea {
+    border: none;
+    outline: none;
+    width: 100%;
+    padding: 0;
+    padding-left: 0;
+    background: transparent;
+    color: var(--color-pink-dark);
+    font-size: 1em;
+    font-family: 'Montserrat', sans-serif;
+}
+
+/* Ajuste para input en modal que tiene ícono */
+.form-modal .input-wrapper input {
+    padding-left: 10px; 
+}
+
+
+.new-holiday-card textarea, .form-modal textarea {
+    width: 100%;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid var(--color-pink-dark);
+    background: rgba(255, 255, 255, 0.6);
+    resize: vertical;
+    color: var(--color-pink-dark);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1em;
+}
+
+.select-wrapper {
+    padding: 0;
+    border: 1px solid var(--color-pink-dark);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.select-wrapper select {
+    padding: 10px 15px;
+    appearance: none; 
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20fill%3D%22%23720035%22%20d%3D%22M9.293%2012.95l.707.707%205%20-5-1.414-1.414L10%2011.536l-3.586-3.586L5%208.243l5%205z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px top 50%;
+    background-size: 0.8em;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.select-wrapper select option {
+    background-color: var(--color-white-solid);
+    color: var(--color-pink-dark);
+}
+
+
+/* ========================================
+   BOTONES
+   ======================================== */
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.3s, transform 0.2s, box-shadow 0.3s;
+}
+
+.btn-primary { 
+    background: var(--color-purple-dark); 
+    color: var(--color-white-solid); 
+}
+.btn-primary:hover { 
+    background: var(--color-pink-dark); 
+    transform: scale(1.02);
+    box-shadow: 0 4px 10px rgba(39, 20, 71, 0.4);
+}
+.btn-full-width {
+    width: 100%;
+    margin-top: 15px;
+}
+
+.btn-search {
+    background: var(--color-pink-dark);
+    color: var(--color-white-solid);
+    border-radius: 8px;
+    padding: 10px 25px;
+    align-self: flex-end;
+    white-space: nowrap;
+}
+.btn-search:hover {
+    background: var(--color-purple-dark);
+    transform: scale(1.02);
+}
+
+.btn-action {
+    padding: 5px 10px;
+    font-size: 0.9em;
+    font-weight: 500;
+    margin: 3px 0;
+    border-radius: 4px;
+    justify-content: flex-start;
+}
+
+.btn-edit {
+    background: var(--color-purple-dark); 
+    color: var(--color-white-solid);
+}
+.btn-edit:hover {
+    background: rgb(55, 30, 95);
+    transform: scale(1.05);
+}
+
+.btn-delete {
+    background: var(--color-pink-dark); 
+    color: var(--color-white-solid);
+}
+.btn-delete:hover {
+    background: rgb(140, 20, 75);
+    transform: scale(1.05);
+}
+
+/* BOTÓN CANCELAR (Para el modal) */
+.btn-cancel {
+    /* CORRECCIÓN: Fondo Morado Oscuro para el estado base */
+    background: var(--color-purple-dark); 
+    color: var(--color-white-solid);
+    border-radius: 25px;
+    padding: 12px 25px;
+}
+.btn-cancel:hover {
+    /* CORRECCIÓN: Hover a Rosa Oscuro */
+    background: var(--color-pink-dark); 
+    transform: scale(1.05);
+}
+#saveModalBtn {
+    border-radius: 25px;
+}
+
+/* ========================================
+   TABLA Y FILTROS
+   ======================================== */
+
+.registered-holidays-card .table-header {
+    background: var(--color-white-solid);
+    padding: 20px 30px;
+    /* Redondeo solo en las esquinas superiores */
+    border-radius: 15px 15px 0 0;
+    border-bottom: 1px solid rgba(39, 20, 71, 0.1);
+}
+
+.filter-controls {
+    display: flex;
+    gap: 15px;
+    padding: 20px 30px;
+    border-bottom: 1px solid rgba(114, 0, 53, 0.1);
+    background: var(--color-white-solid);
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 100px;
+}
+
+.filter-group label {
+    font-weight: 600;
+    color: var(--color-pink-dark);
+    display: block;
+    margin-bottom: 5px;
+    font-family: 'Montserrat', sans-serif;
+}
+
+/* TABLA CONTENIDA */
+.table-wrapper {
+    overflow-x: auto;
+    margin: 0 20px 20px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(39,20,71,0.12);
+    box-shadow: 0 4px 16px rgba(39,20,71,0.08);
+}
+
+table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    background: var(--color-white-transparent);
+}
+
+thead {
+    background: var(--color-table-header-gradient);
+    color: var(--color-white-solid);
+    font-weight: 700;
+    text-align: left;
+}
+thead th { 
+    padding: 16px 18px;
+    font-size: 0.82em;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+td { 
+    padding: 14px 18px; 
+    font-size: 0.95em;
+    color: var(--color-purple-dark);
+}
+
+tbody tr {
+    border-bottom: 1px solid rgba(249,201,201,0.6);
+    transition: background 0.15s;
+}
+tbody tr:last-child td {
+    border-bottom: none;
+}
+tbody tr:hover {
+    background: rgba(249,201,201,0.2);
+}
+
+/* Botones de acción estilo Funcionarios */
+.table-wrapper td:last-child {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1em;
+    transition: all 0.18s;
+    font-family: 'Montserrat', sans-serif;
+}
+.action-btn-edit {
+    background: rgba(39,20,71,0.09);
+    color: var(--color-purple-dark);
+}
+.action-btn-edit:hover {
+    background: var(--color-purple-dark);
+    color: #fff;
+    transform: scale(1.08);
+}
+.action-btn-delete {
+    background: rgba(114,0,53,0.09);
+    color: var(--color-pink-dark);
+}
+.action-btn-delete:hover {
+    background: var(--color-pink-dark);
+    color: #fff;
+    transform: scale(1.08);
+}
+
+/* ========================================
+   MODAL
+   ======================================== */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.15); 
+    display: none; 
+    justify-content: center;
+    align-items: center;
+    z-index: 9999; 
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.modal-overlay.active {
+    display: flex;
+    opacity: 1;
+}
+
+.form-modal {
+    width: 95%;
+    max-width: 500px; /* Se reduce un poco el ancho */
+    
+    background: rgba(255, 255, 255, 0.75); 
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: var(--shadow-accent);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    
+    transform: translateY(-50px) scale(0.95);
+    opacity: 0;
+    transition: transform 0.3s, opacity 0.3s;
+}
+
+.form-modal.active {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    background: var(--color-white-solid);
+}
+
+.modal-title {
+    color: var(--color-purple-dark);
+    font-size: 1.8em;
+    font-weight: 700;
+    margin-bottom: 25px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--color-pink-dark);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* El contenido del modal ahora es una sola columna simple */
+.modal-form-content {
+    display: flex;
+    flex-direction: column; 
+    gap: 0; /* Los .form-group ya tienen su margen */
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(39, 20, 71, 0.2);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+@media (max-width: 1024px) {
+    .content-wrapper {
+        flex-direction: column;
+        gap: 20px;
+    }
+    .module-subtitle {
+        margin-left: 0; 
+    }
+    .new-holiday-card {
+        flex: auto;
+    }
+    .filter-controls {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 15px;
+    }
+    .filter-group {
+        flex: 1 1 calc(50% - 10px);
+    }
+    .btn-search {
+        flex: 1 1 100%;
+        margin-top: 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    .form-modal {
+        max-width: 90%; 
+        padding: 20px;
+    }
+}
+
+@media (max-width: 600px) {
+    body {
+        padding: 15px;
+    }
+    .module-title {
+        font-size: 1.8em;
+    }
+    .filter-group {
+        flex: 1 1 100%;
+    }
+}

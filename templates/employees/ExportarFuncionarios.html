@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte de Funcionarios — SSU UAB</title>
+  <style>
+    body   { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #222; }
+    h1     { font-size: 16px; color: #271447; margin-bottom: 4px; }
+    .sub   { font-size: 11px; color: #666; margin-bottom: 4px; }
+    .filtros { font-size: 11px; color: #720035; font-weight: 600; margin-bottom: 12px; }
+    .acciones { display: flex; gap: 8px; margin-bottom: 14px; }
+  .btn-volver {
+    padding: 6px 14px; cursor: pointer; background: #271447; color: #fff;
+    border: none; border-radius: 5px; font-size: 11px; font-family: Arial, sans-serif;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .btn-print {
+    padding: 6px 14px; cursor: pointer; background: #720035; color: #fff;
+    border: none; border-radius: 5px; font-size: 11px; font-family: Arial, sans-serif;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  table  { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  thead  {
+    background: linear-gradient(90deg, #271447, #720035);
+    color: #fff;
+  }
+  thead th {
+    padding: 10px 8px;
+    text-align: left;
+    font-size: 0.82em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    white-space: nowrap;
+    vertical-align: middle;
+    line-height: 1.35;
+    overflow: hidden;
+  }
+  td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+  /* Columnas de fecha y estado: sin quiebre */
+  td:nth-child(7),
+  td:nth-child(8),
+  td:nth-child(11) {
+    white-space: nowrap;
+  }
+  /* Anchos proporcionales para las 11 columnas */
+  col.col-n       { width: 3%; }
+  col.col-ci      { width: 8%; }
+  col.col-nombre  { width: 16%; }
+  col.col-cargo   { width: 14%; }
+  col.col-unidad  { width: 12%; }
+  col.col-contrato{ width: 8%; }
+  col.col-ingreso { width: 9%; }
+  col.col-antig   { width: 8%; }
+  col.col-tipo    { width: 8%; }
+  col.col-roles   { width: 9%; }
+  col.col-estado  { width: 5%; }
+
+  tr:nth-child(even) td { background: #fdf0f0; }
+  .activo   { color: #1a6b30; font-weight: 700; }
+  .inactivo { color: #900;    font-weight: 700; }
+
+  @media print {
+    @page { size: A4 landscape; margin: 8mm 10mm; }
+    .acciones { display: none; }
+    body { margin: 0; font-size: 9px; }
+    thead th { padding: 6px 5px; font-size: 0.78em; }
+    td { padding: 4px 5px; font-size: 9px; }
+    h1 { font-size: 13px; }
+    .sub, .filtros { font-size: 9px; }
+  }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">   
+</head>
+<body>
+
+<h1>Reporte de Funcionarios — SSU UAB</h1>
+<p class="sub">Generado el {{ fecha }} &nbsp;|&nbsp; Total: {{ funcionarios|length }} funcionario{{ funcionarios|length|pluralize }}</p>
+
+{% if filtros %}
+<p class="filtros">
+  Filtros aplicados:
+  {% for f in filtros %}{{ f }}{% if not forloop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}
+</p>
+{% endif %}
+
+<div class="acciones">
+  <button class="btn-volver" onclick="window.close(); if(window.history.length>1) window.history.back();">
+    {% comment %} <span class="material-symbols-outlined">arrow_back</span>  {% endcomment %}
+    Volver
+  </button>
+  <button class="btn-print" onclick="window.print()">
+    {% comment %} <span class="material-symbols-outlined">print</span>  {% endcomment %}
+    Imprimir / Guardar PDF
+  </button>
+</div>
+
+<table>
+  <colgroup>
+    <col class="col-n">
+    <col class="col-ci">
+    <col class="col-nombre">
+    <col class="col-cargo">
+    <col class="col-unidad">
+    <col class="col-contrato">
+    <col class="col-ingreso">
+    <col class="col-antig">
+    <col class="col-tipo">
+    <col class="col-roles">
+    <col class="col-estado">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>N°</th><th>CI</th><th>Nombres</th><th>Cargo</th>
+      <th>Unidad</th><th>Contrato</th><th>Ingreso</th>
+      <th>Antigüedad</th><th>Tipo</th><th>Roles</th><th>Estado</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for f in funcionarios %}
+    <tr>
+      <td>{{ forloop.counter }}</td>
+      <td>{{ f.ci }}</td>
+      <td>{{ f.nombre }} {{ f.ap_paterno }} {{ f.ap_materno }}</td>
+      <td>{{ f.cargo }}</td>
+      <td>{{ f.unidad }}</td>
+      <td>{{ f.tipo_contrato }}</td>
+      <td>{{ f.fecha_ingreso }}</td>
+      <td>{{ f.antiguedad }}</td>
+      <td>{{ f.tipo_funcionario }}</td>
+      <td>{{ f.roles|join:", " }}</td>
+      <td class="{% if f.estado == 'ACTIVO' %}activo{% else %}inactivo{% endif %}">
+        {{ f.estado }}
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="11" style="text-align:center;padding:20px;color:#aaa">
+        No se encontraron funcionarios con los filtros seleccionados.
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+</body>
+</html>

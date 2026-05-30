@@ -1,0 +1,300 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil de Usuario</title>
+
+    <!-- Configuración para el JS del módulo -->
+    <meta name="csrf-token"        content="{{ csrf_token }}">
+    <meta name="foto-url"          content="{% url 'perfil_foto' %}">
+    <meta name="foto-eliminar-url" content="{% url 'perfil_foto_eliminar' %}">
+    <meta name="placeholder-url"   content="{% static 'img/placeholder_perfil.svg' %}">
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/accounts/Perfil_Usuario.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
+</head>
+<body>
+
+<a href="/Index_Principal.html" class="back-to-menu">
+    <span><i class="material-symbols-outlined">arrow_back</i></span>
+    Volver
+</a>
+
+<div class="main-container">
+    <header class="module-header">
+        <i class="material-symbols-outlined">account_circle</i>
+        <div>
+            <h1 class="module-title">Perfil de Usuario</h1>
+            <p class="module-subtitle">Información personal y datos del sistema</p>
+        </div>
+    </header>
+
+    <div class="profile-container">
+
+        <!-- ═══════════════════════════ FOTO DE PERFIL ═══════════════════════════ -->
+        <div class="profile-photo-section">
+            <div class="photo-card">
+                <div class="photo-wrapper">
+                    <img id="profilePhoto"
+                         src="{% if tiene_foto %}{% url 'perfil_foto' %}{% else %}{% static 'img/placeholder_perfil.svg' %}{% endif %}"
+                         alt="Foto de perfil">
+                    <div class="photo-overlay" id="photoOverlay">
+                        <i class="material-symbols-outlined">photo_camera</i>
+                        <span>Cambiar foto</span>
+                    </div>
+                </div>
+                <input type="file" id="photoInput" accept="image/jpeg,image/png,image/gif" style="display:none;">
+                <button class="btn btn-upload" id="btnUpload">
+                    <i class="material-symbols-outlined">upload</i>
+                    Subir Foto
+                </button>
+                <button class="btn btn-remove" id="btnRemove">
+                    <i class="material-symbols-outlined">delete</i>
+                    Eliminar Foto
+                </button>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════ SECCIÓN DERECHA ═══════════════════════════ -->
+        <div class="profile-info-section">
+
+            <!-- ─── Información Personal ─── -->
+            <div class="info-card">
+                <h2 class="card-title">
+                    <i class="material-symbols-outlined">badge</i>
+                    Información Personal
+                </h2>
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label for="cedula">
+                            <i class="material-symbols-outlined">badge</i>
+                            Cédula de Identidad
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="cedula"
+                                   value="{{ persona.ci|default:user.username }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="nombreCompleto">
+                            <i class="material-symbols-outlined">person</i>
+                            Nombre Completo
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="nombreCompleto"
+                                   value="{{ nombre_completo|default:user.get_full_name }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="fechaNacimiento">
+                            <i class="material-symbols-outlined">cake</i>
+                            Fecha de Nacimiento
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="fechaNacimiento"
+                                   value="{{ fecha_nacimiento_display }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sexo">
+                            <i class="material-symbols-outlined">wc</i>
+                            Sexo
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="sexo"
+                                   value="{{ persona.sexo|default:'' }}" readonly>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ─── Información Laboral ─── -->
+            <div class="info-card">
+                <h2 class="card-title">
+                    <i class="material-symbols-outlined">work</i>
+                    Información Laboral
+                </h2>
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label for="cargo">
+                            <i class="material-symbols-outlined">work</i>
+                            Cargo Actual
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="cargo"
+                                   value="{{ cargo_actual.cargo|default:'' }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tipoContrato">
+                            <i class="material-symbols-outlined">description</i>
+                            Tipo de Contrato
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="tipoContrato"
+                                   value="{{ cargo_actual.tipo_contrato|default:'' }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="unidad">
+                            <i class="material-symbols-outlined">domain</i>
+                            Unidad Organizacional
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="unidad"
+                                   value="{{ funcionario.id_unidad.nombre|default:'' }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="fechaIngreso">
+                            <i class="material-symbols-outlined">event_available</i>
+                            Fecha de Ingreso
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="fechaIngreso"
+                                   value="{{ fecha_ingreso_display }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="matriculaSeguro">
+                            <i class="material-symbols-outlined">shield</i>
+                            Matrícula Seguro
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="matriculaSeguro"
+                                   value="{{ funcionario.matricula_seguro|default:'' }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="codigo">
+                            <i class="material-symbols-outlined">tag</i>
+                            Código
+                        </label>
+                        <div class="input-wrapper">
+                            <input type="text" id="codigo"
+                                   value="{{ funcionario.cod_funcionario|default:'' }}" readonly>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ─── Historial de Cargos ─── -->
+            <div class="info-card historial-card">
+                <h2 class="card-title">
+                    <i class="material-symbols-outlined">history</i>
+                    Historial de Cargos
+                </h2>
+
+                <div class="historial-container{% if historial_cargos|length <= 2 %} expanded{% endif %}"
+                     id="historialContainer">
+                    {% for cargo in historial_cargos %}
+                    <div class="cargo-item">
+                        <div class="cargo-timeline">
+                            <div class="cargo-timeline-dot {% if cargo.es_actual %}active{% endif %}"></div>
+                            {% if not forloop.first %}<div class="cargo-timeline-line"></div>{% endif %}
+                        </div>
+                        <div class="cargo-content">
+                            <div class="cargo-header">
+                                <div class="cargo-title-section">
+                                    <h3 class="cargo-nombre">{{ cargo.cargo }}</h3>
+                                    <p class="cargo-unidad">
+                                        <i class="material-symbols-outlined">domain</i>
+                                        {{ cargo.unidad }}
+                                    </p>
+                                </div>
+                                {% if cargo.es_actual %}
+                                    <span class="cargo-badge cargo-badge-actual">Cargo Actual</span>
+                                {% else %}
+                                    <span class="cargo-badge">Finalizado</span>
+                                {% endif %}
+                            </div>
+                            <div class="cargo-details">
+                                <div class="cargo-detail">
+                                    <i class="material-symbols-outlined">calendar_month</i>
+                                    <span><strong>Período:</strong> {{ cargo.periodo }}</span>
+                                </div>
+                                <div class="cargo-detail">
+                                    <i class="material-symbols-outlined">schedule</i>
+                                    <span><strong>Duración:</strong> {{ cargo.duracion }}</span>
+                                </div>
+                                <div class="cargo-detail">
+                                    <i class="material-symbols-outlined">description</i>
+                                    <span><strong>Contrato:</strong> {{ cargo.tipo_contrato }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="sin-datos">No hay historial de cargos registrado.</p>
+                    {% endfor %}
+                </div>
+
+                {% if mostrar_expandir_historial %}
+                <button class="btn-toggle-roles" id="btnToggleHistorial">
+                    <i class="material-symbols-outlined">expand_more</i>
+                    <span>Ver historial completo</span>
+                </button>
+                {% endif %}
+            </div>
+
+            <!-- ─── Roles en el Sistema ─── -->
+            <div class="info-card roles-card">
+                <h2 class="card-title">
+                    <i class="material-symbols-outlined">badge</i>
+                    Roles en el Sistema
+                </h2>
+
+                <div class="roles-container{% if roles|length <= 2 %} expanded{% endif %}"
+                     id="rolesContainer">
+                    {% for rol in roles %}
+                    <div class="role-item">
+                        <div class="role-icon">
+                            <i class="material-symbols-outlined">{{ rol.icono }}</i>
+                        </div>
+                        <div class="role-info">
+                            <div class="role-name">{{ rol.nombre }}</div>
+                            <div class="role-description">{{ rol.descripcion }}</div>
+                        </div>
+                        {% if rol.activo %}
+                            <span class="role-badge">Activo</span>
+                        {% else %}
+                            <span class="role-badge role-badge-inactivo">Inactivo</span>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <p class="sin-datos">No hay roles asignados.</p>
+                    {% endfor %}
+                </div>
+
+                {% if mostrar_expandir_roles %}
+                <button class="btn-toggle-roles" id="btnToggleRoles">
+                    <i class="material-symbols-outlined">expand_more</i>
+                    <span>Ver todos los roles</span>
+                </button>
+                {% endif %}
+            </div>
+
+        </div><!-- /profile-info-section -->
+    </div><!-- /profile-container -->
+</div><!-- /main-container -->
+
+<script src="{% static 'js/shared/notifications.js' %}"></script>
+<script src="{% static 'js/accounts/Perfil_Usuario.js' %}"></script>
+</body>
+</html>
