@@ -37,13 +37,13 @@
                         {{ cargo_actual_usuario }}
                     </p>
                 {% endif %}
-                <p class="user-role">
+                {% comment %} <p class="user-role">
                     <i class="material-symbols-outlined">shield_person</i>
                     {{ rol_principal }}
-                </p>
-                {% if descripcion_rol_principal %}
+                </p> {% endcomment %}
+                {% comment %} {% if descripcion_rol_principal %}
                     <p class="user-descripcion-rol">{{ descripcion_rol_principal }}</p>
-                {% endif %}
+                {% endif %} {% endcomment %}
             </div>
         </div>
 
