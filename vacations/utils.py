@@ -32,17 +32,18 @@ def dias_por_antiguedad(anios: int) -> Decimal:
 
 def calcular_gestioneS_pendientes(fecha_ingreso: date, hoy: date = None):
     """
-    Devuelve hasta 4 tuplas (slot, anio, dias) con las gestiones que le corresponden
-    al funcionario según su antigüedad (de más antigua a más reciente).
+    Devuelve hasta 4 tuplas (slot, anio, dias) con las gestiones pendientes
+    del funcionario, empezando por las más antiguas (FIFO).
 
     slot 4 = gestión más antigua (se consume primero).
-    slot 1 = gestión más reciente.
+    slot 1 = gestión más reciente de las 4 almacenadas.
     """
     if hoy is None:
         hoy = date.today()
 
-    gestioneS = []  # lista [(anio, dias)] de más reciente a más antigua
-    for year in range(hoy.year, fecha_ingreso.year, -1):
+    gestioneS = []  # [(anio, dias)] de más antigua a más reciente
+    primer_anio = fecha_ingreso.year + 1
+    for year in range(primer_anio, hoy.year + 1):
         referencia = date(year, 12, 31)
         anios = calcular_anios_antiguedad(fecha_ingreso, referencia)
         if anios >= 1:
@@ -50,9 +51,9 @@ def calcular_gestioneS_pendientes(fecha_ingreso: date, hoy: date = None):
         if len(gestioneS) >= 4:
             break
 
-    # Asignar slots: slot 4 para la más antigua, slot 1 para la más reciente
+    # Asignar slots: slot 4 = más antigua, slot 1 = más reciente
     result = []
-    for idx, (year, dias) in enumerate(reversed(gestioneS)):  # oldest first
+    for idx, (year, dias) in enumerate(gestioneS):
         slot = 4 - idx
         result.append((slot, year, dias))
     return result

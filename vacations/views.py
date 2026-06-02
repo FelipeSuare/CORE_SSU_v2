@@ -940,12 +940,17 @@ def acreditar_gestion(request):
                 status=400
             )
 
-    # Encontrar el primer slot vacío (slot 4 = más antiguo, slot 1 = más reciente)
+    # Encontrar slot disponible: primero vacíos (anio=None), luego consumidos (dias=0)
     slot = None
     for i in range(4, 0, -1):
         if getattr(gv, f'anio_gestion{i}') is None:
             slot = i
             break
+    if slot is None:
+        for i in range(4, 0, -1):
+            if getattr(gv, f'dias_gestion{i}') == 0:
+                slot = i
+                break
 
     if slot is None:
         return JsonResponse(

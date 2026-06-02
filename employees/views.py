@@ -24,7 +24,7 @@ _NIVELES = {
 }
 
 _ROLES_EMPLOYEES  = frozenset({'RRHH', 'Administrador'})
-_ROLES_HISTORIAL  = frozenset({'RRHH', 'Administrador', 'Auditoria'})
+_ROLES_HISTORIAL  = frozenset({'Funcionario', 'Administrador', 'Auditoria'})
 
 _ROL_LABEL = {
     'Administrador': 'ADMINISTRADOR',
