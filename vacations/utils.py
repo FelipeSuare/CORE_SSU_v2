@@ -32,28 +32,37 @@ def dias_por_antiguedad(anios: int) -> Decimal:
 
 def calcular_gestioneS_pendientes(fecha_ingreso: date, hoy: date = None):
     """
-    Devuelve hasta 4 tuplas (slot, anio, dias) con las gestiones pendientes
-    del funcionario, empezando por las más antiguas (FIFO).
+    Devuelve hasta 4 tuplas (slot, anio, dias) con las 4 gestiones más
+    recientes del funcionario, de más antigua a más reciente.
+
+    Regla de gestión más reciente válida:
+      - Si hoy >= aniversario del año actual  → gestión reciente = año actual
+      - Si hoy <  aniversario del año actual  → gestión reciente = año actual - 1
 
     slot 4 = gestión más antigua (se consume primero).
-    slot 1 = gestión más reciente de las 4 almacenadas.
+    slot 1 = gestión más reciente.
     """
     if hoy is None:
         hoy = date.today()
 
-    gestioneS = []  # [(anio, dias)] de más antigua a más reciente
-    primer_anio = fecha_ingreso.year + 1
-    for year in range(primer_anio, hoy.year + 1):
-        referencia = date(year, 12, 31)
-        anios = calcular_anios_antiguedad(fecha_ingreso, referencia)
+    # Aniversario en el año actual (maneja bisiesto)
+    try:
+        aniversario_hoy = fecha_ingreso.replace(year=hoy.year)
+    except ValueError:
+        aniversario_hoy = date(hoy.year, 3, 1)
+
+    gestion_reciente = hoy.year if hoy >= aniversario_hoy else hoy.year - 1
+
+    # 4 gestiones de más reciente a más antigua, filtrando las que no tienen 1 año completo
+    gestioneS = []  # [(anio, dias)] newest first
+    for year in range(gestion_reciente, gestion_reciente - 4, -1):
+        anios = calcular_anios_antiguedad(fecha_ingreso, date(year, 12, 31))
         if anios >= 1:
             gestioneS.append((year, dias_por_antiguedad(anios)))
-        if len(gestioneS) >= 4:
-            break
 
-    # Asignar slots: slot 4 = más antigua, slot 1 = más reciente
+    # Asignar slots: oldest → slot 4, newest → slot 1
     result = []
-    for idx, (year, dias) in enumerate(gestioneS):
+    for idx, (year, dias) in enumerate(reversed(gestioneS)):  # oldest first
         slot = 4 - idx
         result.append((slot, year, dias))
     return result
