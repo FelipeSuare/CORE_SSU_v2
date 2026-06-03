@@ -9,40 +9,77 @@ const URL_CREAR       = '/api/vacaciones/crear/';
 const URL_SEGUIMIENTO = '/api/vacaciones/seguimiento/';
 
 // ══════════════════════════════════════════════════════════════
-//  ELEMENTOS DEL DOM
+//  ELEMENTOS DEL DOM  (se inicializan dentro de DOMContentLoaded)
 // ══════════════════════════════════════════════════════════════
-const tipoContratoInput   = document.getElementById('tipoContrato');
-const funcionarioInput    = document.getElementById('funcionario');
-const fechaIngresoInput   = document.getElementById('fechaIngreso');
-const fechaSolicitudInput = document.getElementById('fechaSolicitud');
-const fechaSalidaInput    = document.getElementById('fechaSalida');
-const diasTomarInput      = document.getElementById('diasTomar');
-const fechaRetornoInput   = document.getElementById('fechaRetorno');
-const motivoVacacionTextarea = document.getElementById('motivoVacacion');
-const saldosContainer     = document.getElementById('saldosContainer');
-const notificationMessage = document.getElementById('notificationMessage');
-const vacationRequestForm = document.getElementById('vacationRequestForm');
-const summaryModal        = document.getElementById('summaryModal');
-const cancelModalBtn      = document.getElementById('cancelModalBtn');
-const confirmModalBtn     = document.getElementById('confirmModalBtn');
-const btnTracking         = document.getElementById('btnTracking');
-const trackingPanel       = document.getElementById('trackingPanel');
-const closeTracking       = document.getElementById('closeTracking');
-const trackingContent     = document.getElementById('trackingContent');
+let tipoContratoInput, funcionarioInput, fechaIngresoInput, fechaSolicitudInput;
+let fechaSalidaInput, diasTomarInput, fechaRetornoInput, motivoVacacionTextarea;
+let saldosContainer, notificationMessage, vacationRequestForm;
+let summaryModal, cancelModalBtn, confirmModalBtn;
+let btnTracking, trackingPanel, closeTracking, trackingContent;
+
 // ══════════════════════════════════════════════════════════════
 //  ESTADO DEL MÓDULO
 // ══════════════════════════════════════════════════════════════
-let datosFormulario  = null;   // respuesta de /api/vacaciones/datos/
-let retornoData      = null;   // respuesta de /api/vacaciones/calcular-retorno/
-let calcularTimeout  = null;   // debounce para el cálculo de retorno
+let datosFormulario  = null;
+let retornoData      = null;
+let calcularTimeout  = null;
 
 // ══════════════════════════════════════════════════════════════
 //  INICIALIZACIÓN
 // ══════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
-    const hoy = new Date().toISOString().split('T')[0];
-    fechaSolicitudInput.value = hoy;
-    // Los roles y el perfil visual se inicializan tras cargar datos del backend
+    // Inicializar referencias DOM aquí, garantizando que el HTML ya está cargado
+    tipoContratoInput    = document.getElementById('tipoContrato');
+    funcionarioInput     = document.getElementById('funcionario');
+    fechaIngresoInput    = document.getElementById('fechaIngreso');
+    fechaSolicitudInput  = document.getElementById('fechaSolicitud');
+    fechaSalidaInput     = document.getElementById('fechaSalida');
+    diasTomarInput       = document.getElementById('diasTomar');
+    fechaRetornoInput    = document.getElementById('fechaRetorno');
+    motivoVacacionTextarea = document.getElementById('motivoVacacion');
+    saldosContainer      = document.getElementById('saldosContainer');
+    notificationMessage  = document.getElementById('notificationMessage');
+    vacationRequestForm  = document.getElementById('vacationRequestForm');
+    summaryModal         = document.getElementById('summaryModal');
+    cancelModalBtn       = document.getElementById('cancelModalBtn');
+    confirmModalBtn      = document.getElementById('confirmModalBtn');
+    btnTracking          = document.getElementById('btnTracking');
+    trackingPanel        = document.getElementById('trackingPanel');
+    closeTracking        = document.getElementById('closeTracking');
+    trackingContent      = document.getElementById('trackingContent');
+
+    // Registrar listeners que dependen del DOM
+    fechaSalidaInput.addEventListener('change', triggerCalculo);
+    diasTomarInput.addEventListener('input',  triggerCalculo);
+
+    vacationRequestForm.addEventListener('submit', manejarEnvioFormulario);
+    cancelModalBtn.addEventListener('click', ocultarModal);
+    summaryModal.addEventListener('click', e => { if (e.target === summaryModal) ocultarModal(); });
+    confirmModalBtn.addEventListener('click', enviarSolicitud);
+
+    btnTracking.addEventListener('click', () => {
+        trackingPanel.classList.toggle('show');
+        if (trackingPanel.classList.contains('show')) {
+            document.getElementById('profilePanel')?.classList.remove('show');
+            cargarSeguimiento();
+        }
+    });
+    closeTracking.addEventListener('click', () => trackingPanel.classList.remove('show'));
+
+    document.getElementById('btnProfile')?.addEventListener('click', e => {
+        e.stopPropagation();
+        document.getElementById('profilePanel')?.classList.toggle('show');
+        trackingPanel.classList.remove('show');
+    });
+
+    document.addEventListener('click', e => {
+        if (!document.querySelector('.tracking-button-container')?.contains(e.target))
+            trackingPanel.classList.remove('show');
+        if (!document.querySelector('.profile-switcher-container')?.contains(e.target))
+            document.getElementById('profilePanel')?.classList.remove('show');
+    });
+
+    fechaSolicitudInput.value = new Date().toISOString().split('T')[0];
     await cargarDatosFormulario();
 });
 
@@ -187,9 +224,6 @@ function mostrarNotificacion(texto, tipo = 'normal') {
 // ══════════════════════════════════════════════════════════════
 //  CÁLCULO DE FECHA DE RETORNO (con debounce)
 // ══════════════════════════════════════════════════════════════
-fechaSalidaInput.addEventListener('change', triggerCalculo);
-diasTomarInput.addEventListener('input',  triggerCalculo);
-
 function triggerCalculo() {
     clearTimeout(calcularTimeout);
     calcularTimeout = setTimeout(calcularFechaRetorno, 400);
@@ -248,7 +282,7 @@ function calcularRetornoLocal(fechaSalida, diasTomar) {
 // ══════════════════════════════════════════════════════════════
 //  VALIDACIÓN Y MODAL DE RESUMEN
 // ══════════════════════════════════════════════════════════════
-vacationRequestForm.addEventListener('submit', e => {
+function manejarEnvioFormulario(e) {
     e.preventDefault();
 
     if (!datosFormulario) {
@@ -263,8 +297,8 @@ vacationRequestForm.addEventListener('submit', e => {
         return;
     }
 
-    const diasTomar    = parseFloat(diasTomarInput.value);
-    const saldoTotal   = datosFormulario.saldos.dias_adeudados;
+    const diasTomar  = parseFloat(diasTomarInput.value);
+    const saldoTotal = datosFormulario.saldos.dias_adeudados;
 
     if (isNaN(diasTomar) || diasTomar <= 0) {
         AppDialog.alert('Ingrese una cantidad válida de días a tomar.');
@@ -283,7 +317,7 @@ vacationRequestForm.addEventListener('submit', e => {
 
     poblarModal(diasTomar, saldoTotal, motivo);
     mostrarModal();
-});
+}
 
 function poblarModal(diasTomar, saldoTotal, motivo) {
     const rd = retornoData || {};
@@ -318,7 +352,7 @@ function poblarModal(diasTomar, saldoTotal, motivo) {
 // ══════════════════════════════════════════════════════════════
 //  ENVÍO DE SOLICITUD
 // ══════════════════════════════════════════════════════════════
-confirmModalBtn.addEventListener('click', async () => {
+async function enviarSolicitud() {
     confirmModalBtn.disabled = true;
 
     try {
@@ -377,21 +411,11 @@ confirmModalBtn.addEventListener('click', async () => {
     } finally {
         confirmModalBtn.disabled = false;
     }
-});
+}
 
 // ══════════════════════════════════════════════════════════════
 //  SEGUIMIENTO DE SOLICITUD
 // ══════════════════════════════════════════════════════════════
-btnTracking.addEventListener('click', () => {
-    trackingPanel.classList.toggle('show');
-    if (trackingPanel.classList.contains('show')) {
-        document.getElementById('profilePanel')?.classList.remove('show');
-        cargarSeguimiento();
-    }
-});
-
-closeTracking.addEventListener('click', () => trackingPanel.classList.remove('show'));
-
 async function cargarSeguimiento() {
     trackingContent.innerHTML = `
         <div class="no-request-message">
@@ -460,24 +484,8 @@ async function cargarSeguimiento() {
 // ══════════════════════════════════════════════════════════════
 
 function renderizarRoles(roles, nombreCompleto) {
-    // El toggle de este módulo lo maneja el listener de btnProfile de abajo
-    // (también cierra el panel de seguimiento), así que no se llama setupProfileToggle
     window.initProfileSwitcher?.({ roles, nombre: nombreCompleto });
 }
-
-// Toggle del perfil — cierra el panel de seguimiento si está abierto
-document.getElementById('btnProfile')?.addEventListener('click', e => {
-    e.stopPropagation();
-    document.getElementById('profilePanel')?.classList.toggle('show');
-    trackingPanel.classList.remove('show');
-});
-
-document.addEventListener('click', e => {
-    if (!document.querySelector('.tracking-button-container')?.contains(e.target))
-        trackingPanel.classList.remove('show');
-    if (!document.querySelector('.profile-switcher-container')?.contains(e.target))
-        document.getElementById('profilePanel')?.classList.remove('show');
-});
 
 // ══════════════════════════════════════════════════════════════
 //  MODAL — abrir / cerrar
@@ -491,9 +499,6 @@ function ocultarModal() {
     document.querySelector('.form-modal').classList.remove('active');
     setTimeout(() => summaryModal.classList.remove('active'), 300);
 }
-
-cancelModalBtn.addEventListener('click', ocultarModal);
-summaryModal.addEventListener('click', e => { if (e.target === summaryModal) ocultarModal(); });
 
 // ══════════════════════════════════════════════════════════════
 //  FORMATO DE FECHA
