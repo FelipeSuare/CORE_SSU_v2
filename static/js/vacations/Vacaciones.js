@@ -336,11 +336,27 @@ confirmModalBtn.addEventListener('click', async () => {
             }),
         });
 
-        const data = await resp.json();
+        // Leer como texto primero para manejar respuestas no-JSON
+        const text = await resp.text();
+        let data = {};
+        try {
+            data = JSON.parse(text);
+        } catch {
+            // El servidor devolvió HTML (error 500 u otro)
+            console.error('Respuesta no-JSON del servidor:', text.substring(0, 300));
+            ocultarModal();
+            AppDialog.alert(
+                `Error del servidor (${resp.status}). Verifique que el sistema esté funcionando correctamente.`,
+                { title: 'Error', icon: 'error' }
+            );
+            return;
+        }
+
         ocultarModal();
 
         if (!resp.ok || data.error) {
-            AppDialog.alert(data.error || 'Error al enviar la solicitud.');
+            AppDialog.alert(data.error || `Error al enviar la solicitud (${resp.status}).`,
+                { title: 'Error', icon: 'error' });
             return;
         }
 
@@ -349,12 +365,15 @@ confirmModalBtn.addEventListener('click', async () => {
             { title: 'Solicitud registrada', icon: 'check_circle', variant: 'success' }
         );
 
-        // Recargar para actualizar saldos y seguimiento
         setTimeout(() => location.reload(), 1800);
 
     } catch (err) {
-        console.error('Error al crear solicitud:', err);
-        AppDialog.alert('Error de conexión al enviar la solicitud. Intente nuevamente.');
+        console.error('Error de red al crear solicitud:', err);
+        ocultarModal();
+        AppDialog.alert(
+            'No se pudo conectar con el servidor. Verifique su conexión e intente nuevamente.',
+            { title: 'Error de conexión', icon: 'wifi_off' }
+        );
     } finally {
         confirmModalBtn.disabled = false;
     }
