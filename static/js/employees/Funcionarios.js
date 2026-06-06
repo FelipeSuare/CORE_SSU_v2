@@ -90,9 +90,15 @@ function renderizarTabla(lista) {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#aaa">No hay funcionarios registrados</td></tr>`;
         return;
     }
+    const esInactivo = tabActual === 'INACTIVO';
     tbody.innerHTML = lista.map(f => {
         const rolesExtra = f.roles.filter(r => r !== 'Funcionario');
         const fechaFmt   = f.fecha_ingreso ? f.fecha_ingreso.split('-').reverse().join('/') : '-';
+        const col5 = esInactivo
+            ? (f.fecha_baja
+                ? `<span style="font-weight:600;color:var(--color-pink-dark)">${f.fecha_baja.split('-').reverse().join('/')}</span>`
+                : '<span style="color:#bbb;font-size:.85em">—</span>')
+            : `<span class="antiguedad-badge">${f.antiguedad}</span>`;
         return `
         <tr>
             <td style="font-weight:700;color:var(--color-pink-dark)">${f.ci}</td>
@@ -102,7 +108,7 @@ function renderizarTabla(lista) {
             </td>
             <td>${f.unidad || '-'}</td>
             <td>${fechaFmt}</td>
-            <td><span class="antiguedad-badge">${f.antiguedad}</span></td>
+            <td>${col5}</td>
             <td>${etiquetaTipo(f.tipo_funcionario)}</td>
             <td>${rolesExtra.length ? generarBadgesRoles(rolesExtra) : '<span style="color:#bbb;font-size:.85em">—</span>'}</td>
             <td style="white-space:nowrap">
@@ -125,6 +131,8 @@ function cambiarTab(estado) {
     tabActual = estado === 'activo' ? 'ACTIVO' : 'INACTIVO';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     event.currentTarget.classList.add('active');
+    const th = document.getElementById('thAntiguedadBaja');
+    if (th) th.innerHTML = tabActual === 'INACTIVO' ? 'FECHA DE<br>BAJA' : 'ANTIGÜEDAD';
     cargarTabla();
 }
 
@@ -310,6 +318,7 @@ async function mostrarFormulario() {
     document.getElementById('codFuncionario').value = '';
     document.getElementById('matriculaSeguro').value = '';
     limpiarRoles();
+    document.getElementById('grupoBaja').style.display = 'none';
     document.getElementById('sectionJerarquia').style.display    = 'none';
     document.getElementById('sectionGerenteGeneral').style.display = 'none';
     document.getElementById('gridJerarquia').innerHTML = '';
@@ -343,6 +352,15 @@ async function abrirEditar(cod) {
     document.getElementById('codFuncionario').value  = f.cod;
     document.getElementById('matriculaSeguro').value = f.matricula_seguro || '';
     document.getElementById('cargo').value           = f.cargo;
+    // Mostrar fecha de baja solo para personal inactivo
+    const grupoBaja = document.getElementById('grupoBaja');
+    const inputBaja = document.getElementById('fechaBajaInfo');
+    if (f.estado === 'INACTIVO' && f.fecha_baja) {
+        inputBaja.value = f.fecha_baja.split('-').reverse().join('/');
+        grupoBaja.style.display = '';
+    } else {
+        grupoBaja.style.display = 'none';
+    }
     const tcSelect = document.getElementById('tipoContrato');
     tcSelect.value = f.tipo_contrato;
     if (tcSelect.value !== f.tipo_contrato && f.tipo_contrato) {
@@ -362,10 +380,12 @@ async function abrirEditar(cod) {
 
     await actualizarJerarquia();
 
-    // Pre-rellenar aprobadores actuales
+    // Pre-rellenar aprobadores actuales (nivel DB → select físico según tipo)
     setTimeout(() => {
+        const map = _NIVEL_A_SEL[f.tipo_funcionario] || {};
         f.jerarquia.forEach(j => {
-            const s  = document.getElementById(`aprobadorN${j.nivel}`);
+            const selId = map[j.nivel];
+            const s = selId ? document.getElementById(selId) : null;
             if (s) s.value = j.aprobador_cod;
         });
     }, 80);
@@ -433,32 +453,32 @@ async function actualizarJerarquia() {
     }
 
     switch (tipo) {
-        case 'GERENTE_GENERAL':
+        case 'GERENTE GENERAL':
             seccionGG.style.display = 'block';
             marcarRol('rolGerGeneral');
             break;
 
-        case 'GERENTE_ADMINISTRATIVO':
+        case 'GERENTE ADMINISTRATIVO':
             seccion.style.display = 'block';
             infoDiv.innerHTML = `<i class="material-symbols-outlined">info</i> <strong>1 nivel:</strong> Gerente General.`;
             grid.innerHTML = campo('Nivel 1 — Gerente General', 'Gerente General', 'workspace_premium', 'aprobadorN3', 3);
             marcarRol('rolGerAdm');
             break;
 
-        case 'GERENTE_SALUD':
+        case 'GERENTE SALUD':
             seccion.style.display = 'block';
             infoDiv.innerHTML = `<i class="material-symbols-outlined">info</i> <strong>1 nivel:</strong> Gerente General.`;
             grid.innerHTML = campo('Nivel 1 — Gerente General', 'Gerente General', 'workspace_premium', 'aprobadorN3', 3);
             marcarRol('rolGerSalud');
             break;
 
-        case 'DEPENDENCIA_DIRECTA':
+        case 'DEPENDENCIA DIRECTA':
             seccion.style.display = 'block';
             infoDiv.innerHTML = `<i class="material-symbols-outlined">info</i> <strong>1 nivel:</strong> Gerente General.`;
             grid.innerHTML = campo('Nivel 1 — Gerente General', 'Gerente General', 'workspace_premium', 'aprobadorN3', 3);
             break;
 
-        case 'JEFE_AREA':
+        case 'JEFE AREA':
             seccion.style.display = 'block';
             infoDiv.innerHTML = `<i class="material-symbols-outlined">info</i> <strong>2 niveles:</strong> Gerente → Gerente General.`;
             grid.innerHTML =
@@ -467,7 +487,7 @@ async function actualizarJerarquia() {
             marcarRol('rolJefeArea');
             break;
 
-        case 'SUBORDINADO':
+        case 'PERSONAL DE AREA':
             seccion.style.display = 'block';
             infoDiv.innerHTML = `<i class="material-symbols-outlined">info</i> <strong>3 niveles:</strong> Jefe de Área → Gerente → Gerente General.`;
             grid.innerHTML =
@@ -494,20 +514,25 @@ function marcarRol(cbId) {
     if (cb) cb.checked = true;
 }
 
+// Mapeo de nivel DB (secuencial desde 1) → id del select en el DOM, por tipo de funcionario.
+// Los niveles en BD son siempre 1..N; el select físico refleja el rol del aprobador.
+const _NIVEL_A_SEL = {
+    'PERSONAL DE AREA':      { 1: 'aprobadorN1', 2: 'aprobadorN2', 3: 'aprobadorN3' },
+    'JEFE AREA':             { 1: 'aprobadorN2', 2: 'aprobadorN3' },
+    'GERENTE ADMINISTRATIVO':{ 1: 'aprobadorN3' },
+    'GERENTE SALUD':         { 1: 'aprobadorN3' },
+    'DEPENDENCIA DIRECTA':   { 1: 'aprobadorN3' },
+};
+
 function leerJerarquia() {
     const tipo = document.getElementById('tipoFuncionario').value;
     const jerarquia = [];
-    const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-
-    const push = (nivel, selId) => {
-        const cod = val(selId);
-        if (cod) jerarquia.push({ nivel, aprobador_cod: cod });
-    };
-
-    if      (tipo === 'SUBORDINADO')  { push(1,'aprobadorN1'); push(2,'aprobadorN2'); push(3,'aprobadorN3'); }
-    else if (tipo === 'JEFE_AREA')    { push(2,'aprobadorN2'); push(3,'aprobadorN3'); }
-    else if (['GERENTE_ADMINISTRATIVO','GERENTE_SALUD','DEPENDENCIA_DIRECTA'].includes(tipo))
-                                      { push(3,'aprobadorN3'); }
+    const map = _NIVEL_A_SEL[tipo] || {};
+    for (const [nivel, selId] of Object.entries(map)) {
+        const el = document.getElementById(selId);
+        const cod = el ? el.value.trim() : '';
+        if (cod) jerarquia.push({ nivel: parseInt(nivel, 10), aprobador_cod: cod });
+    }
     return jerarquia;
 }
 
@@ -606,12 +631,12 @@ document.getElementById('funcionarioForm').addEventListener('submit', async e =>
 // ═══════════════════════════════════════════════════════════════
 function etiquetaTipo(tipo) {
     const map = {
-        SUBORDINADO:            { label: 'Subordinado',      color: 'rgba(39,20,71,.7)' },
-        JEFE_AREA:              { label: 'Jefe de Área',     color: 'rgb(114,0,53)' },
-        DEPENDENCIA_DIRECTA:    { label: 'Dep. Directa',     color: '#666' },
-        GERENTE_ADMINISTRATIVO: { label: 'Ger. Adm.',        color: '#1a5c2a' },
-        GERENTE_SALUD:          { label: 'Ger. Salud',       color: '#0a4b7c' },
-        GERENTE_GENERAL:        { label: 'Gerente General',  color: '#6b0000' },
+        'PERSONAL DE AREA':      { label: 'Personal de Área',  color: 'rgba(39,20,71,.7)' },
+        'JEFE AREA':             { label: 'Jefe de Área',      color: 'rgb(114,0,53)' },
+        'DEPENDENCIA DIRECTA':   { label: 'Dep. Directa',      color: '#666' },
+        'GERENTE ADMINISTRATIVO':{ label: 'Ger. Adm.',         color: '#1a5c2a' },
+        'GERENTE SALUD':         { label: 'Ger. Salud',        color: '#0a4b7c' },
+        'GERENTE GENERAL':       { label: 'Gerente General',   color: '#6b0000' },
     };
     const t = map[tipo] || { label: tipo, color: '#555' };
     return `<span class="role-badge-mini" style="background:${t.color}">${t.label}</span>`;

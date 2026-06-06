@@ -394,6 +394,8 @@ body {
     border-radius: 10px;
     border-left: 4px solid;
     width: 45%;
+    min-width: 0;
+    overflow: hidden;
     position: relative;
 }
 
@@ -578,6 +580,9 @@ body {
     font-size: 0.9em;
     color: #555;
     font-style: italic;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .no-request-message {

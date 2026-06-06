@@ -4,6 +4,8 @@ from datetime import date
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, update_session_auth_hash
+from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import make_password, check_password as django_check_password
 from django.http import HttpResponse, JsonResponse
@@ -243,6 +245,124 @@ def cambiar_contrasena_view(request):
         return JsonResponse({'ok': True})
 
     return HttpResponse(status=405)
+
+
+# ──────────────────────────────────────────────────────────────
+#  Recuperación de contraseña (sin email)
+# ──────────────────────────────────────────────────────────────
+
+def recuperar_contrasena_view(request):
+    return render(request, 'accounts/Recuperar_Contrasena.html')
+
+
+def _incrementar_intentos_rec(ci):
+    intentos_key = f'rec_intentos_{ci}'
+    bloqueo_key  = f'rec_bloqueado_{ci}'
+    intentos = (cache.get(intentos_key) or 0) + 1
+    if intentos >= 3:
+        cache.set(bloqueo_key, True, 15 * 60)
+        cache.delete(intentos_key)
+    else:
+        cache.set(intentos_key, intentos, 15 * 60)
+
+
+@require_POST
+def recuperar_verificar(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Solicitud inválida.'}, status=400)
+
+    ci            = data.get('ci', '').strip()
+    fecha_nac_str = data.get('fecha_nacimiento', '').strip()
+    matricula     = data.get('matricula_seguro', '').strip()
+
+    if not all([ci, fecha_nac_str, matricula]):
+        return JsonResponse({'error': 'Todos los campos son obligatorios.'}, status=400)
+
+    if cache.get(f'rec_bloqueado_{ci}'):
+        return JsonResponse(
+            {'error': 'Demasiados intentos fallidos. Intente nuevamente en 15 minutos.'},
+            status=429,
+        )
+
+    try:
+        fecha_nac = date.fromisoformat(fecha_nac_str)
+    except ValueError:
+        return JsonResponse({'error': 'Formato de fecha inválido.'}, status=400)
+
+    _ERROR = 'Los datos ingresados no coinciden con ningún registro.'
+
+    try:
+        persona     = Persona.objects.get(ci=ci)
+        funcionario = Funcionario.objects.get(ci=persona, estado='ACTIVO')
+    except (Persona.DoesNotExist, Funcionario.DoesNotExist):
+        _incrementar_intentos_rec(ci)
+        return JsonResponse({'error': _ERROR}, status=400)
+
+    if persona.fecha_nacimiento != fecha_nac:
+        _incrementar_intentos_rec(ci)
+        return JsonResponse({'error': _ERROR}, status=400)
+
+    if not funcionario.matricula_seguro or funcionario.matricula_seguro.strip() != matricula:
+        _incrementar_intentos_rec(ci)
+        return JsonResponse({'error': _ERROR}, status=400)
+
+    # Verificación exitosa — guardar CI en sesión temporal
+    cache.delete(f'rec_intentos_{ci}')
+    request.session['recuperacion_ci'] = ci
+    request.session.set_expiry(10 * 60)  # 10 minutos para completar el paso 2
+
+    return JsonResponse({'ok': True})
+
+
+@require_POST
+def recuperar_nueva_contrasena(request):
+    ci = request.session.get('recuperacion_ci')
+    if not ci:
+        return JsonResponse(
+            {'error': 'Sesión de recuperación expirada. Vuelva a verificar sus datos.'},
+            status=403,
+        )
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Solicitud inválida.'}, status=400)
+
+    nueva     = data.get('nueva', '').strip()
+    confirmar = data.get('confirmar', '').strip()
+
+    if not nueva or not confirmar:
+        return JsonResponse({'error': 'Todos los campos son obligatorios.'}, status=400)
+
+    if nueva != confirmar:
+        return JsonResponse({'error': 'Las contraseñas no coinciden.'}, status=400)
+
+    if not _PATRON_CONTRASENA.match(nueva):
+        return JsonResponse(
+            {'error': 'La contraseña no cumple con los requisitos de seguridad.'},
+            status=400,
+        )
+
+    try:
+        persona     = Persona.objects.get(ci=ci)
+        funcionario = Funcionario.objects.get(ci=persona)
+        user        = User.objects.get(username=ci)
+    except Exception:
+        return JsonResponse({'error': 'No se encontró el registro del funcionario.'}, status=404)
+
+    funcionario.contrasena_hash = make_password(nueva)
+    funcionario.save(update_fields=['contrasena_hash'])
+    user.set_password(nueva)
+    user.save()
+
+    try:
+        del request.session['recuperacion_ci']
+    except KeyError:
+        pass
+
+    return JsonResponse({'ok': True})
 
 
 # ──────────────────────────────────────────────────────────────

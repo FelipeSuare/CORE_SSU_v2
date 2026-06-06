@@ -20,30 +20,30 @@ from vacations.models import (
 from vacations.utils import calcular_anios_antiguedad, dias_por_antiguedad, poblar_gestion_vacacion
 
 _NIVEL_LABELS = {
-    'SUBORDINADO':            {1: 'Jefe de Área', 2: 'Gerente Adm./Salud', 3: 'Gerente General'},
-    'JEFE_AREA':              {1: 'Gerente Adm./Salud', 2: 'Gerente General'},
-    'DEPENDENCIA_DIRECTA':    {1: 'Gerente General'},
-    'GERENTE_ADMINISTRATIVO': {1: 'Gerente General'},
-    'GERENTE_SALUD':          {1: 'Gerente General'},
-    'GERENTE_GENERAL':        {},
+    'PERSONAL DE AREA':      {1: 'Jefe de Área', 2: 'Gerente Adm./Salud', 3: 'Gerente General'},
+    'JEFE AREA':             {1: 'Gerente Adm./Salud', 2: 'Gerente General'},
+    'DEPENDENCIA DIRECTA':   {1: 'Gerente General'},
+    'GERENTE ADMINISTRATIVO':{1: 'Gerente General'},
+    'GERENTE SALUD':         {1: 'Gerente General'},
+    'GERENTE GENERAL':       {},
 }
 
 _ESTADOS_PENDIENTE = ('PENDIENTE_JEFE', 'PENDIENTE_GERENTE_AREA', 'PENDIENTE_GERENTE_GENERAL')
 
 _NIVEL_COLS = {
-    'SUBORDINADO': [
+    'PERSONAL DE AREA': [
         {'db_nivel': 1, 'header': 'Nivel 1', 'subtitle': 'Jefe de Área'},
         {'db_nivel': 2, 'header': 'Nivel 2', 'subtitle': 'Gte. Adm./Salud'},
         {'db_nivel': 3, 'header': 'Nivel 3', 'subtitle': 'Gerente General'},
     ],
-    'JEFE_AREA': [
+    'JEFE AREA': [
         {'db_nivel': 1, 'header': 'Nivel 2', 'subtitle': 'Gte. Adm./Salud'},
         {'db_nivel': 2, 'header': 'Nivel 3', 'subtitle': 'Gerente General'},
     ],
-    'DEPENDENCIA_DIRECTA':    [{'db_nivel': 1, 'header': 'Nivel 3', 'subtitle': 'Gerente General'}],
-    'GERENTE_ADMINISTRATIVO': [{'db_nivel': 1, 'header': 'Nivel 3', 'subtitle': 'Gerente General'}],
-    'GERENTE_SALUD':          [{'db_nivel': 1, 'header': 'Nivel 3', 'subtitle': 'Gerente General'}],
-    'GERENTE_GENERAL':        [],
+    'DEPENDENCIA DIRECTA':   [{'db_nivel': 1, 'header': 'Nivel 3', 'subtitle': 'Gerente General'}],
+    'GERENTE ADMINISTRATIVO':[{'db_nivel': 1, 'header': 'Nivel 3', 'subtitle': 'Gerente General'}],
+    'GERENTE SALUD':         [{'db_nivel': 1, 'header': 'Nivel 3', 'subtitle': 'Gerente General'}],
+    'GERENTE GENERAL':       [],
 }
 
 
@@ -341,13 +341,19 @@ def crear_solicitud(request):
 
     try:
         with transaction.atomic():
+            # Sin niveles de aprobación (ej. GERENTE_GENERAL) → aprobada automáticamente
+            tiene_niveles = JerarquiaAprobacion.objects.filter(
+                cod_funcionario=f, activo=True
+            ).exists()
+            estado_inicial = 'PENDIENTE_JEFE' if tiene_niveles else 'APROBADA'
+
             solicitud = SolicitudVacacion.objects.create(
                 cod_funcionario=f,
                 fecha_salida=fecha_salida,
                 fecha_retorno=fecha_retorno,
                 dias_solicitados=dias,
                 motivo_vacacion=motivo,
-                estado='PENDIENTE_JEFE',
+                estado=estado_inicial,
             )
             # Descontar días desde la gestión más antigua (4 → 1)
             pendientes = dias
@@ -386,6 +392,16 @@ def mis_solicitudes(request):
         f = _get_funcionario(request)
     except Funcionario.DoesNotExist:
         return JsonResponse({'error': 'Funcionario no encontrado.'}, status=404)
+
+    # Corregir solicitudes antiguas de funcionarios sin niveles de aprobación
+    # que quedaron atrapadas en estado PENDIENTE_* antes del fix de auto-aprobación.
+    sin_niveles = not JerarquiaAprobacion.objects.filter(
+        cod_funcionario=f, activo=True
+    ).exists()
+    if sin_niveles:
+        SolicitudVacacion.objects.filter(
+            cod_funcionario=f, estado__in=list(_ESTADOS_PENDIENTE)
+        ).update(estado='APROBADA')
 
     solicitudes_qs = list(
         SolicitudVacacion.objects.filter(cod_funcionario=f)
@@ -461,7 +477,7 @@ def mis_solicitudes(request):
             'ci': f.ci.ci,
         },
         'tipo_funcionario': f.tipo_funcionario,
-        'nivel_cols': _NIVEL_COLS.get(f.tipo_funcionario, _NIVEL_COLS['SUBORDINADO']),
+        'nivel_cols': _NIVEL_COLS.get(f.tipo_funcionario, _NIVEL_COLS['PERSONAL DE AREA']),
     })
 
 
@@ -507,14 +523,29 @@ def seguimiento_solicitud(request):
         'comentarios': solicitud.motivo_vacacion or 'Solicitud enviada a revisión',
     }]
 
+    # Sin niveles de aprobación → entrada automática en el timeline
+    if not jerarquia:
+        timeline.append({
+            'nivel':       'Aprobación automática',
+            'responsable': 'Sistema',
+            'estado':      'approved',
+            'fecha':       solicitud.fecha_solicitud.strftime('%Y-%m-%d'),
+            'comentarios': 'No requiere niveles de aprobación.',
+        })
+
     hubo_rechazo = False
     for j in jerarquia:
-        ap = aprobaciones.get(j.nivel_aprobacion)
-        nombre_ap = (
-            f"{j.cod_aprobador.ci.nombre} {j.cod_aprobador.ci.ap_paterno} "
-            f"{j.cod_aprobador.ci.ap_materno or ''}"
-        ).strip()
+        ap    = aprobaciones.get(j.nivel_aprobacion)
         label = labels.get(j.nivel_aprobacion, f'Nivel {j.nivel_aprobacion}')
+
+        # Si ya hay decisión, mostrar quien realmente la tomó (puede ser un aprobador anterior).
+        # Si está pendiente, mostrar el aprobador activo actual del nivel.
+        if ap:
+            dec = ap.cod_aprobador.ci
+            nombre_ap = f"{dec.nombre} {dec.ap_paterno} {dec.ap_materno or ''}".strip()
+        else:
+            cur = j.cod_aprobador.ci
+            nombre_ap = f"{cur.nombre} {cur.ap_paterno} {cur.ap_materno or ''}".strip()
 
         if hubo_rechazo:
             timeline.append({
@@ -690,12 +721,16 @@ def solicitudes_para_aprobar(request):
         flujo = []
         for j in jerarquias_por_func.get(f.cod_funcionario, []):
             ap = aprs.get(j.nivel_aprobacion)
+            # Nombre: quien realmente decidió si ya hay decisión, o el aprobador activo actual
+            if ap:
+                dec = ap.cod_aprobador.ci
+                nombre_apr = f"{dec.nombre} {dec.ap_paterno}".strip()
+            else:
+                nombre_apr = f"{j.cod_aprobador.ci.nombre} {j.cod_aprobador.ci.ap_paterno}".strip()
             flujo.append({
                 'nivel': j.nivel_aprobacion,
                 'label': labels.get(j.nivel_aprobacion, f'Nivel {j.nivel_aprobacion}'),
-                'nombre_aprobador': (
-                    f"{j.cod_aprobador.ci.nombre} {j.cod_aprobador.ci.ap_paterno}"
-                ).strip(),
+                'nombre_aprobador': nombre_apr,
                 'decision': ap.decision if ap else None,
                 'fecha': ap.fecha_decision.strftime('%Y-%m-%d') if ap else None,
                 'observacion': ap.observacion if ap else None,
@@ -1054,19 +1089,19 @@ def inicializar_vacaciones(request):
 _ROLES_HISTORIAL = {'RRHH', 'Administrador'}
 
 _PDF_FIRMAS = {
-    'SUBORDINADO': [
+    'PERSONAL DE AREA': [
         ('Firma Jefe de Área', 1),
         ('Firma de Gerente de\nSalud o Administrativo', 2),
         ('Firma de Gerente General', 3),
     ],
-    'JEFE_AREA': [
+    'JEFE AREA': [
         ('Firma de Gerente de\nSalud o Administrativo', 1),
         ('Firma de Gerente General', 2),
     ],
-    'GERENTE_ADMINISTRATIVO': [('Firma de Gerente General', 1)],
-    'GERENTE_SALUD':          [('Firma de Gerente General', 1)],
-    'DEPENDENCIA_DIRECTA':    [('Firma de Gerente General', 1)],
-    'GERENTE_GENERAL':        [],
+    'GERENTE ADMINISTRATIVO': [('Firma de Gerente General', 1)],
+    'GERENTE SALUD':          [('Firma de Gerente General', 1)],
+    'DEPENDENCIA DIRECTA':    [('Firma de Gerente General', 1)],
+    'GERENTE GENERAL':        [],
 }
 
 
@@ -1107,6 +1142,17 @@ def api_historial_rrhh(request):
     unidad_id = request.GET.get('unidad', '').strip()
     tipo_cont = request.GET.get('tipo_contrato', '').strip()
     nombre_b  = request.GET.get('funcionario', '').strip()
+
+    # Corregir en lote solicitudes pendientes de funcionarios sin niveles de aprobación
+    # (ej. GERENTE_GENERAL) que quedaron atrapadas antes del fix de auto-aprobación.
+    from django.db.models import Exists, OuterRef
+    SolicitudVacacion.objects.filter(
+        estado__in=list(_ESTADOS_PENDIENTE)
+    ).exclude(
+        cod_funcionario__in=JerarquiaAprobacion.objects.filter(
+            activo=True
+        ).values('cod_funcionario')
+    ).update(estado='APROBADA')
 
     qs = SolicitudVacacion.objects.filter(estado='APROBADA').select_related(
         'cod_funcionario__ci', 'cod_funcionario__id_unidad'
@@ -1349,7 +1395,7 @@ def _generar_pdf_solicitud(solicitud):
         os.path.join(os.path.dirname(__file__), '..', 'static', 'img', 'login', 'LOGOSSU.png')
     )
     logo_cell = (
-        Image(logo_path, width=2.8*cm, height=2.8*cm)
+        Image(logo_path, width=6*cm, height=6*cm)
         if os.path.exists(logo_path) else P('', sVal)
     )
 
@@ -1476,7 +1522,7 @@ def _generar_pdf_solicitud(solicitud):
 
     firmas = _PDF_FIRMAS.get(tipo, [])
 
-    if tipo == 'GERENTE_GENERAL':
+    if tipo == 'GERENTE GENERAL':
         t_nap = Table([[P('<b>NO POSEE NIVEL DE APROBACIÓN</b>', sBCenter)]], colWidths=[W])
         t_nap.setStyle(TableStyle([
             ('BOX',           (0, 0), (-1, -1), 0.5, BLACK),
@@ -1489,42 +1535,59 @@ def _generar_pdf_solicitud(solicitud):
         n  = len(firmas)
         fw = W / n
         # Fila de etiquetas (con espacio para la firma encima)
+        row_info   = []
         row_labels = []
         for label, nivel in firmas:
             apr = aprobadores.get(nivel)
-            nombre_apr = (
-                f"{apr.ci.nombre} {apr.ci.ap_paterno}".strip() if apr else ''
-            )
+            if apr:
+                nombre_apr = f"{apr.ci.nombre} {apr.ci.ap_paterno} {apr.ci.ap_materno or ''}".strip()
+                cod_apr    = apr.cod_funcionario
+                info_txt   = f'<b>{nombre_apr}</b><br/><font size="6">Cód: {cod_apr}</font>'
+            else:
+                info_txt = ''
+            row_info.append(P(info_txt, sCenter))
             row_labels.append(P(label, sBCenter))
 
         t_ap = Table([
             [P('', sVal)] * n,    # espacio para firma
-            row_labels,            # etiquetas
-        ], colWidths=[fw] * n, rowHeights=[2.2*cm, None])
+            row_info,              # nombre + código del aprobador
+            row_labels,            # etiqueta del rol
+        ], colWidths=[fw] * n, rowHeights=[2.2*cm, None, None])
         t_ap.setStyle(TableStyle([
             ('BOX',           (0, 0), (-1, -1), 0.5, BLACK),
             ('INNERGRID',     (0, 0), (-1, -1), 0.5, BLACK),
             ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN',        (0, 0), (-1, 0), 'BOTTOM'),
-            ('TOPPADDING',    (0, 1), (-1, 1), 4),
-            ('BOTTOMPADDING', (0, 1), (-1, 1), 6),
+            ('TOPPADDING',    (0, 1), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
         ]))
         elements.append(t_ap)
 
     # ── Firma funcionario + RRHH ─────────────────────────────
     wh = W / 2
+
+    func_info = f'<b>{nombre_completo}</b><br/><font size="6">Cód: {f.cod_funcionario}</font>'
+
+    if rrhh_fr:
+        rrhh_full = f"{rrhh_fr.cod_funcionario.ci.nombre} {rrhh_fr.cod_funcionario.ci.ap_paterno} {rrhh_fr.cod_funcionario.ci.ap_materno or ''}".strip()
+        rrhh_cod  = rrhh_fr.cod_funcionario.cod_funcionario
+        rrhh_info = f'<b>{rrhh_full}</b><br/><font size="6">Cód: {rrhh_cod}</font>'
+    else:
+        rrhh_info = ''
+
     t_fin = Table([
-        [P('', sVal), P('', sVal)],              # espacio firma
+        [P('', sVal), P('', sVal)],                          # espacio para firma/sello
+        [P(func_info, sCenter), P(rrhh_info, sCenter)],      # nombre + código
         [P('Firma funcionario', sBCenter),
-         P('Firma del Jefe de Recursos Humanos', sBCenter)],
-    ], colWidths=[wh, wh], rowHeights=[2.2*cm, None])
+         P('Firma del Jefe de Recursos Humanos', sBCenter)],  # etiqueta
+    ], colWidths=[wh, wh], rowHeights=[2.2*cm, None, None])
     t_fin.setStyle(TableStyle([
         ('BOX',           (0, 0), (-1, -1), 0.5, BLACK),
         ('INNERGRID',     (0, 0), (-1, -1), 0.5, BLACK),
         ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN',        (0, 0), (-1, 0), 'BOTTOM'),
-        ('TOPPADDING',    (0, 1), (-1, 1), 4),
-        ('BOTTOMPADDING', (0, 1), (-1, 1), 6),
+        ('TOPPADDING',    (0, 1), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
     ]))
     elements.append(t_fin)
     elements.append(Spacer(1, 0.2*cm))
@@ -1532,7 +1595,7 @@ def _generar_pdf_solicitud(solicitud):
     # ── Nota y fecha de impresión ────────────────────────────
     fecha_imp = date.today().strftime('%d/%m/%Y')
     t_nota = Table([[
-        P("Nota: El funcionario al firmar esto en total acuerdo el o ver presentado y aprobada su solicitud.", sSmall),
+        P("Nota: Este documento certifica la conformidad del funcionario con haber presentado y obtenido la aprobación de su solicitud.", sSmall),
         P(f"<b>Fecha:</b> {fecha_imp}", sSmallB),
     ]], colWidths=[W * 0.72, W * 0.28])
     t_nota.setStyle(TableStyle([

@@ -25,6 +25,7 @@ urlpatterns = [
     # Accounts
     path('Perfil.html', accounts_views.perfil_view, name='perfil'),
     path('Contrasena.html', accounts_views.cambiar_contrasena_view, name='contrasena'),
+    path('Recuperar.html', accounts_views.recuperar_contrasena_view, name='recuperar'),
 
     # Core
     path('Feriados.html', core_views.feriados_view, name='feriados'),

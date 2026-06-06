@@ -46,21 +46,23 @@
   /* Columnas de fecha y estado: sin quiebre */
   td:nth-child(7),
   td:nth-child(8),
-  td:nth-child(11) {
+  td:nth-child(11),
+  td:nth-child(12) {
     white-space: nowrap;
   }
-  /* Anchos proporcionales para las 11 columnas */
+  /* Anchos proporcionales para las 12 columnas */
   col.col-n       { width: 3%; }
-  col.col-ci      { width: 8%; }
-  col.col-nombre  { width: 16%; }
-  col.col-cargo   { width: 14%; }
-  col.col-unidad  { width: 12%; }
+  col.col-ci      { width: 7%; }
+  col.col-nombre  { width: 14%; }
+  col.col-cargo   { width: 13%; }
+  col.col-unidad  { width: 10%; }
   col.col-contrato{ width: 8%; }
-  col.col-ingreso { width: 9%; }
-  col.col-antig   { width: 8%; }
-  col.col-tipo    { width: 8%; }
-  col.col-roles   { width: 9%; }
+  col.col-ingreso { width: 8%; }
+  col.col-antig   { width: 7%; }
+  col.col-tipo    { width: 7%; }
+  col.col-roles   { width: 8%; }
   col.col-estado  { width: 5%; }
+  col.col-baja    { width: 8%; }
 
   tr:nth-child(even) td { background: #fdf0f0; }
   .activo   { color: #1a6b30; font-weight: 700; }
@@ -114,12 +116,13 @@
     <col class="col-tipo">
     <col class="col-roles">
     <col class="col-estado">
+    <col class="col-baja">
   </colgroup>
   <thead>
     <tr>
       <th>N°</th><th>CI</th><th>Nombres</th><th>Cargo</th>
       <th>Unidad</th><th>Contrato</th><th>Ingreso</th>
-      <th>Antigüedad</th><th>Tipo</th><th>Roles</th><th>Estado</th>
+      <th>Antigüedad</th><th>Tipo</th><th>Roles</th><th>Estado</th><th>Fecha Baja</th>
     </tr>
   </thead>
   <tbody>
@@ -138,10 +141,13 @@
       <td class="{% if f.estado == 'ACTIVO' %}activo{% else %}inactivo{% endif %}">
         {{ f.estado }}
       </td>
+      <td class="{% if f.fecha_baja %}inactivo{% endif %}">
+        {% if f.fecha_baja %}{{ f.fecha_baja }}{% else %}—{% endif %}
+      </td>
     </tr>
     {% empty %}
     <tr>
-      <td colspan="11" style="text-align:center;padding:20px;color:#aaa">
+      <td colspan="12" style="text-align:center;padding:20px;color:#aaa">
         No se encontraron funcionarios con los filtros seleccionados.
       </td>
     </tr>

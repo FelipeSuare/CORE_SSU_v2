@@ -278,7 +278,10 @@ tbody tr:hover td { background: rgba(249,201,201,0.22); transition: background 0
 .td-texto {
     text-align: left !important;
     max-width: 160px;
-    white-space: normal;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    overflow: hidden;
 }
 
 /* ── APROBACIÓN POR NIVELES ── */

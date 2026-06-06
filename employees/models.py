@@ -19,8 +19,16 @@ class Funcionario(models.Model):
     matricula_seguro = models.CharField(max_length=20, unique=True, blank=True, null=True)
     id_unidad = models.ForeignKey('core.UnidadOrganizacional', models.DO_NOTHING, db_column='id_unidad')
     fecha_ingreso = models.DateField()
-    tipo_funcionario = models.CharField(max_length=20, choices=[('SUBORDINADO', 'SUBORDINADO'), ('JEFE_AREA', 'JEFE_AREA')])
+    tipo_funcionario = models.CharField(max_length=25, choices=[
+        ('PERSONAL DE AREA',      'PERSONAL DE AREA'),
+        ('JEFE AREA',             'JEFE AREA'),
+        ('DEPENDENCIA DIRECTA',   'DEPENDENCIA DIRECTA'),
+        ('GERENTE ADMINISTRATIVO','GERENTE ADMINISTRATIVO'),
+        ('GERENTE SALUD',         'GERENTE SALUD'),
+        ('GERENTE GENERAL',       'GERENTE GENERAL'),
+    ])
     estado = models.CharField(max_length=10, default='ACTIVO')
+    fecha_baja = models.DateField(blank=True, null=True)
     contrasena_hash = models.CharField(max_length=255)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 

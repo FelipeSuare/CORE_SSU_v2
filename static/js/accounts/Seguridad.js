@@ -168,16 +168,22 @@ async function cambiarContrasena() {
         const data = await resp.json();
 
         if (!resp.ok) {
-            mostrarError(data.error || 'Error al cambiar la contraseña.');
+            AppDialog.alert(data.error || 'Error al cambiar la contraseña.', {
+                title: 'Error', icon: 'error', variant: 'danger',
+            });
             return;
         }
 
         // Éxito
-        alertSuccess.style.display = 'flex';
         limpiarFormulario();
+        AppDialog.alert('Contraseña actualizada correctamente.', {
+            title: 'Éxito', icon: 'check_circle', variant: 'success',
+        });
 
     } catch {
-        mostrarError('Error de conexión. Intente nuevamente.');
+        AppDialog.alert('Error de conexión. Intente nuevamente.', {
+            title: 'Error de conexión', icon: 'wifi_off',
+        });
     } finally {
         btnSubmit.disabled    = false;
         btnSubmit.innerHTML   = '<i class="material-symbols-outlined">save</i> Cambiar Contraseña';

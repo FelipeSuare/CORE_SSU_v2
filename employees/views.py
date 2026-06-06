@@ -15,12 +15,12 @@ from vacations.models import GestionVacacion, JerarquiaAprobacion
 from vacations.utils import calcular_anios_antiguedad
 
 _NIVELES = {
-    'SUBORDINADO':            3,
-    'JEFE_AREA':              2,
-    'DEPENDENCIA_DIRECTA':    1,
-    'GERENTE_ADMINISTRATIVO': 1,
-    'GERENTE_SALUD':          1,
-    'GERENTE_GENERAL':        0,
+    'PERSONAL DE AREA':      3,
+    'JEFE AREA':             2,
+    'DEPENDENCIA DIRECTA':   1,
+    'GERENTE ADMINISTRATIVO':1,
+    'GERENTE SALUD':         1,
+    'GERENTE GENERAL':       0,
 }
 
 _ROLES_EMPLOYEES  = frozenset({'RRHH', 'Administrador'})
@@ -76,6 +76,9 @@ def _siguiente_cod_funcionario():
 def _serializar_funcionario(f):
     p = f.ci
     cargo_act = HistorialCargo.objects.filter(cod_funcionario=f, es_actual=True).first()
+    if not cargo_act:
+        # Para inactivos: el último cargo registrado (es_actual=False)
+        cargo_act = HistorialCargo.objects.filter(cod_funcionario=f).order_by('-fecha_inicio').first()
     roles = list(
         FuncionarioRol.objects.filter(cod_funcionario=f, activo=True)
         .values_list('id_roles__tipo_rol', flat=True)
@@ -90,6 +93,7 @@ def _serializar_funcionario(f):
             cod_funcionario=f, activo=True
         ).select_related('cod_aprobador__ci').order_by('nivel_aprobacion')
     ]
+    fecha_baja = f.fecha_baja.strftime('%Y-%m-%d') if f.fecha_baja else ''
     return {
         'cod':              f.cod_funcionario,
         'ci':               p.ci,
@@ -106,6 +110,7 @@ def _serializar_funcionario(f):
         'tipo_funcionario': f.tipo_funcionario,
         'estado':           f.estado,
         'antiguedad':       _calcular_antiguedad(f.fecha_ingreso),
+        'fecha_baja':       fecha_baja,
         'roles':            roles,
         'jerarquia':        jerarquia,
     }
@@ -480,12 +485,16 @@ def toggle_estado(request, cod):
 
         cargo_act = HistorialCargo.objects.filter(cod_funcionario=f, es_actual=True).first()
         if cargo_act:
-            cargo_act.fecha_fin = fecha_baja
             cargo_act.es_actual = False
-            cargo_act.save(update_fields=['fecha_fin', 'es_actual'])
+            cargo_act.save(update_fields=['es_actual'])
 
-    f.estado = nuevo_estado
-    f.save(update_fields=['estado'])
+        f.fecha_baja = fecha_baja
+        f.estado = nuevo_estado
+        f.save(update_fields=['estado', 'fecha_baja'])
+    else:
+        f.fecha_baja = None
+        f.estado = nuevo_estado
+        f.save(update_fields=['estado', 'fecha_baja'])
     return JsonResponse({'ok': True, 'estado': f.estado})
 
 

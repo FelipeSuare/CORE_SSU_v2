@@ -86,7 +86,7 @@
                                 <th>NOMBRES Y CARGO</th>
                                 <th>UNIDAD</th>
                                 <th>FECHA<br>INGRESO</th>
-                                <th>ANTIGÜEDAD</th>
+                                <th id="thAntiguedadBaja">ANTIGÜEDAD</th>
                                 <th>TIPO DE<br>FUNCIONARIO</th>
                                 <th>ROLES EN<br>EL SISTEMA</th>
                                 <th>ACCIONES</th>
@@ -127,6 +127,13 @@
                         <div class="form-group"><label>Tipo de Contrato</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">description</i><select id="tipoContrato" required><option value="">Seleccionar...</option><option value="Contrato Indefinido">Contrato Indefinido</option><option value="Item">Item</option></select></div></div>
                         <div class="form-group"><label>Unidad Organizacional</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">domain</i><select id="unidad" required><option value="">Seleccionar...</option><option value="Administrativa">Administrativa</option><option value="Salud">Salud</option></select></div></div>
                         <div class="form-group"><label>Fecha de Ingreso</label><div class="input-wrapper"><i class="material-symbols-outlined input-icon">calendar_month</i><input type="date" id="fechaIngreso" required></div></div>
+                        <div class="form-group" id="grupoBaja" style="display:none">
+                            <label style="color:var(--color-pink-dark)">Fecha de Baja</label>
+                            <div class="input-wrapper">
+                                <i class="material-symbols-outlined input-icon" style="color:var(--color-pink-dark)">event_busy</i>
+                                <input type="text" id="fechaBajaInfo" readonly style="background:#fff5f7;color:var(--color-pink-dark);cursor:default;font-weight:600">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -154,12 +161,12 @@
                                 <i class="material-symbols-outlined input-icon">domain</i>
                                 <select id="tipoFuncionario" required onchange="actualizarJerarquia()">
                                     <option value="">Seleccionar tipo...</option>
-                                    <option value="SUBORDINADO">Subordinado</option>
-                                    <option value="JEFE_AREA">Jefe de Área</option>
-                                    <option value="DEPENDENCIA_DIRECTA">Dependencia Directa</option>
-                                    <option value="GERENTE_ADMINISTRATIVO">Gerente Administrativo</option>
-                                    <option value="GERENTE_SALUD">Gerente de Salud</option>
-                                    <option value="GERENTE_GENERAL">Gerente General</option>
+                                    <option value="PERSONAL DE AREA">Personal de Área</option>
+                                    <option value="JEFE AREA">Jefe de Área</option>
+                                    <option value="DEPENDENCIA DIRECTA">Dependencia Directa</option>
+                                    <option value="GERENTE ADMINISTRATIVO">Gerente Administrativo</option>
+                                    <option value="GERENTE SALUD">Gerente de Salud</option>
+                                    <option value="GERENTE GENERAL">Gerente General</option>
                                 </select>
                             </div>
                         </div>
