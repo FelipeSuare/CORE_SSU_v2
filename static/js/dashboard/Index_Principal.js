@@ -1,65 +1,87 @@
-﻿// Variables globales
-const sidebar = document.getElementById('sidebar');
+// ── Sidebar elements ─────────────────────────────────────────────
+const sidebar       = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebarToggle');
-const mainContent = document.getElementById('mainContent');
+const mainContent   = document.getElementById('mainContent');
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 
-// Toggle del sidebar
+// Overlay (created once, always in DOM)
+const overlay = document.createElement('div');
+overlay.className = 'sidebar-overlay';
+document.body.appendChild(overlay);
+
+// ── Helpers ──────────────────────────────────────────────────────
+function isMobile() {
+    return window.innerWidth <= 768;
+}
+
+function openMobile() {
+    sidebar.classList.add('mobile-open');
+    overlay.classList.add('active');
+    if (mobileMenuBtn) {
+        mobileMenuBtn.querySelector('.material-symbols-outlined').textContent = 'close';
+    }
+}
+
+function closeMobile() {
+    sidebar.classList.remove('mobile-open');
+    overlay.classList.remove('active');
+    if (mobileMenuBtn) {
+        mobileMenuBtn.querySelector('.material-symbols-outlined').textContent = 'menu';
+    }
+}
+
+// ── Sidebar toggle ───────────────────────────────────────────────
+// Desktop: colapsa/expande. Móvil: solo cierra (el botón está dentro del sidebar visible).
 sidebarToggle.addEventListener('click', () => {
-    sidebar.classList.toggle('collapsed');
-    mainContent.classList.toggle('expanded');
+    if (isMobile()) {
+        closeMobile();
+    } else {
+        sidebar.classList.toggle('collapsed');
+        mainContent.classList.toggle('expanded');
+    }
 });
 
-// Manejo de items del menú
+// Botón hamburguesa del topbar móvil
+if (mobileMenuBtn) {
+    mobileMenuBtn.addEventListener('click', () => {
+        sidebar.classList.contains('mobile-open') ? closeMobile() : openMobile();
+    });
+}
+
+// Click en overlay cierra el sidebar
+overlay.addEventListener('click', closeMobile);
+
+// ── Ítems del menú ───────────────────────────────────────────────
 const menuItems = document.querySelectorAll('.menu-item a');
 menuItems.forEach(item => {
-    item.addEventListener('click', (e) => {
-        // No prevenir el default si es un toggle de submenú
+    item.addEventListener('click', () => {
         if (!item.classList.contains('submenu-toggle')) {
-            // Remover clase active de todos los items
-            document.querySelectorAll('.menu-item').forEach(mi => {
-                mi.classList.remove('active');
-            });
-            
-            // Agregar clase active al item clickeado
+            document.querySelectorAll('.menu-item').forEach(mi => mi.classList.remove('active'));
             item.closest('.menu-item').classList.add('active');
-            
-            // Obtener la página a cargar
-            const page = item.getAttribute('data-page');
-            // Dejar que el nav del navegador actúe por defecto sobre el href
+            if (isMobile()) closeMobile();
         }
     });
 });
 
-// Manejo de submenús
+// ── Submenús ─────────────────────────────────────────────────────
 const submenuToggles = document.querySelectorAll('.submenu-toggle');
 submenuToggles.forEach(toggle => {
     toggle.addEventListener('click', (e) => {
         e.preventDefault();
-        const parentItem = toggle.closest('.has-submenu');
-        parentItem.classList.toggle('open');
+        toggle.closest('.has-submenu').classList.toggle('open');
     });
 });
 
-// Manejo de items del submenú
 const submenuItems = document.querySelectorAll('.submenu a');
 submenuItems.forEach(item => {
-    item.addEventListener('click', (e) => {
-        // Remover clase active de todos los items principales
-        document.querySelectorAll('.menu-item').forEach(mi => {
-            mi.classList.remove('active');
-        });
-        
-        // Agregar clase active al parent del submenú
-        const parentMenuItem = item.closest('.has-submenu');
-        parentMenuItem.classList.add('active');
-        
-        // Obtener la página a cargar
-        const page = item.getAttribute('data-page');
-        // Dejar que el nav del navegador actúe por defecto sobre el href
+    item.addEventListener('click', () => {
+        document.querySelectorAll('.menu-item').forEach(mi => mi.classList.remove('active'));
+        item.closest('.has-submenu').classList.add('active');
+        if (isMobile()) closeMobile();
     });
 });
 
-// Botón de cerrar sesión
+// ── Cerrar sesión ─────────────────────────────────────────────────
 const btnLogout = document.querySelector('.btn-logout');
 btnLogout.addEventListener('click', async () => {
     const confirmar = await AppDialog.confirm('¿Estás seguro que deseas cerrar sesión?', {
@@ -71,7 +93,6 @@ btnLogout.addEventListener('click', async () => {
     });
 
     if (confirmar) {
-        // Aquí iría la lógica de cierre de sesión
         await AppDialog.alert('Sesion cerrada correctamente', {
             title: 'Sesion finalizada',
             icon: 'check_circle',
@@ -81,99 +102,47 @@ btnLogout.addEventListener('click', async () => {
     }
 });
 
-// Función para cargar páginas (simulada)
-function loadPage(pageName) {
-    console.log(`Cargando página: ${pageName}`);
-    
-    // Aquí­ iría la lógica real de carga de páginas
-    // Por ejemplo: window.location.href = `${pageName}.html`;
-    
-    // En móvil, cerrar el sidebar después de seleccionar
-    if (window.innerWidth <= 768) {
-        sidebar.classList.remove('mobile-open');
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (overlay) {
-            overlay.classList.remove('active');
-        }
-    }
-}
-
-// Manejo responsive del sidebar en móviles
-if (window.innerWidth <= 768) {
-    // Agregar overlay para cerrar sidebar
-    const overlay = document.createElement('div');
-    overlay.className = 'sidebar-overlay';
-    document.body.appendChild(overlay);
-    
-    sidebarToggle.addEventListener('click', () => {
-        sidebar.classList.toggle('mobile-open');
-        overlay.classList.toggle('active');
-    });
-    
-    overlay.addEventListener('click', () => {
-        sidebar.classList.remove('mobile-open');
-        overlay.classList.remove('active');
-    });
-}
-
-// Ajustar el estado del sidebar al cambiar el tamaño de la ventana
+// ── Resize ────────────────────────────────────────────────────────
 window.addEventListener('resize', () => {
-    if (window.innerWidth > 768) {
-        sidebar.classList.remove('mobile-open');
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (overlay) {
-            overlay.classList.remove('active');
-        }
+    if (!isMobile()) {
+        closeMobile();
     }
+    updateCarousel();
 });
 
-// CAROUSEL FUNCTIONALITY
+// ── CAROUSEL ──────────────────────────────────────────────────────
 const carouselTrack = document.getElementById('carouselTrack');
-const slides = document.querySelectorAll('.carousel-slide');
-const prevBtn = document.getElementById('prevBtn');
-const nextBtn = document.getElementById('nextBtn');
-const indicators = document.querySelectorAll('.indicator');
+const slides        = document.querySelectorAll('.carousel-slide');
+const prevBtn       = document.getElementById('prevBtn');
+const nextBtn       = document.getElementById('nextBtn');
+const indicators    = document.querySelectorAll('.indicator');
 
 let currentSlide = 0;
 const totalSlides = slides.length;
 
-// Función para actualizar el carousel
 function updateCarousel() {
     const slideWidth = slides[0].clientWidth;
     carouselTrack.style.transform = `translateX(-${currentSlide * slideWidth}px)`;
-    
-    // Actualizar indicadores
+
     indicators.forEach((indicator, index) => {
-        if (index === currentSlide) {
-            indicator.classList.add('active');
-        } else {
-            indicator.classList.remove('active');
-        }
+        indicator.classList.toggle('active', index === currentSlide);
     });
-    
-    // Actualizar slides activas
+
     slides.forEach((slide, index) => {
-        if (index === currentSlide) {
-            slide.classList.add('active');
-        } else {
-            slide.classList.remove('active');
-        }
+        slide.classList.toggle('active', index === currentSlide);
     });
 }
 
-// Botón siguiente
 nextBtn.addEventListener('click', () => {
     currentSlide = (currentSlide + 1) % totalSlides;
     updateCarousel();
 });
 
-// Botón anterior
 prevBtn.addEventListener('click', () => {
     currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
     updateCarousel();
 });
 
-// Click en indicadores
 indicators.forEach((indicator, index) => {
     indicator.addEventListener('click', () => {
         currentSlide = index;
@@ -181,27 +150,16 @@ indicators.forEach((indicator, index) => {
     });
 });
 
-// Auto-play del carousel
 let autoplayInterval = setInterval(() => {
     currentSlide = (currentSlide + 1) % totalSlides;
     updateCarousel();
 }, 5000);
 
-// Pausar autoplay al hacer hover
 const carouselWrapper = document.querySelector('.carousel-wrapper');
-carouselWrapper.addEventListener('mouseenter', () => {
-    clearInterval(autoplayInterval);
-});
-
+carouselWrapper.addEventListener('mouseenter', () => clearInterval(autoplayInterval));
 carouselWrapper.addEventListener('mouseleave', () => {
     autoplayInterval = setInterval(() => {
         currentSlide = (currentSlide + 1) % totalSlides;
         updateCarousel();
     }, 5000);
 });
-
-// Ajustar carousel al cambiar tamaño de ventana
-window.addEventListener('resize', () => {
-    updateCarousel();
-});
-

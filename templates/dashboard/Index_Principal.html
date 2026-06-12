@@ -6,12 +6,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SSU - Gestión de Vacaciones</title>
     <style>:root{--color-pink-light:#F9c9c9;}body{background:#F9c9c9;margin:0;}</style>
-    <link rel="stylesheet" href="{% static 'css/dashboard/Index_Principal.css' %}">
+    <link rel="stylesheet" href="{% static 'css/dashboard/Index_Principal.css' %} ?v1.0">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
 </head>
 <body>
+
+    <!-- Barra superior solo en móvil -->
+    <div class="mobile-topbar" id="mobileTopbar">
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Abrir menú">
+            <i class="material-symbols-outlined">menu</i>
+        </button>
+        <span class="mobile-topbar-brand">SSU</span>
+        <div class="mobile-topbar-spacer"></div>
+    </div>
+
     <!-- Sidebar -->
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -207,8 +217,8 @@
         </div>
     </main>
 
-    <script src="{% static 'js/dashboard/Index_Principal.js' %}"></script>
-    <script src="{% static 'js/shared/notifications.js' %}"></script>
+    <script src="{% static 'js/dashboard/Index_Principal.js' %} ?v1.0"></script>
+    <script src="{% static 'js/shared/notifications.js' %} ?v1.0"></script>
 </body>
 </html>
 

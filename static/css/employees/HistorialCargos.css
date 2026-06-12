@@ -711,7 +711,7 @@ input[type="text"]:focus {
 ══════════════════════════════════════════ */
 @media (max-width: 768px) {
     body { padding: 14px; }
-    .filtros-card { flex-direction: column; }
+    /* .filtros-card { flex-direction: column; } */
     .filtro-grupo { min-width: 100%; }
     #cargosContainer { padding: 12px; }
     .cargo-bloque-header { flex-direction: column; align-items: flex-start; }

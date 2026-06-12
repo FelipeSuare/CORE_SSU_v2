@@ -333,16 +333,18 @@ body {
 /* TABLA CONTENIDA */
 .table-wrapper {
     overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
     margin: 0 20px 20px;
     border-radius: 14px;
-    overflow: hidden;
     border: 1px solid rgba(39,20,71,0.12);
     box-shadow: 0 4px 16px rgba(39,20,71,0.08);
 }
 
-table { 
-    width: 100%; 
-    border-collapse: collapse; 
+table {
+    width: 100%;
+    min-width: 520px;
+    border-collapse: collapse;
     background: var(--color-white-transparent);
 }
 
@@ -530,5 +532,16 @@ tbody tr:hover {
     }
     .filter-group {
         flex: 1 1 100%;
+    }
+    .table-wrapper {
+        margin: 0 10px 15px;
+    }
+    thead th {
+        padding: 12px 12px;
+        font-size: 0.78em;
+    }
+    td {
+        padding: 11px 12px;
+        font-size: 0.88em;
     }
 }

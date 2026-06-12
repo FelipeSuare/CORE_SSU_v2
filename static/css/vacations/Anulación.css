@@ -710,4 +710,8 @@ tbody tr:hover td {
     .summary-grid {
         grid-template-columns: 1fr;
     }
+
+    body {
+        padding: 15px;
+    }
 }

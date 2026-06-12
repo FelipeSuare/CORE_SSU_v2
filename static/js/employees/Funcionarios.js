@@ -416,17 +416,38 @@ async function actualizarJerarquia() {
     seccion.style.display   = 'none';
     seccionGG.style.display = 'none';
     grid.innerHTML = '';
+
+    // Limpiar roles de tipo antes de re-asignar el correcto
+    ['rolJefeArea', 'rolGerAdm', 'rolGerSalud', 'rolGerGeneral'].forEach(id => {
+        const cb = document.getElementById(id);
+        if (cb) cb.checked = false;
+    });
+
     if (!tipo) return;
 
     if (!aprobadoresCache) {
         const excluir = editandoCod ? `?excluir=${editandoCod}` : '';
-        const resp = await fetch(URL_APROBADORES + excluir, { headers: { 'X-CSRFToken': CSRF } });
-        aprobadoresCache = await resp.json();
+        try {
+            const resp = await fetch(URL_APROBADORES + excluir, { headers: { 'X-CSRFToken': CSRF } });
+            if (!resp.ok) throw new Error('Error al cargar aprobadores');
+            aprobadoresCache = await resp.json();
+        } catch {
+            AppDialog.alert('No se pudieron cargar los aprobadores disponibles.', { title: 'Error', icon: 'error' });
+            return;
+        }
     }
 
     const { jefes_area, gerentes, gerente_general, descripciones } = aprobadoresCache;
 
+    if (!Array.isArray(jefes_area) || !Array.isArray(gerentes) || !Array.isArray(gerente_general)) {
+        AppDialog.alert('La respuesta del servidor no tiene el formato esperado. Recarga la página.', { title: 'Error', icon: 'error' });
+        return;
+    }
+
     function opts(lista, ph) {
+        if (!lista || lista.length === 0) {
+            return `<option value="">${ph}</option><option value="" disabled style="color:#aaa">— Sin aprobadores disponibles —</option>`;
+        }
         return `<option value="">${ph}</option>` +
             lista.map(f => `<option value="${f.cod}">${f.nombre} — ${f.cargo}</option>`).join('');
     }
@@ -496,6 +517,12 @@ async function actualizarJerarquia() {
                 campo('Nivel 3 — Gerente General',  'Gerente General', 'workspace_premium','aprobadorN3', 3);
             break;
     }
+
+    // Desplazar la sección visible al área del usuario
+    requestAnimationFrame(() => {
+        const seccionVisible = seccion.style.display !== 'none' ? seccion : seccionGG;
+        seccionVisible.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
 }
 
 function mostrarDescripcionRol(selId, rolKey) {

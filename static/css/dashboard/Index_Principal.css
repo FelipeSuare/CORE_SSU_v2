@@ -581,6 +581,7 @@ body {
 @media (max-width: 768px) {
     .sidebar {
         transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     .sidebar.mobile-open {
@@ -590,6 +591,7 @@ body {
     .main-content {
         margin-left: 0;
         padding: 20px;
+        padding-top: 76px;
     }
 
     .main-content.expanded {
@@ -658,6 +660,10 @@ body {
         font-size: 1em;
     }
 
+    .carousel-slide img {
+        height: 220px;
+    }
+
     .carousel-caption h3 {
         font-size: 1.2em;
     }
@@ -679,17 +685,13 @@ body {
     z-index: 999;
     opacity: 0;
     transition: opacity 0.3s;
+    pointer-events: none;
 }
 
 .sidebar-overlay.active {
     display: block;
     opacity: 1;
-}
-
-@media (max-width: 768px) {
-    .sidebar-overlay {
-        display: block;
-    }
+    pointer-events: auto;
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -706,34 +708,103 @@ body {
     to   { opacity: 1; transform: translateY(0);     }
 }
 
-/* Sidebar desliza desde la izquierda */
-.sidebar {
-    animation: ssuEntradaIzquierda 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+/* Animaciones de entrada solo en desktop — en móvil causaban que el sidebar
+   quedara visible (animation-fill-mode:both sobreescribía el translateX(-100%)) */
+@media (min-width: 769px) {
+    .sidebar {
+        animation: ssuEntradaIzquierda 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .user-profile {
+        animation: ssuEntradaArriba 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
+    }
+
+    .sidebar-menu .menu-item {
+        animation: ssuEntradaArriba 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .sidebar-menu .menu-item:nth-child(1)  { animation-delay: 0.22s; }
+    .sidebar-menu .menu-item:nth-child(2)  { animation-delay: 0.28s; }
+    .sidebar-menu .menu-item:nth-child(3)  { animation-delay: 0.34s; }
+    .sidebar-menu .menu-item:nth-child(4)  { animation-delay: 0.40s; }
+    .sidebar-menu .menu-item:nth-child(5)  { animation-delay: 0.46s; }
+    .sidebar-menu .menu-item:nth-child(6)  { animation-delay: 0.52s; }
+    .sidebar-menu .menu-item:nth-child(7)  { animation-delay: 0.58s; }
+    .sidebar-menu .menu-item:nth-child(8)  { animation-delay: 0.64s; }
+    .sidebar-menu .menu-item:nth-child(9)  { animation-delay: 0.70s; }
+    .sidebar-menu .menu-item:nth-child(10) { animation-delay: 0.76s; }
+    .sidebar-menu .menu-item:nth-child(11) { animation-delay: 0.82s; }
+
+    .main-content {
+        animation: ssuEntradaArriba 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+    }
 }
 
-/* Perfil de usuario dentro del sidebar */
-.user-profile {
-    animation: ssuEntradaArriba 0.4s 
-    cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TOPBAR MÓVIL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.mobile-topbar {
+    display: none;
 }
 
-/* Ítems del menú: cascada de arriba hacia abajo */
-.sidebar-menu .menu-item {
-    animation: ssuEntradaArriba 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+@media (max-width: 768px) {
+    .mobile-topbar {
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 56px;
+        background: linear-gradient(90deg, #1e1e52 0%, #271447 100%);
+        z-index: 998;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+    }
 }
-.sidebar-menu .menu-item:nth-child(1)  { animation-delay: 0.22s; }
-.sidebar-menu .menu-item:nth-child(2)  { animation-delay: 0.28s; }
-.sidebar-menu .menu-item:nth-child(3)  { animation-delay: 0.34s; }
-.sidebar-menu .menu-item:nth-child(4)  { animation-delay: 0.40s; }
-.sidebar-menu .menu-item:nth-child(5)  { animation-delay: 0.46s; }
-.sidebar-menu .menu-item:nth-child(6)  { animation-delay: 0.52s; }
-.sidebar-menu .menu-item:nth-child(7)  { animation-delay: 0.58s; }
-.sidebar-menu .menu-item:nth-child(8)  { animation-delay: 0.64s; }
-.sidebar-menu .menu-item:nth-child(9)  { animation-delay: 0.70s; }
-.sidebar-menu .menu-item:nth-child(10) { animation-delay: 0.76s; }
-.sidebar-menu .menu-item:nth-child(11) { animation-delay: 0.82s; }
 
-/* Contenido principal baja desde arriba */
-.main-content {
-    animation: ssuEntradaArriba 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+.mobile-menu-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.mobile-menu-btn:hover,
+.mobile-menu-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.mobile-menu-btn .material-symbols-outlined {
+    font-size: 1.6em;
+}
+
+.mobile-topbar-brand {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 1.15em;
+    color: #e8b4b8;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+.mobile-topbar-spacer {
+    width: 40px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        z-index: 1000;
+        top: 0;
+    }
 }

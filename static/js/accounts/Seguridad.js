@@ -169,9 +169,7 @@ async function cambiarContrasena() {
         const data = await resp.json();
 
         if (!resp.ok) {
-            AppDialog.alert(data.error || 'Error al cambiar la contraseña.', {
-                title: 'Error', icon: 'error', variant: 'danger',
-            });
+            mostrarError(data.error || 'Error al cambiar la contraseña.');
             return;
         }
 
@@ -184,9 +182,7 @@ async function cambiarContrasena() {
             return;
         }
         limpiarFormulario();
-        AppDialog.alert('Contraseña actualizada correctamente.', {
-            title: 'Éxito', icon: 'check_circle', variant: 'success',
-        });
+        mostrarExito('¡Contraseña actualizada exitosamente!');
 
     } catch {
         AppDialog.alert('Error de conexión. Intente nuevamente.', {
@@ -228,6 +224,12 @@ function mostrarError(mensaje) {
     errorMessage.textContent    = mensaje;
     alertError.style.display    = 'flex';
     alertSuccess.style.display  = 'none';
+}
+
+function mostrarExito(mensaje) {
+    alertSuccess.querySelector('span').textContent = mensaje;
+    alertSuccess.style.display = 'flex';
+    alertError.style.display   = 'none';
 }
 
 function ocultarAlertas() {

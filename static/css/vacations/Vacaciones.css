@@ -1047,6 +1047,63 @@ body {
     }
 }
 
+@media (max-width: 640px) {
+    .header-actions {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    /* Fila 1: botón Volver, ancho completo */
+    .back-to-menu {
+        order: 1;
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Fila 2: perfil + seguimiento, lado a lado */
+    .profile-switcher-container {
+        flex: 1;
+        min-width: 0;
+        order: 2;
+    }
+
+    .tracking-button-container {
+        flex: 1;
+        min-width: 0;
+        order: 3;
+    }
+
+    .btn-tracking {
+        width: 100%;
+        justify-content: center;
+        padding: 10px 12px;
+        font-size: 0.9em;
+    }
+
+    .btn-profile-trigger {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Panel de perfil: se ancla al borde izquierdo del contenedor y se expande
+       hacia la derecha; ancho máximo limitado a la pantalla para no salirse */
+    .profile-panel {
+        left: 0;
+        right: auto;
+        width: min(280px, calc(100vw - 40px));
+        max-height: max-content;
+        overflow-y: auto;
+    }
+
+    /* Panel de seguimiento: anclado al borde derecho,
+       se extiende al ancho completo del cuerpo */
+    .tracking-panel {
+        right: 0;
+        left: auto;
+        width: calc(100vw - 60px);
+    }
+}
+
 @media (max-width: 768px) {
     .form-modal {
         max-width: 90%;

@@ -431,4 +431,8 @@ tbody tr:hover td {
         float: none; 
         margin: 0;
     }
+
+    body {
+        padding: 15px;
+    }
 }

@@ -391,6 +391,15 @@ body {
         width: 100%;
         justify-content: center;
     }
+
+    .back-to-menu {
+        max-width: max-content;
+        margin-left: auto !important;
+        margin-right: 0px;
+        margin-top: auto;
+        top: 1px;
+        right: 10px;
+    }
 }
 
 @media (max-width: 480px) {

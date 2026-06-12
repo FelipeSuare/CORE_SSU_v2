@@ -29,9 +29,6 @@ body {
 }
 
 .back-to-menu {
-    position: fixed; 
-    top: 10px; 
-    right: 10px; 
     display: flex;
     align-items: center;
     justify-content: center;
@@ -42,12 +39,11 @@ body {
     text-decoration: none; 
     border-radius: 25px; 
     font-family: sans-serif; 
-    /* z-index: 9999;  */
     box-shadow: 0 4px 6px var(--shadow-heavy); 
     font-weight: bold;
     transition: transform 0.3s, box-shadow 0.3s;
-    margin-right: 20px;
-    margin-top: 20px;
+    max-width: max-content;
+    margin-left: auto;    
 }
 
 .back-to-menu:hover {

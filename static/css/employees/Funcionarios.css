@@ -658,11 +658,16 @@ tbody tr:hover {
 
 /* ======================================== RESPONSIVE ======================================== */
 @media (max-width: 768px) {
+    .back-to-menu {
+        margin-right: 20px;
+    }
+
     .header {
         flex-direction: column;
         align-items: flex-start;
     }
     .header-actions {
+        display: inline-grid;
         margin-top: 15px;
         width: 100%;
         justify-content: stretch;

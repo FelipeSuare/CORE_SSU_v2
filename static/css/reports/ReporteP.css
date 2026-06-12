@@ -628,8 +628,8 @@ tbody tr:hover td { background: rgba(249,201,201,0.22); transition: background 0
 @media (max-width: 768px) {
     body { padding: 14px; }
     .header-wrapper { flex-direction: column; align-items: flex-start; }
-    .filters-container { flex-direction: column; }
+    /* .filters-container { flex-direction: column; } */
     .filter-group, .filter-group.wide { flex: 1 1 100%; }
-    .input-action-wrapper { flex-wrap: wrap; }
+    .input-action-wrapper { flex-wrap: wrap; display: flow; }
     .modal-datos-func { grid-template-columns: 1fr; }
 }

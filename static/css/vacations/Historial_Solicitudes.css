@@ -344,7 +344,8 @@ tbody tr:hover td { background: rgba(249,201,201,0.22); transition: background 0
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
     body { padding: 14px; }
-    .tabs-container { flex-direction: column; align-items: flex-start; }
+    .tabs-container { padding:10px; align-items: flex-start; }
     .tabs-search { margin-left: 0; width: 100%; }
     .search-box input { width: 100%; }
+    .tab.active { width: 100%; text-align: center; }
 }
