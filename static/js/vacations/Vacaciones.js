@@ -108,6 +108,12 @@ async function cargarDatosFormulario() {
         fechaSolicitudInput.value = data.fecha_solicitud;
         document.getElementById('requestIdDisplay').textContent = data.siguiente_codigo;
 
+        // Fecha mínima de salida: la mayor entre fecha_ingreso y fecha_solicitud (hoy)
+        const minSalida = data.fecha_ingreso > data.fecha_solicitud
+            ? data.fecha_ingreso
+            : data.fecha_solicitud;
+        fechaSalidaInput.min = minSalida;
+
         // Renderizar saldos
         renderizarSaldos(data.saldos, data.gestiones_con_saldo);
 
@@ -294,6 +300,26 @@ function manejarEnvioFormulario(e) {
     if (!motivo || motivo.length < 10) {
         AppDialog.alert('Ingrese un motivo válido para la vacación (mínimo 10 caracteres).');
         motivoVacacionTextarea.focus();
+        return;
+    }
+
+    const fechaSalidaVal   = fechaSalidaInput.value;
+    const fechaIngresoVal  = fechaIngresoInput.value;
+    const fechaSolicitudVal = fechaSolicitudInput.value;
+
+    if (!fechaSalidaVal) {
+        AppDialog.alert('Seleccione la fecha de salida.');
+        fechaSalidaInput.focus();
+        return;
+    }
+    if (fechaSalidaVal < fechaIngresoVal) {
+        AppDialog.alert('La fecha de salida no puede ser anterior a su fecha de ingreso a la institución.');
+        fechaSalidaInput.focus();
+        return;
+    }
+    if (fechaSalidaVal < fechaSolicitudVal) {
+        AppDialog.alert('La fecha de salida no puede ser una fecha pasada.');
+        fechaSalidaInput.focus();
         return;
     }
 

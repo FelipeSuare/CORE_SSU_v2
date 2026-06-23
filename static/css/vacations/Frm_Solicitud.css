@@ -1,55 +1,9 @@
-/* PALETA DE COLORES Y VARIABLES GLOBALES */
-:root {
-    --color-pink-light: #F9c9c9;
-    --color-pink-dark: rgb(114, 0, 53);
-    --color-purple-dark: rgb(39, 20, 71);
-    
-    --color-white-transparent: rgba(255, 255, 255, 0.9);
-    --color-white-solid: #ffffff;
-    
-    --color-table-header-gradient: linear-gradient(90deg, var(--color-purple-dark), var(--color-pink-dark));
-    
-    --shadow-heavy: 0 8px 20px rgba(0, 0, 0, 0.2);
-    --shadow-accent: 0 0 15px 6px rgba(39, 20, 71, 0.3);
-}
+/*
+ * Frm_Solicitud.css — específico del formulario de solicitud de vacaciones
+ * base.css carga primero.
+ */
 
-/* ======================================== ESTILOS BASE ======================================== */
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-    font-family: 'Montserrat', sans-serif;
-    background-color: var(--color-pink-light); 
-    padding: 30px;
-    min-height: 100vh;
-}
-
-.main-container {
-    max-width: 1400px; 
-    margin: 0 auto;
-}
-
-.back-to-menu {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    background: var(--color-pink-dark); 
-    color: var(--color-white-solid); 
-    padding: 10px 15px; 
-    text-decoration: none; 
-    border-radius: 25px; 
-    font-family: sans-serif; 
-    box-shadow: 0 4px 6px var(--shadow-heavy); 
-    font-weight: bold;
-    transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.back-to-menu:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(0,0,0,.25);
-}
-
-/* ENCABEZADO DEL MÓDULO */
+/* ── HEADER ── */
 .header-wrapper {
     display: flex;
     justify-content: space-between;
@@ -63,217 +17,52 @@ body {
     align-items: center;
     gap: 20px;
     flex: 1;
-}
-
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-shrink: 0;
-}
-
-.module-title {
-    color: var(--color-purple-dark);
-    font-size: 2.2em;
-    font-weight: 700;
-    margin-bottom: 5px;
-    display: flex;
-    align-items: center;
+    margin-bottom: 0;
+    padding: 0;
 }
 
 .module-header i {
-    font-size: 3em; 
+    font-size: 3em;
     color: var(--color-purple-dark);
 }
 
-.module-subtitle {
-    margin-left: 0; 
-    font-size: 1.1em;
-}
+.module-subtitle { margin-left: 0; }
 
-/* ======================================== SECCIÓN DE FILTROS ======================================== */
-.filters-container {
-    display: flex;
-    gap: 20px;
-    background: var(--color-white-solid);
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: var(--shadow-heavy);
-    margin-bottom: 30px;
-    flex-wrap: wrap; 
-    align-items: flex-end; 
-}
+/* ── FILTROS ── */
+.filter-group { min-width: 180px; }
+.filter-actions { min-width: 180px; }
 
-.filter-group {
-    flex: 1;
-    min-width: 180px;
-}
-
-.filter-actions {
-    display: flex;
-    gap: 10px;
-    min-width: 180px;
-}
-
-.filter-group label {
-    font-weight: 600;
-    color: var(--color-pink-dark);
-    display: block;
-    margin-bottom: 5px;
-    font-size: 0.95em;
-}
-
-/* Estilos de input y select (reutilizados) */
-.input-wrapper, .select-wrapper {
-    border: 1px solid var(--color-pink-dark);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.6);
-    padding: 0; 
-}
-
-.input-wrapper input {
-    border: none;
-    outline: none;
-    width: 100%;
-    padding: 10px 15px;
-    background: transparent;
-    color: var(--color-pink-dark);
-    font-size: 1em;
-}
-
-.select-wrapper select {
-    padding: 10px 15px;
-    width: 100%;
-    border: none;
-    outline: none;
-    background: transparent;
-    color: var(--color-pink-dark);
-    font-weight: 500;
-    font-size: 1em;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20fill%3D%22%23720035%22%20d%3D%22M9.293%2012.95l.707.707%205%20-5-1.414-1.414L10%2011.536l-3.586-3.586L5%208.243l5%205z%22%2F%3E%3C%2Fsvg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px top 50%;
-    background-size: 0.8em;
-    cursor: pointer;
-}
-
-/* ======================================== BOTONES ======================================== */
+/* ── BOTONES (estilo compacto, override) ── */
 .btn {
-    padding: 10px 20px;
-    border: none;
     border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: background 0.3s, transform 0.2s;
+    padding: 10px 20px;
 }
 
-.btn-primary { 
-    background: var(--color-purple-dark); 
-    color: var(--color-white-solid);
-    flex: 1; 
-}
-
-.btn-primary:hover { 
-    background: var(--color-pink-dark); 
-    transform: scale(1.02);
-}
-
+.btn-primary { flex: 1; }
 .btn-secondary {
+    flex: 1;
     background: var(--color-pink-light);
     color: var(--color-pink-dark);
-    flex: 1;
 }
+.btn-secondary:hover { background: #e0baba; }
 
-.btn-secondary:hover {
-    background: #e0baba;
-    transform: scale(1.02);
-}
-
-/* ======================================== ESTILOS DE TABLA (PC VIEW) ======================================== */
+/* ── TABLA CARD ── */
 .table-card {
-    background: var(--color-white-solid);
-    padding: 30px;
-    border-radius: 15px; 
-    box-shadow: var(--shadow-heavy);
-    overflow-x: hidden; 
-}
-
-.card-title {
-    color: var(--color-purple-dark);
-    font-size: 1.5em;
-    font-weight: 700;
-    margin-bottom: 20px;
+    overflow-x: hidden;
+    margin-bottom: 0;
 }
 
 table {
-    width: 100%;
-    border-collapse: separate; 
-    border-spacing: 0; 
-    min-width: 800px; 
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 800px;
 }
 
-/* Aplicar el degradado y color de texto a TODO el encabezado */
-thead {
-    background: var(--color-table-header-gradient);
-    color: var(--color-white-solid);
-}
+tbody tr:nth-child(odd)  td { background-color: var(--color-white-solid); }
+tbody tr:nth-child(even) td { background-color: #f7f7f7; }
+tbody tr:hover td { background-color: var(--color-pink-light); }
 
-/* Redondear las esquinas superiores del encabezado */
-thead tr:first-child th:first-child {
-    border-top-left-radius: 10px;
-}
-
-thead tr:first-child th:last-child {
-    border-top-right-radius: 10px;
-}
-
-th {
-    padding: 15px 10px;
-    text-align: left;
-    font-weight: 600;
-    font-size: 0.9em;
-    text-transform: uppercase;
-    border-bottom: none;
-}
-
-/* Aplicar el fondo rayado y el borde rosado a las celdas */
-td {
-    padding: 12px 10px;
-    color: #555;
-    font-size: 0.95em;
-    font-weight: 500;
-    vertical-align: middle;
-    border-bottom: 1px solid var(--color-pink-light); 
-}
-
-/* Quitar el borde inferior de la última fila de la tabla */
-tbody tr:last-child td {
-    border-bottom: none;
-}
-
-/* Fondo para filas impares (blanco) */
-tbody tr:nth-child(odd) td {
-    background-color: var(--color-white-solid); 
-}
-
-/* Fondo para filas pares (gris claro) */
-tbody tr:nth-child(even) td {
-    background-color: #f7f7f7; 
-}
-
-/* Estilo de la fila de hover */
-tbody tr:hover td {
-    background-color: var(--color-pink-light);
-}
-
-/* Columna especial para el PDF */
+/* Botón PDF */
 .btn-pdf {
     background: var(--color-pink-dark);
     color: var(--color-white-solid);
@@ -282,157 +71,69 @@ tbody tr:hover td {
     padding: 8px 12px;
     cursor: pointer;
     transition: background 0.3s;
+    font-family: 'Montserrat', sans-serif;
 }
+.btn-pdf:hover { background: var(--color-purple-dark); }
 
-.btn-pdf:hover {
-    background: var(--color-purple-dark);
-}
-
-
-/* ======================================== MODAL PDF ======================================== */
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-}
+/* ── MODAL ── */
+.modal-overlay { background: rgba(0,0,0,0.45); }
 
 .form-modal {
-    background: var(--color-white-solid);
-    border-radius: 15px;
-    padding: 32px;
-    width: 95%;
     max-width: 460px;
-    box-shadow: var(--shadow-accent);
+    padding: 32px;
 }
 
-.modal-title {
-    color: var(--color-purple-dark);
-    font-size: 1.4em;
-    font-weight: 700;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding-bottom: 12px;
-    border-bottom: 2px solid var(--color-pink-light);
-}
-
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    margin-top: 8px;
-}
-
-/* ======================================== RESPONSIVE: VISTA DE CELULAR (CARD VIEW) ======================================== */
-
+/* ── RESPONSIVE CARD VIEW (móvil) ── */
 @media (max-width: 800px) {
-    /* 1. Ajuste de filtros */
-    .filters-container {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .filter-group {
-        min-width: 100%;
-    }
+    .filters-container { flex-direction: column; align-items: stretch; }
+    .filter-group { min-width: 100%; }
+    .filter-actions { margin-top: 10px; }
 
-    .filter-actions {
-        margin-top: 10px;
-    }
+    thead { display: none; }
+    table, tbody, tr { display: block; width: 100%; }
+    table { min-width: unset; }
 
-    /* 2. OCULTAR ENCABEZADOS DE TABLA */
-    thead {
-        display: none;
-    }
-
-    /* 3. TRANSFORMAR CADA FILA (TR) EN UNA TARJETA */
-    table, tbody, tr {
-        display: block;
-        width: 100%;
-    }
-
-    /* Quitar el min-width para que la tabla no sea más ancha que la pantalla */
-    table {
-        min-width: unset; 
-    }
-    
-    /* Aplicar estilos de tarjeta a la fila */
     tbody tr {
         margin-bottom: 15px;
         padding: 15px;
         border: 1px solid var(--color-pink-light);
         border-radius: 10px;
-        background-color: var(--color-white-solid) !important; 
+        background-color: var(--color-white-solid) !important;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
         position: relative;
     }
 
-    /* Remover el color de fondo rayado y hover en la celda para aplicar solo a la tarjeta */
     tbody tr:nth-child(odd) td,
     tbody tr:nth-child(even) td,
-    tbody tr:hover td {
-        background-color: transparent !important;
-    }
+    tbody tr:hover td { background-color: transparent !important; }
 
-
-    /* 4. TRANSFORMAR CADA CELDA (TD) EN UNA LÍNEA DE LA TARJETA (VALOR) */
     td {
         display: block;
-        text-align: right !important; /* El valor a la derecha */
-        border: none; /* Quitamos el borde entre celdas */
+        text-align: right !important;
+        border: none;
         padding: 8px 0;
-        font-weight: 600; 
+        font-weight: 600;
         color: var(--color-purple-dark);
     }
-    
-    /* Etiqueta de la columna (ej: Cargo, Fecha Solicitud) */
     td::before {
-        content: attr(data-label); 
+        content: attr(data-label);
         float: left;
-        font-weight: 700; 
+        font-weight: 700;
         text-transform: uppercase;
-        color: var(--color-pink-dark); 
+        color: var(--color-pink-dark);
     }
 
-    /* 💥 5. ESTILOS ESPECÍFICOS PARA LA COLUMNA del PDF (SOLUCIÓN FINAL CON LÍNEA CORTADA) */
     td:last-child {
-        display: flex; /* Usamos Flexbox para alinear contenido */
-        justify-content: space-between; /* Etiqueta a la izquierda, botón a la derecha */
-        align-items: center; /* Centrado vertical del botón con la etiqueta */
-        
-        margin-top: 10px; /* Separación de la línea anterior */
-        padding-top: 10px; /* Espacio debajo de la línea punteada */
-        padding-bottom: 0;
-        
-        /* 🚨 RE-INCLUIMOS LA LÍNEA PUNTEADA QUE SEPARÓ EL BOTÓN DEL RESTO DE DATOS */
-        border-top: 1px dashed var(--color-pink-light); 
-        
-        text-align: left !important; 
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed var(--color-pink-light);
+        text-align: left !important;
     }
-    
-    /* Etiqueta de la columna PDF */
-    td:last-child::before {
-        content: attr(data-label); 
-        float: none; 
-        order: -1; 
-        
-        font-weight: 700; 
-        text-transform: uppercase;
-        color: var(--color-pink-dark); 
-    }
+    td:last-child::before { float: none; order: -1; }
+    .btn-pdf { float: none; margin: 0; }
 
-    /* El botón PDF */
-    .btn-pdf {
-        float: none; 
-        margin: 0;
-    }
-
-    body {
-        padding: 15px;
-    }
+    body { padding: 15px; }
 }

@@ -288,7 +288,7 @@ class CrearSolicitudView(APIView):
             fecha_salida  = date.fromisoformat(fecha_salida_str)
             fecha_retorno = date.fromisoformat(fecha_retorno_str)
             dias          = Decimal(dias_str)
-            if dias <= 0:
+            if dias <= 0 or (dias * 2) != int(dias * 2):
                 raise ValueError
         except (ValueError, InvalidOperation):
             return Response(
@@ -300,6 +300,17 @@ class CrearSolicitudView(APIView):
             f = _get_funcionario(request)
         except Funcionario.DoesNotExist:
             return Response({'error': 'Funcionario no encontrado o inactivo.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if fecha_salida < f.fecha_ingreso:
+            return Response(
+                {'error': 'La fecha de salida no puede ser anterior a la fecha de ingreso del funcionario.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if fecha_salida < date.today():
+            return Response(
+                {'error': 'La fecha de salida no puede ser una fecha pasada.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             gv = GestionVacacion.objects.get(cod_funcionario=f)

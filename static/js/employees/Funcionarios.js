@@ -20,6 +20,7 @@ let editandoCod      = null;
 let aprobadoresCache = null;
 let _debounceTimer   = null;
 let _bajaCod         = null;
+let _reactivarCod    = null;
 
 const formOverlay = document.getElementById('formOverlay');
 const formPanel   = document.getElementById('formPanel');
@@ -84,10 +85,16 @@ async function actualizarContadores() {
     } catch { /* silencioso */ }
 }
 
+function _colorTipoBaja(tipo) {
+    const map = { Despido: '#c62828', Renuncia: '#e65100', Muerte: '#546e7a' };
+    return map[tipo] || '#555';
+}
+
 function renderizarTabla(lista) {
     const tbody = document.getElementById('funcionariosBody');
     if (lista.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#aaa">No hay funcionarios registrados</td></tr>`;
+        const cols = tabActual === 'INACTIVO' ? 10 : 8;
+        tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;padding:40px;color:#aaa">No hay funcionarios registrados</td></tr>`;
         return;
     }
     const esInactivo = tabActual === 'INACTIVO';
@@ -99,8 +106,20 @@ function renderizarTabla(lista) {
                 ? `<span style="font-weight:600;color:var(--color-pink-dark)">${f.fecha_baja.split('-').reverse().join('/')}</span>`
                 : '<span style="color:#bbb;font-size:.85em">—</span>')
             : `<span class="antiguedad-badge">${f.antiguedad}</span>`;
+        const colTipoBaja = esInactivo
+            ? `<td>${f.tipo_baja
+                ? `<span class="role-badge-mini" style="background:${_colorTipoBaja(f.tipo_baja)}">${f.tipo_baja}</span>`
+                : '<span style="color:#bbb;font-size:.85em">—</span>'}</td>`
+            : '';
+        const colPDF = esInactivo
+            ? `<td style="text-align:center">
+                <button class="action-btn" onclick="descargarPDFVacaciones('${f.cod}')" title="Descargar PDF de vacaciones al cierre">
+                    <i class="material-symbols-outlined" style="color:#c62828">picture_as_pdf</i>
+                </button>
+               </td>`
+            : '';
         return `
-        <tr>
+        <tr data-cod="${f.cod}" data-fecha-ingreso="${f.fecha_ingreso || ''}">
             <td style="font-weight:700;color:var(--color-pink-dark)">${f.ci}</td>
             <td>
                 <div style="font-weight:700;color:var(--color-purple-dark)">${f.nombre} ${f.ap_paterno} ${f.ap_materno}</div>
@@ -120,6 +139,8 @@ function renderizarTabla(lista) {
                     <i class="material-symbols-outlined">power_settings_new</i>
                 </button>
             </td>
+            ${colTipoBaja}
+            ${colPDF}
         </tr>`;
     }).join('');
 }
@@ -133,6 +154,10 @@ function cambiarTab(estado) {
     event.currentTarget.classList.add('active');
     const th = document.getElementById('thAntiguedadBaja');
     if (th) th.innerHTML = tabActual === 'INACTIVO' ? 'FECHA DE<br>BAJA' : 'ANTIGÜEDAD';
+    const esInactivo = tabActual === 'INACTIVO';
+    document.querySelectorAll('.col-solo-inactivo').forEach(el => {
+        el.style.display = esInactivo ? '' : 'none';
+    });
     cargarTabla();
 }
 
@@ -210,21 +235,7 @@ async function cambiarEstado(cod, estadoActual) {
     if (estadoActual === 'ACTIVO') {
         abrirModalBaja(cod);
     } else {
-        const confirmar = await AppDialog.confirm(
-            '¿Reactivar a este funcionario?',
-            { title: 'Reactivar', icon: 'person_check', confirmText: 'Sí', cancelText: 'No' }
-        );
-        if (!confirmar) return;
-        try {
-            const resp = await fetch(estadoUrl(cod), {
-                method: 'POST', headers: { 'X-CSRFToken': CSRF },
-            });
-            const data = await resp.json();
-            if (!resp.ok) { AppDialog.alert(data.error, { title: 'Error', icon: 'error' }); return; }
-            cargarTabla();
-        } catch {
-            AppDialog.alert('Error de conexión.', { title: 'Error', icon: 'wifi_off' });
-        }
+        abrirModalReactivar(cod);
     }
 }
 
@@ -234,11 +245,52 @@ function abrirModalBaja(cod) {
     const input = document.getElementById('fechaBaja');
     input.value = hoy;
     input.max   = hoy;
+    document.getElementById('tipoBaja').value = '';
     const overlay = document.getElementById('bajaOverlay');
     const panel   = document.getElementById('bajaPanel');
     overlay.style.display = 'flex';
     setTimeout(() => { overlay.classList.add('active'); panel.classList.add('active'); }, 10);
 }
+
+function abrirModalReactivar(cod) {
+    _reactivarCod = cod;
+    const row = document.querySelector(`tr[data-cod="${cod}"]`);
+    const fechaIngreso = row ? row.dataset.fechaIngreso : '';
+    document.getElementById('reactivarFechaIngreso').value = fechaIngreso;
+    const overlay = document.getElementById('reactivarOverlay');
+    const panel   = document.getElementById('reactivarPanel');
+    overlay.style.display = 'flex';
+    setTimeout(() => { overlay.classList.add('active'); panel.classList.add('active'); }, 10);
+}
+
+function cerrarModalReactivar() {
+    const overlay = document.getElementById('reactivarOverlay');
+    const panel   = document.getElementById('reactivarPanel');
+    panel.classList.remove('active');
+    setTimeout(() => {
+        overlay.classList.remove('active');
+        setTimeout(() => { overlay.style.display = 'none'; _reactivarCod = null; }, 300);
+    }, 300);
+}
+
+async function confirmarReactivar() {
+    const fechaIngreso = document.getElementById('reactivarFechaIngreso').value;
+    cerrarModalReactivar();
+    try {
+        const body = {};
+        if (fechaIngreso) body.fecha_ingreso = fechaIngreso;
+        const resp = await fetch(estadoUrl(_reactivarCod), {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body:    JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok) { AppDialog.alert(data.error, { title: 'Error', icon: 'error' }); return; }
+        cargarTabla();
+        AppDialog.alert('Funcionario reactivado correctamente.', { title: 'Reactivado', icon: 'check_circle', variant: 'success' });
+    } catch {
+        AppDialog.alert('Error de conexión.', { title: 'Error', icon: 'wifi_off' });
+    }}
 
 function cerrarModalBaja() {
     const overlay = document.getElementById('bajaOverlay');
@@ -252,8 +304,13 @@ function cerrarModalBaja() {
 
 async function confirmarBaja() {
     const fechaBaja = document.getElementById('fechaBaja').value;
+    const tipoBaja  = document.getElementById('tipoBaja').value;
     if (!fechaBaja) {
         AppDialog.alert('Debe ingresar una fecha de baja.', { title: 'Campo requerido', icon: 'warning' });
+        return;
+    }
+    if (!tipoBaja) {
+        AppDialog.alert('Debe seleccionar el tipo de baja.', { title: 'Campo requerido', icon: 'warning' });
         return;
     }
     cerrarModalBaja();
@@ -261,7 +318,7 @@ async function confirmarBaja() {
         const resp = await fetch(estadoUrl(_bajaCod), {
             method:  'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-            body:    JSON.stringify({ fecha_baja: fechaBaja }),
+            body:    JSON.stringify({ fecha_baja: fechaBaja, tipo_baja: tipoBaja }),
         });
         const data = await resp.json();
         if (!resp.ok) { AppDialog.alert(data.error, { title: 'Error', icon: 'error' }); return; }
@@ -270,6 +327,10 @@ async function confirmarBaja() {
     } catch {
         AppDialog.alert('Error de conexión.', { title: 'Error', icon: 'wifi_off' });
     }
+}
+
+function descargarPDFVacaciones(cod) {
+    window.open(`/funcionarios/${cod}/vacaciones-baja-pdf/`, '_blank');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -352,11 +413,12 @@ async function abrirEditar(cod) {
     document.getElementById('codFuncionario').value  = f.cod;
     document.getElementById('matriculaSeguro').value = f.matricula_seguro || '';
     document.getElementById('cargo').value           = f.cargo;
-    // Mostrar fecha de baja solo para personal inactivo
+    // Mostrar fecha y tipo de baja solo para personal inactivo
     const grupoBaja = document.getElementById('grupoBaja');
     const inputBaja = document.getElementById('fechaBajaInfo');
     if (f.estado === 'INACTIVO' && f.fecha_baja) {
         inputBaja.value = f.fecha_baja.split('-').reverse().join('/');
+        document.getElementById('tipoBajaInfo').value = f.tipo_baja || '—';
         grupoBaja.style.display = '';
     } else {
         grupoBaja.style.display = 'none';

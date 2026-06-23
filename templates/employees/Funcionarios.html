@@ -15,6 +15,8 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/shared/base.css' %}">
+    <link rel="stylesheet" href="{% static 'css/shared/utils.css' %}">
     <link rel="stylesheet" href="{% static 'css/shared/profile-switcher.css' %}">
     <link rel="stylesheet" href="{% static 'css/employees/Funcionarios.css' %} ?v=1.0">
     <link rel="stylesheet" href="{% static 'css/shared/notifications.css' %}">
@@ -90,6 +92,8 @@
                                 <th>TIPO DE<br>FUNCIONARIO</th>
                                 <th>ROLES EN<br>EL SISTEMA</th>
                                 <th>ACCIONES</th>
+                                <th class="col-solo-inactivo" style="display:none">TIPO<br>BAJA</th>
+                                <th class="col-solo-inactivo" style="display:none">VACACIONES<br>AL CIERRE</th>
                             </tr>
                         </thead>
                         <tbody id="funcionariosBody"></tbody>
@@ -132,6 +136,11 @@
                             <div class="input-wrapper">
                                 <i class="material-symbols-outlined input-icon" style="color:var(--color-pink-dark)">event_busy</i>
                                 <input type="text" id="fechaBajaInfo" readonly style="background:#fff5f7;color:var(--color-pink-dark);cursor:default;font-weight:600">
+                            </div>
+                            <label style="color:var(--color-pink-dark);margin-top:8px;display:block">Tipo de Baja</label>
+                            <div class="input-wrapper">
+                                <i class="material-symbols-outlined input-icon" style="color:var(--color-pink-dark)">info</i>
+                                <input type="text" id="tipoBajaInfo" readonly style="background:#fff5f7;color:var(--color-pink-dark);cursor:default;font-weight:600">
                             </div>
                         </div>
                     </div>
@@ -262,7 +271,7 @@
                     <i class="material-symbols-outlined">close</i>
                 </button>
             </div>
-            <p style="color:#666;font-size:.9em;margin-bottom:20px">Ingrese la fecha en que se registra la baja. Esta fecha quedará registrada como cierre del historial de cargo actual.</p>
+            <p style="color:#666;font-size:.9em;margin-bottom:20px">Ingrese la fecha y motivo de la baja. Esta información quedará registrada en el historial del funcionario.</p>
             <div class="form-group">
                 <label>Fecha de Baja</label>
                 <div class="input-wrapper">
@@ -270,10 +279,48 @@
                     <input type="date" id="fechaBaja">
                 </div>
             </div>
+            <div class="form-group" style="margin-top:14px">
+                <label>Tipo de Baja</label>
+                <div class="input-wrapper">
+                    <i class="material-symbols-outlined input-icon">info</i>
+                    <select id="tipoBaja" required>
+                        <option value="">Seleccionar motivo...</option>
+                        <option value="Despido">Despido</option>
+                        <option value="Renuncia">Renuncia</option>
+                        <option value="Muerte">Muerte</option>
+                    </select>
+                </div>
+            </div>
             <div class="form-actions" style="margin-top:24px">
                 <button type="button" class="btn btn-cancel" onclick="cerrarModalBaja()">Cancelar</button>
                 <button type="button" class="btn btn-primary" onclick="confirmarBaja()" style="background:var(--color-pink-dark)">
                     <i class="material-symbols-outlined">check</i> Confirmar Baja
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ MODAL REACTIVAR FUNCIONARIO ═══ -->
+    <div class="modal-overlay" id="reactivarOverlay" style="display:none">
+        <div class="form-modal" id="reactivarPanel" style="max-width:420px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+                <h2 style="margin:0"><i class="material-symbols-outlined" style="color:var(--color-purple-dark)">person_check</i> Reactivar Funcionario</h2>
+                <button type="button" class="btn btn-cancel pd-5-5" onclick="cerrarModalReactivar()">
+                    <i class="material-symbols-outlined">close</i>
+                </button>
+            </div>
+            <p style="color:#666;font-size:.9em;margin-bottom:20px">Si el funcionario retorna con una nueva fecha de ingreso, actualícela. De lo contrario deje el valor actual.</p>
+            <div class="form-group">
+                <label>Fecha de Ingreso <span style="color:#999;font-size:.8em">(actualice si es necesario)</span></label>
+                <div class="input-wrapper">
+                    <i class="material-symbols-outlined input-icon">calendar_month</i>
+                    <input type="date" id="reactivarFechaIngreso">
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top:24px">
+                <button type="button" class="btn btn-cancel" onclick="cerrarModalReactivar()">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmarReactivar()" style="background:var(--color-purple-dark)">
+                    <i class="material-symbols-outlined">check</i> Reactivar
                 </button>
             </div>
         </div>

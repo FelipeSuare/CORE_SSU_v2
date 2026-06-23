@@ -93,6 +93,7 @@ def _serializar_funcionario(f):
         'estado':           f.estado,
         'antiguedad':       _calcular_antiguedad(f.fecha_ingreso),
         'fecha_baja':       fecha_baja,
+        'tipo_baja':        f.tipo_baja or '',
         'roles':            roles,
         'jerarquia':        jerarquia,
     }
@@ -426,9 +427,16 @@ class ToggleEstadoView(APIView):
 
         if nuevo_estado == 'INACTIVO':
             fecha_baja_str = data.get('fecha_baja', '').strip()
+            tipo_baja      = data.get('tipo_baja', '').strip()
+
             if not fecha_baja_str:
                 return Response(
                     {'error': 'La fecha de baja es requerida.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if tipo_baja not in ('Despido', 'Renuncia', 'Muerte'):
+                return Response(
+                    {'error': 'El tipo de baja es requerido (Despido, Renuncia o Muerte).'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             try:
@@ -442,12 +450,34 @@ class ToggleEstadoView(APIView):
                 cargo_act.save(update_fields=['es_actual'])
 
             f.fecha_baja = fecha_baja
-            f.estado = nuevo_estado
-            f.save(update_fields=['estado', 'fecha_baja'])
+            f.tipo_baja  = tipo_baja
+            f.estado     = nuevo_estado
+            f.save(update_fields=['estado', 'fecha_baja', 'tipo_baja'])
         else:
+            # Reactivar
+            fecha_ingreso_str = data.get('fecha_ingreso', '').strip()
+
+            # Re-activar el último cargo registrado
+            cargo_reciente = HistorialCargo.objects.filter(
+                cod_funcionario=f
+            ).order_by('-fecha_inicio').first()
+            if cargo_reciente and not cargo_reciente.es_actual:
+                cargo_reciente.es_actual = True
+                cargo_reciente.save(update_fields=['es_actual'])
+
+            campos = ['estado', 'fecha_baja', 'tipo_baja']
             f.fecha_baja = None
-            f.estado = nuevo_estado
-            f.save(update_fields=['estado', 'fecha_baja'])
+            f.tipo_baja  = None
+            f.estado     = nuevo_estado
+
+            if fecha_ingreso_str:
+                try:
+                    f.fecha_ingreso = date.fromisoformat(fecha_ingreso_str)
+                    campos.append('fecha_ingreso')
+                except ValueError:
+                    pass
+
+            f.save(update_fields=campos)
 
         return Response({'ok': True, 'estado': f.estado})
 
@@ -547,3 +577,209 @@ class HistorialCargosView(APIView):
             'cargos':    cargos,
             'rol_label': rol_label,
         })
+
+
+_ROLES_PDF_BAJA = frozenset({'RRHH', 'Administrador'})
+
+
+def _generar_pdf_vacaciones_baja(f, gv, cargo):
+    import os
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        leftMargin=2*cm, rightMargin=2*cm,
+        topMargin=1.5*cm, bottomMargin=1.5*cm,
+    )
+    W = A4[0] - 4*cm
+
+    p = f.ci
+    HDR_RED  = colors.HexColor('#F2949C')
+    BLACK    = colors.black
+    WHITE    = colors.white
+    GRAY     = colors.HexColor('#000000')
+
+    def sty(fname, fsize, align=TA_LEFT, color=BLACK, leading=None):
+        return ParagraphStyle(
+            f'{fname}_{fsize}_{align}_{id(color)}',
+            fontName=fname, fontSize=fsize,
+            alignment=align,
+            leading=leading or (fsize + 2),
+            textColor=color,
+        )
+
+    sTitle  = sty('Helvetica-Bold', 12, TA_CENTER)
+    sLabel  = sty('Helvetica-Bold',  8)
+    sVal    = sty('Helvetica',       8)
+    sBCtr   = sty('Helvetica-Bold',  8, TA_CENTER)
+    sSmall  = sty('Helvetica',       7)
+    sSmallB = sty('Helvetica-Bold',  7)
+    sSection = sty('Helvetica-Bold', 8, TA_CENTER, BLACK)
+
+    def P(txt, style): return Paragraph(str(txt), style)
+
+    HDR_TS = TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, -1), HDR_RED),
+        ('BOX',           (0, 0), (-1, -1), 0.5, BLACK),
+        ('TOPPADDING',    (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+        ('TEXTCOLOR',     (0, 0), (-1, -1), WHITE),
+        ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+    ])
+    DATA_TS = TableStyle([
+        ('BOX',           (0, 0), (-1, -1), 0.5, BLACK),
+        ('INNERGRID',     (0, 0), (-1, -1), 0.25, GRAY),
+        ('TOPPADDING',    (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+    ])
+
+    def section_hdr(text):
+        t = Table([[P(text, sSection)]], colWidths=[W])
+        t.setStyle(HDR_TS)
+        return t
+
+    logo_path = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), '..', 'static', 'img', 'login', 'LOGOSSU.png')
+    )
+
+    elements = []
+    elements.append(P('<u><b>INFORME DE SALDO DE VACACIONES AL CIERRE</b></u>', sTitle))
+    elements.append(Spacer(1, 0.2*cm))
+
+    nombre_completo = f"{p.nombre} {p.ap_paterno} {p.ap_materno or ''}".strip()
+    wL = W * 0.65
+    wR = W * 0.35
+    wLa = wL * 0.38
+    wLb = wL * 0.62
+
+    logo_cell = (
+        Image(logo_path, width=5*cm, height=5*cm)
+        if os.path.exists(logo_path) else P('', sVal)
+    )
+
+    hdr_datos = Table([
+        [P('DATOS DEL FUNCIONARIO', sSection), '', logo_cell],
+        [P('Carnet:', sLabel),                P(p.ci, sVal),                ''],
+        [P('Nombre Completo:', sLabel),        P(nombre_completo, sVal),     ''],
+        [P('Unidad Organizacional:', sLabel),  P(f.id_unidad.nombre if f.id_unidad else '—', sVal), ''],
+        [P('Cargo:', sLabel),                  P(cargo.cargo if cargo else '—', sVal), ''],
+        [P('Fecha de Ingreso:', sLabel),       P(f.fecha_ingreso.strftime('%d/%m/%Y') if f.fecha_ingreso else '—', sVal), ''],
+    ], colWidths=[wLa, wLb, wR])
+
+    hdr_datos.setStyle(TableStyle([
+        ('BOX',           (0, 0), (-1, -1), 0.5, BLACK),
+        ('INNERGRID',     (0, 0), (-1, -1), 0.25, GRAY),
+        ('TOPPADDING',    (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('SPAN',          (0, 0), (1, 0)),
+        ('BACKGROUND',    (0, 0), (1, 0), HDR_RED),
+        ('TEXTCOLOR',     (0, 0), (1, 0), WHITE),
+        ('ALIGN',         (0, 0), (1, 0), 'CENTER'),
+        ('SPAN',          (2, 0), (2, 5)),
+        ('ALIGN',         (2, 0), (2, 5), 'CENTER'),
+        ('VALIGN',        (2, 0), (2, 5), 'MIDDLE'),
+        ('BACKGROUND',    (2, 0), (2, 5), WHITE),
+        ('LINEAFTER',     (1, 0), (1, 5), 0.5, BLACK),
+    ]))
+    elements.append(hdr_datos)
+    elements.append(Spacer(1, 0.15*cm))
+
+    elements.append(section_hdr('DATOS DE LA BAJA'))
+    w2 = W / 2
+    t_baja = Table([
+        [P('Fecha de Baja:', sLabel), P(f.fecha_baja.strftime('%d/%m/%Y') if f.fecha_baja else '—', sVal),
+         P('Tipo de Baja:', sLabel),  P(f.tipo_baja or '—', sVal)],
+    ], colWidths=[w2 * 0.35, w2 * 0.65, w2 * 0.35, w2 * 0.65])
+    t_baja.setStyle(DATA_TS)
+    elements.append(t_baja)
+    elements.append(Spacer(1, 0.15*cm))
+
+    elements.append(section_hdr('SALDO DE VACACIONES AL MOMENTO DE LA BAJA'))
+
+    def gest_row(n):
+        if gv:
+            anio = getattr(gv, f'anio_gestion{n}')
+            dias = float(getattr(gv, f'dias_gestion{n}') or 0)
+            label = f'Gestión {anio}:' if anio else f'Gestión {n}:'
+            return label, f'{dias:.1f} días'
+        return f'Gestión {n}:', '0.0 días'
+
+    g = [gest_row(n) for n in range(1, 5)]
+    total = f'{float(gv.dias_adeudados or 0):.1f}' if gv else '0.0'
+
+    wa, wb = W * 0.40, W * 0.60
+    rows_gest = [[P(label, sLabel), P(val, sVal)] for label, val in g if val != '0.0 días' or True]
+    rows_gest.append([P('TOTAL ADEUDADO:', sLabel), P(f'{total} días', sSmallB)])
+
+    t_gest = Table(rows_gest, colWidths=[wa, wb])
+    t_gest.setStyle(DATA_TS)
+    elements.append(t_gest)
+    elements.append(Spacer(1, 0.3*cm))
+
+    fecha_imp = date.today().strftime('%d/%m/%Y')
+    t_nota = Table([[
+        P('Este documento certifica el saldo de vacaciones acumuladas al momento del cierre laboral del funcionario.', sSmall),
+        P(f'<b>Fecha de impresión:</b> {fecha_imp}', sSmallB),
+    ]], colWidths=[W * 0.68, W * 0.32])
+    t_nota.setStyle(TableStyle([
+        ('TOPPADDING',    (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 0),
+        ('ALIGN',         (1, 0), (1, 0), 'RIGHT'),
+        ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(t_nota)
+
+    doc.build(elements)
+    return buffer.getvalue()
+
+
+class VacacionesBajaPDFView(APIView):
+    def get(self, request, cod):
+        from django.http import HttpResponse as DjangoHttpResponse
+
+        ci = request.user.username
+        try:
+            user_func = Funcionario.objects.get(ci__ci=ci, estado='ACTIVO')
+        except Funcionario.DoesNotExist:
+            return Response({'error': 'No autorizado.'}, status=status.HTTP_403_FORBIDDEN)
+
+        roles = set(
+            FuncionarioRol.objects.filter(cod_funcionario=user_func, activo=True)
+            .values_list('id_roles__tipo_rol', flat=True)
+        )
+        if not (roles & _ROLES_PDF_BAJA):
+            return Response({'error': 'Sin permiso para generar este reporte.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            f = Funcionario.objects.select_related('ci', 'id_unidad').get(
+                cod_funcionario=cod, estado='INACTIVO'
+            )
+        except Funcionario.DoesNotExist:
+            return Response(
+                {'error': 'Funcionario inactivo no encontrado.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        gv    = GestionVacacion.objects.filter(cod_funcionario=f).first()
+        cargo = HistorialCargo.objects.filter(cod_funcionario=f).order_by('-fecha_inicio').first()
+
+        pdf_bytes = _generar_pdf_vacaciones_baja(f, gv, cargo)
+
+        p      = f.ci
+        nombre = f"{p.nombre}_{p.ap_paterno}".replace(' ', '_')
+        response = DjangoHttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Vacaciones_Baja_{nombre}.pdf"'
+        return response

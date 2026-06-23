@@ -10,4 +10,5 @@ urlpatterns = [
     path('funcionarios/<str:cod>/editar/',           api_views.EditarFuncionarioView.as_view(),    name='funcionarios_editar'),
     path('funcionarios/<str:cod>/estado/',           api_views.ToggleEstadoView.as_view(),          name='funcionarios_estado'),
     path('funcionarios/<str:cod>/historial-cargos/', api_views.HistorialCargosView.as_view(),      name='funcionarios_historial_cargos'),
+    path('funcionarios/<str:cod>/vacaciones-baja-pdf/', api_views.VacacionesBajaPDFView.as_view(), name='funcionarios_vacaciones_baja_pdf'),
 ]

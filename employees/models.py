@@ -29,6 +29,12 @@ class Funcionario(models.Model):
     ])
     estado = models.CharField(max_length=10, default='ACTIVO')
     fecha_baja = models.DateField(blank=True, null=True)
+    tipo_baja = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        choices=[('Despido', 'Despido'), ('Renuncia', 'Renuncia'), ('Muerte', 'Muerte')],
+    )
     contrasena_hash = models.CharField(max_length=255)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
