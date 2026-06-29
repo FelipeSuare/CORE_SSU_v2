@@ -30,6 +30,7 @@ _ROLES_HISTORIAL = frozenset({'Administrador', 'Auditoria'})
 
 _SEXOS_VALIDOS = frozenset({'Masculino', 'Femenino'})
 _TIPOS_FUNCIONARIO_VALIDOS = frozenset(_NIVELES.keys())
+_TIPOS_GERENTE = frozenset({'GERENTE ADMINISTRATIVO', 'GERENTE SALUD', 'GERENTE GENERAL'})
 
 _ROL_LABEL = {
     'Administrador': 'ADMINISTRACIÓN',
@@ -355,6 +356,8 @@ class EditarFuncionarioView(APIView):
 
         hoy = date.today()
 
+        tipo_anterior = funcionario.tipo_funcionario
+
         try:
             with transaction.atomic():
                 p = funcionario.ci
@@ -455,6 +458,17 @@ class EditarFuncionarioView(APIView):
                     cod_funcionario=funcionario, nivel_aprobacion__gt=nivel_max, activo=True,
                 ).update(activo=False, fecha_fin=hoy)
 
+                # Mejora 1: Si este funcionario asume un cargo de gerente,
+                # reasignar todas las jerarquías que apuntaban al gerente anterior.
+                if tipo_func in _TIPOS_GERENTE and tipo_func != tipo_anterior:
+                    from employees.utils import reasignar_aprobador
+                    gerentes_anteriores = Funcionario.objects.filter(
+                        tipo_funcionario=tipo_func,
+                        estado='ACTIVO',
+                    ).exclude(cod_funcionario=cod)
+                    for gerente_ant in gerentes_anteriores:
+                        reasignar_aprobador(gerente_ant, funcionario, hoy)
+
         except IntegrityError:
             logger.exception('IntegrityError en operación de funcionario')
             return Response(
@@ -496,15 +510,22 @@ class ToggleEstadoView(APIView):
             except ValueError:
                 return Response({'error': 'Fecha de baja inválida.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            cargo_act = HistorialCargo.objects.filter(cod_funcionario=f, es_actual=True).first()
-            if cargo_act:
-                cargo_act.es_actual = False
-                cargo_act.save(update_fields=['es_actual'])
+            with transaction.atomic():
+                cargo_act = HistorialCargo.objects.filter(cod_funcionario=f, es_actual=True).first()
+                if cargo_act:
+                    cargo_act.es_actual = False
+                    cargo_act.save(update_fields=['es_actual'])
 
-            f.fecha_baja = fecha_baja
-            f.tipo_baja  = tipo_baja
-            f.estado     = nuevo_estado
-            f.save(update_fields=['estado', 'fecha_baja', 'tipo_baja'])
+                f.fecha_baja = fecha_baja
+                f.tipo_baja  = tipo_baja
+                f.estado     = nuevo_estado
+                f.save(update_fields=['estado', 'fecha_baja', 'tipo_baja'])
+
+                # Mejora 2: Redirigir flujo de aprobación cuando el dado de baja
+                # es un Jefe de Área con personal a su cargo.
+                if f.tipo_funcionario == 'JEFE AREA':
+                    from employees.utils import redirigir_jerarquia_por_baja_jefe
+                    redirigir_jerarquia_por_baja_jefe(f, fecha_baja)
         else:
             # Reactivar
             fecha_ingreso_str = data.get('fecha_ingreso', '').strip()
@@ -842,7 +863,14 @@ class VacacionesBajaPDFView(APIView):
         gv    = GestionVacacion.objects.filter(cod_funcionario=f).first()
         cargo = HistorialCargo.objects.filter(cod_funcionario=f).order_by('-fecha_inicio').first()
 
-        pdf_bytes = _generar_pdf_vacaciones_baja(f, gv, cargo)
+        try:
+            pdf_bytes = _generar_pdf_vacaciones_baja(f, gv, cargo)
+        except Exception:
+            logger.exception('Error generando PDF de baja para funcionario %s', cod)
+            return Response(
+                {'error': 'Error al generar el PDF. Por favor intente nuevamente.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         p      = f.ci
         nombre = f"{p.nombre}_{p.ap_paterno}".replace(' ', '_')

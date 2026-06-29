@@ -1,6 +1,9 @@
+import logging
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
+
+logger = logging.getLogger(__name__)
 
 from django.db import transaction
 from django.db.models import Q, Sum
@@ -1141,10 +1144,18 @@ class DescargarPDFView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        from vacations.views import _generar_pdf_solicitud
-        pdf_bytes = _generar_pdf_solicitud(solicitud)
-        cod       = f"G{solicitud.id_formulario:03d}"
-        response  = HttpResponse(pdf_bytes, content_type='application/pdf')
+        try:
+            from vacations.views import _generar_pdf_solicitud
+            pdf_bytes = _generar_pdf_solicitud(solicitud)
+        except Exception:
+            logger.exception('Error generando PDF de solicitud #%s', id_formulario)
+            return Response(
+                {'error': 'Error al generar el PDF. Por favor intente nuevamente.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        cod      = f"G{solicitud.id_formulario:03d}"
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="Vacacion_{cod}.pdf"'
         return response
 

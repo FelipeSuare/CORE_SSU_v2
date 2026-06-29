@@ -135,11 +135,15 @@ function abrirModalPDF(id, nombre, fechaSol) {
     _pendientePDF = id;
     document.getElementById('modalPDFMensaje').textContent =
         `Descargando PDF para la solicitud de ${nombre}, presentada el ${fmt(fechaSol)}.`;
-    document.getElementById('modalPDF').style.display = 'flex';
+    const overlay = document.getElementById('modalPDF');
+    overlay.classList.add('active');
+    overlay.querySelector('.form-modal').classList.add('active');
 }
 
 function cerrarModal() {
-    document.getElementById('modalPDF').style.display = 'none';
+    const overlay = document.getElementById('modalPDF');
+    overlay.classList.remove('active');
+    overlay.querySelector('.form-modal').classList.remove('active');
     _pendientePDF = null;
 }
 
@@ -147,7 +151,12 @@ function confirmarDescarga() {
     if (!_pendientePDF) return;
     const id = _pendientePDF;
     cerrarModal();
-    window.location.href = `${API_PDF}${id}/`;
+    const a = document.createElement('a');
+    a.href = `${API_PDF}${id}/`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 0);
 }
 
 // ── Utilidades ────────────────────────────────────────────────

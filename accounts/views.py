@@ -45,14 +45,20 @@ def login_view(request):
         if user is not None:
             cache.delete(clave_intentos)
             cache.delete(clave_bloqueo)
-            login(request, user)
             try:
                 func = Funcionario.objects.get(ci__ci=user.username)
+                if func.estado != 'ACTIVO':
+                    messages.error(
+                        request,
+                        'Su acceso ha sido deshabilitado. Comuníquese con RRHH.',
+                    )
+                    return redirect('login_home')
+                login(request, user)
                 if func.contrasena_hash == '1234567':
                     request.session['debe_cambiar_contrasena'] = True
                     return redirect('contrasena')
             except Funcionario.DoesNotExist:
-                pass
+                login(request, user)
             return redirect('index')
         else:
             intentos = (cache.get(clave_intentos) or 0) + 1

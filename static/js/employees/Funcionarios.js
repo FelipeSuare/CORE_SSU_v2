@@ -330,7 +330,12 @@ async function confirmarBaja() {
 }
 
 function descargarPDFVacaciones(cod) {
-    window.open(`/funcionarios/${cod}/vacaciones-baja-pdf/`, '_blank');
+    const a = document.createElement('a');
+    a.href = `/funcionarios/${cod}/vacaciones-baja-pdf/`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 0);
 }
 
 // ═══════════════════════════════════════════════════════════════

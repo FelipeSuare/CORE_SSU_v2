@@ -368,6 +368,10 @@ document.addEventListener('DOMContentLoaded', () => {
 </body></html>`;
 
         const ventana = window.open('', '_blank');
+        if (!ventana) {
+            alert('El navegador bloqueó la ventana emergente. Permita ventanas emergentes para este sitio e intente de nuevo.');
+            return;
+        }
         ventana.document.write(htmlPDF);
         ventana.document.close();
     }
