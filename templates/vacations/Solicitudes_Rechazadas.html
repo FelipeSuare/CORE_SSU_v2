@@ -1,0 +1,147 @@
+{% load static static_v %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitudes Rechazadas</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" rel="stylesheet">
+    <link rel="stylesheet" href="{% staticv 'css/shared/base.css' %}">
+    <link rel="stylesheet" href="{% staticv 'css/shared/utils.css' %}">
+    <link rel="stylesheet" href="{% staticv 'css/shared/profile-switcher.css' %}">
+    <link rel="stylesheet" href="{% staticv 'css/vacations/Frm_Solicitud.css' %}">
+    <link rel="stylesheet" href="{% staticv 'css/shared/notifications.css' %}">
+    <style>
+        .badge-rechazo {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #fdecea;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 0.78em;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .obs-cell {
+            max-width: 220px;
+            white-space: normal;
+            line-height: 1.4;
+            font-size: 0.85em;
+            color: #555;
+        }
+        .counter-badge {
+            display: inline-block;
+            background: #c62828;
+            color: #fff;
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 0.82em;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="header-wrapper">
+            <header class="module-header">
+                <i class="material-symbols-outlined" style="color:#c62828">cancel</i>
+                <div>
+                    <h1 class="module-title">
+                        Solicitudes Rechazadas
+                        <span class="counter-badge" id="totalBadge">0</span>
+                    </h1>
+                    <p class="module-subtitle">Registro de solicitudes de vacación que fueron rechazadas</p>
+                </div>
+            </header>
+            <div class="header-actions">
+                <a href="/Index_Principal.html" class="back-to-menu">
+                    <i class="material-symbols-outlined">arrow_back</i>
+                    Volver
+                </a>
+                <div class="profile-switcher-container">
+                    <button class="btn-profile-trigger" id="btnProfile">
+                        <i class="material-symbols-outlined">account_circle</i>
+                        <span id="currentProfileText">—</span>
+                        <i class="material-symbols-outlined">expand_more</i>
+                    </button>
+                    <div class="profile-panel" id="profilePanel">
+                        <div class="profile-info">
+                            <i class="material-symbols-outlined profile-icon">account_circle</i>
+                            <div class="profile-text">
+                                <span class="profile-name" id="profileNamePanel">—</span>
+                                <span class="profile-role" id="currentRolePanel">—</span>
+                            </div>
+                        </div>
+                        <ul class="role-list" id="roleList"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="filters-container">
+            <div class="filter-group">
+                <label for="unidadOrg">Unidad Organizacional</label>
+                <div class="select-wrapper">
+                    <select id="unidadOrg">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label for="funcionarioFilter">Funcionario</label>
+                <div class="input-wrapper">
+                    <input type="text" id="funcionarioFilter" placeholder="Buscar funcionario...">
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button class="btn btn-primary btn-search" id="btnFilter">
+                    <i class="material-symbols-outlined">search</i> Filtrar
+                </button>
+                <button class="btn btn-secondary btn-clear" id="btnClear">
+                    <i class="material-symbols-outlined">refresh</i> Limpiar
+                </button>
+            </div>
+        </div>
+
+        <div class="table-card">
+            <h2 class="card-title">Solicitudes con estado Rechazada</h2>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cód.</th>
+                            <th>Funcionario</th>
+                            <th>Unidad</th>
+                            <th>Fecha Solicitud</th>
+                            <th>Fecha Inicio</th>
+                            <th>Fecha Final</th>
+                            <th>Días</th>
+                            <th>Rechazado por</th>
+                            <th>Fecha Rechazo</th>
+                            <th>Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rechazadasTableBody">
+                        <tr>
+                            <td colspan="10" style="text-align:center;padding:30px;color:#999">
+                                Cargando solicitudes...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% staticv 'js/shared/profile-switcher.js' %}"></script>
+    <script src="{% staticv 'js/vacations/Solicitudes_Rechazadas.js' %}"></script>
+    <script src="{% staticv 'js/shared/notifications.js' %}"></script>
+</body>
+</html>
