@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ══════════════════════════════════════════════
     async function cargarFuncionarios(params = {}) {
         const tbody = document.getElementById('tablaBody');
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:#aaa">
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:#aaa">
             <i class="material-symbols-outlined" style="vertical-align:middle">hourglass_empty</i> Cargando…
         </td></tr>`;
 
@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res  = await fetch(`/api/reportes/personal/funcionarios/${qs ? '?' + qs : ''}`);
             const data = await res.json();
             if (data.error) {
-                tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:28px;color:#c00">${data.error}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:28px;color:#c00">${data.error}</td></tr>`;
                 return;
             }
             todosFuncionarios = data.funcionarios;
@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             console.error('Error cargando funcionarios:', e);
             document.getElementById('tablaBody').innerHTML =
-                `<tr><td colspan="10" style="text-align:center;padding:28px;color:#c00">Error al cargar datos.</td></tr>`;
+                `<tr><td colspan="9" style="text-align:center;padding:28px;color:#c00">Error al cargar datos.</td></tr>`;
         }
     }
 
@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ══════════════════════════════════════════════
     function actualizarHeadersGestion() {
         const base = new Date().getFullYear();
-        ['thRP1','thRP2','thRP3','thRP4'].forEach((id, i) => {
+        ['thRP1','thRP2','thRP3'].forEach((id, i) => {
             const th = document.getElementById(id);
             if (th) th.textContent = base - i;
         });
@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `${datos.length} funcionario${datos.length !== 1 ? 's' : ''}`;
 
         if (datos.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:32px;color:#aaa">
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:#aaa">
                 No se encontraron funcionarios con los criterios seleccionados.
             </td></tr>`;
             return;

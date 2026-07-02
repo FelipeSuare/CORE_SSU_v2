@@ -5,6 +5,7 @@ env/
 
 # Variables de entorno (contiene credenciales de BD)
 .env
+.env.docker
 
 # Python
 __pycache__/

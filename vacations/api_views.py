@@ -1,3 +1,4 @@
+import calendar
 import logging
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
@@ -20,7 +21,14 @@ from vacations.models import (
     AnulacionAjuste, AprobacionSolicitud, GestionVacacion,
     JerarquiaAprobacion, SolicitudVacacion,
 )
-from vacations.utils import calcular_anios_antiguedad, dias_por_antiguedad, poblar_gestion_vacacion
+from vacations.utils import (
+    calcular_anios_antiguedad,
+    calcular_gestioneS_pendientes,
+    dias_por_antiguedad,
+    poblar_gestion_vacacion,
+    aplicar_limite_gestiones_activas,
+    LIMITE_GESTIONES_ACTIVAS,
+)
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -136,6 +144,23 @@ def _calcular_retorno(fecha_salida, dias_solicitados, fecha_nacimiento, feriados
         'dias_feriados':   dias_feriados_count,
         'dias_cumpleanos': dias_cumple,
     }
+
+
+def _siguiente_dia_habil(fecha, feriados_set):
+    """Si `fecha` cae en fin de semana o feriado, avanza al próximo día hábil."""
+    while fecha.weekday() >= 5 or fecha in feriados_set:
+        fecha += timedelta(days=1)
+    return fecha
+
+
+def _sumar_meses(fecha, meses):
+    """Suma `meses` calendario a `fecha`, recortando al último día del mes
+    destino si el día original no existe ahí (ej. 31 de enero + 1 mes)."""
+    mes_total = fecha.month - 1 + meses
+    anio = fecha.year + mes_total // 12
+    mes  = mes_total % 12 + 1
+    ultimo_dia_mes = calendar.monthrange(anio, mes)[1]
+    return date(anio, mes, min(fecha.day, ultimo_dia_mes))
 
 
 def _get_usuario_rrhh(request):
@@ -1015,42 +1040,52 @@ class AcreditarGestionView(APIView):
 
         dias = dias_por_antiguedad(anios)
 
-        try:
-            gv = GestionVacacion.objects.get(cod_funcionario=funcionario)
-        except GestionVacacion.DoesNotExist:
-            gv = GestionVacacion(cod_funcionario=funcionario)
+        with transaction.atomic():
+            try:
+                gv = GestionVacacion.objects.select_for_update().get(cod_funcionario=funcionario)
+            except GestionVacacion.DoesNotExist:
+                gv = GestionVacacion(cod_funcionario=funcionario)
 
-        for i in range(1, 5):
-            if getattr(gv, f'anio_gestion{i}') == anio_gestion:
+            for i in range(1, 5):
+                if getattr(gv, f'anio_gestion{i}') == anio_gestion:
+                    return Response(
+                        {'error': f'La gestión {anio_gestion} ya fue acreditada para este funcionario.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            slot = next((i for i in range(4, 0, -1) if getattr(gv, f'anio_gestion{i}') is None), None)
+
+            evictadas = []
+            if slot is None:
+                # Datos legado: los 4 slots físicos ya están ocupados (aún no se
+                # corrió la migración de datos a 2 gestiones activas). Se libera
+                # espacio evictando la(s) más antigua(s) antes de insertar.
+                evictadas += aplicar_limite_gestiones_activas(gv, limite=LIMITE_GESTIONES_ACTIVAS - 1)
+                slot = next((i for i in range(4, 0, -1) if getattr(gv, f'anio_gestion{i}') is None), None)
+
+            if slot is None:
                 return Response(
-                    {'error': f'La gestión {anio_gestion} ya fue acreditada para este funcionario.'},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    {'error': 'No se pudo asignar un slot libre. Contacte soporte.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-        slot = None
-        for i in range(4, 0, -1):
-            if getattr(gv, f'anio_gestion{i}') is None:
-                slot = i
-                break
-        if slot is None:
-            for i in range(4, 0, -1):
-                if getattr(gv, f'dias_gestion{i}') == 0:
-                    slot = i
-                    break
+            setattr(gv, f'anio_gestion{slot}', anio_gestion)
+            setattr(gv, f'dias_gestion{slot}', dias)
 
-        if slot is None:
-            return Response(
-                {'error': 'No hay slots disponibles. El funcionario tiene 4 gestiones pendientes de uso.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            # Tope normal: ya con la gestión nueva insertada, recorta a 2 activas.
+            evictadas += aplicar_limite_gestiones_activas(gv)
 
-        setattr(gv, f'anio_gestion{slot}', anio_gestion)
-        setattr(gv, f'dias_gestion{slot}', dias)
+            campos = {f'anio_gestion{slot}', f'dias_gestion{slot}'}
+            if evictadas:
+                campos.add('dias_perdidos')
+                for ev in evictadas:
+                    campos.add(f"anio_gestion{ev['slot']}")
+                    campos.add(f"dias_gestion{ev['slot']}")
 
-        if gv.pk:
-            gv.save(update_fields=[f'anio_gestion{slot}', f'dias_gestion{slot}'])
-        else:
-            gv.save()
+            if gv.pk:
+                gv.save(update_fields=list(campos))
+            else:
+                gv.save()
 
         p = funcionario.ci
         return Response({
@@ -1060,6 +1095,9 @@ class AcreditarGestionView(APIView):
             'anios_antiguedad': anios,
             'dias_acreditados': float(dias),
             'slot':             slot,
+            'gestiones_perdidas': [
+                {'anio': ev['anio'], 'dias': float(ev['dias'])} for ev in evictadas
+            ],
         }, status=status.HTTP_201_CREATED)
 
 
@@ -1574,3 +1612,164 @@ class DescargarPDFRechazadaView(APIView):
         response = HttpResponse(pdf_bytes, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="Rechazada_{cod}.pdf"'
         return response
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ALERTA: funcionarios a punto de perder días (3ra gestión sin solicitar)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_ANTICIPO_RIESGO_MESES = 1
+
+
+class AlertaGestionesPorPerderView(APIView):
+    """
+    Funcionarios que ya tienen sus 2 gestiones activas ocupadas (tope actual)
+    y además ya son elegibles -o lo serán dentro de _ANTICIPO_RIESGO_MESES,
+    según su antigüedad- para una gestión adicional que todavía no fue
+    acreditada. La próxima acreditación (automática vía 'poblar_vacaciones' o
+    manual por RRHH) evictará su gestión más antigua a días perdidos, así que
+    se alerta a RRHH con antelación -incluyendo la fecha límite exacta- para
+    que le pida solicitar vacaciones antes de que eso ocurra. Solo
+    RRHH/Administrador.
+    """
+    permission_classes = [NoCambioPendiente, EsRRHH]
+
+    def get(self, request):
+        tiene_acceso, _ = _check_acceso_historial(request)
+        if not tiene_acceso:
+            return Response({'error': 'Sin acceso.'}, status=status.HTTP_403_FORBIDDEN)
+
+        hoy       = date.today()
+        horizonte = _sumar_meses(hoy, _ANTICIPO_RIESGO_MESES)
+
+        funcionarios = Funcionario.objects.filter(estado='ACTIVO').select_related('ci', 'id_unidad')
+        gestiones_map = {
+            gv.cod_funcionario_id: gv
+            for gv in GestionVacacion.objects.filter(cod_funcionario__in=funcionarios)
+        }
+
+        alertas = []
+        for f in funcionarios:
+            gv = gestiones_map.get(f.cod_funcionario)
+            if not gv:
+                continue
+
+            ocupados = [
+                (i, getattr(gv, f'anio_gestion{i}'), getattr(gv, f'dias_gestion{i}'))
+                for i in range(1, 5)
+                if getattr(gv, f'anio_gestion{i}') is not None
+            ]
+            if len(ocupados) < LIMITE_GESTIONES_ACTIVAS:
+                continue
+
+            # Se simula "dentro de _ANTICIPO_RIESGO_MESES" para detectar el
+            # riesgo con antelación, no solo el día exacto del aniversario.
+            esperadas = calcular_gestioneS_pendientes(f.fecha_ingreso, horizonte)
+            if not esperadas:
+                continue
+            anio_mas_reciente_esperado = esperadas[-1][1]  # última tupla = más reciente
+            anios_actuales = {anio for _, anio, _ in ocupados}
+            if anio_mas_reciente_esperado in anios_actuales:
+                continue  # ya está al día, no hay gestión nueva pendiente de acreditar
+
+            # Fecha límite: el aniversario exacto en que se vuelve elegible
+            # para la gestión nueva -y por lo tanto el día desde el cual una
+            # acreditación evictaría la gestión más antigua-.
+            try:
+                fecha_limite = f.fecha_ingreso.replace(year=anio_mas_reciente_esperado)
+            except ValueError:
+                fecha_limite = date(anio_mas_reciente_esperado, 3, 1)
+
+            ocupados.sort(key=lambda t: t[1])  # año ascendente = más antigua primero
+            _, anio_riesgo, dias_riesgo = ocupados[0]
+
+            p = f.ci
+            alertas.append({
+                'nombre':          f"{p.nombre} {p.ap_paterno} {p.ap_materno or ''}".strip(),
+                'ci':              p.ci,
+                'cod':             f.cod_funcionario,
+                'unidad':          f.id_unidad.nombre if f.id_unidad else '—',
+                'anio_en_riesgo':  anio_riesgo,
+                'dias':            float(dias_riesgo or 0),
+                'fecha_limite':    fecha_limite.strftime('%d/%m/%Y'),
+                '_fecha_limite_dt': fecha_limite,
+            })
+
+        alertas.sort(key=lambda a: a['_fecha_limite_dt'])
+        for a in alertas:
+            del a['_fecha_limite_dt']
+
+        return Response({'funcionarios': alertas})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  ALERTA: hoy toca poblar (aniversario del día, ajustado a día hábil)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class AlertaPoblarHoyView(APIView):
+    """
+    Funcionarios cuyo aniversario de ingreso -ajustado al siguiente día hábil
+    si cayó en fin de semana o feriado- ya se cumplió y cuya gestión
+    correspondiente todavía no fue acreditada. Es un recordatorio persistente
+    (no desaparece si RRHH no lo atiende el mismo día) para que sepa que le
+    corresponde correr "Poblar Vacaciones" para ese funcionario. Solo
+    RRHH/Administrador.
+    """
+    permission_classes = [NoCambioPendiente, EsRRHH]
+
+    def get(self, request):
+        tiene_acceso, _ = _check_acceso_historial(request)
+        if not tiene_acceso:
+            return Response({'error': 'Sin acceso.'}, status=status.HTTP_403_FORBIDDEN)
+
+        hoy = date.today()
+        feriados_set = set(Feriado.objects.values_list('fecha', flat=True))
+
+        funcionarios = Funcionario.objects.filter(estado='ACTIVO').select_related('ci', 'id_unidad')
+        gestiones_map = {
+            gv.cod_funcionario_id: gv
+            for gv in GestionVacacion.objects.filter(cod_funcionario__in=funcionarios)
+        }
+
+        resultado = []
+        for f in funcionarios:
+            esperadas = calcular_gestioneS_pendientes(f.fecha_ingreso, hoy)
+            if not esperadas:
+                continue
+            anio_pendiente = esperadas[-1][1]
+
+            gv = gestiones_map.get(f.cod_funcionario)
+            anios_actuales = set()
+            if gv:
+                anios_actuales = {
+                    getattr(gv, f'anio_gestion{i}')
+                    for i in range(1, 5)
+                    if getattr(gv, f'anio_gestion{i}') is not None
+                }
+            if anio_pendiente in anios_actuales:
+                continue  # ya acreditada
+
+            try:
+                aniversario = f.fecha_ingreso.replace(year=anio_pendiente)
+            except ValueError:
+                aniversario = date(anio_pendiente, 3, 1)
+
+            if _siguiente_dia_habil(aniversario, feriados_set) > hoy:
+                continue  # todavía no corresponde (ajustado a día hábil)
+
+            p = f.ci
+            resultado.append({
+                'nombre':          f"{p.nombre} {p.ap_paterno} {p.ap_materno or ''}".strip(),
+                'ci':              p.ci,
+                'cod':             f.cod_funcionario,
+                'unidad':          f.id_unidad.nombre if f.id_unidad else '—',
+                'anio_pendiente':  anio_pendiente,
+                'aniversario':     aniversario.strftime('%d/%m/%Y'),
+                '_aniversario_dt': aniversario,
+            })
+
+        resultado.sort(key=lambda a: a['_aniversario_dt'])
+        for a in resultado:
+            del a['_aniversario_dt']
+
+        return Response({'funcionarios': resultado})

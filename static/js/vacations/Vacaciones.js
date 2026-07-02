@@ -124,12 +124,12 @@ async function cargarDatosFormulario() {
 
         // Notificación de gestiones acumuladas
         const n = data.gestiones_con_saldo;
-        if (n >= 4) {
+        if (n >= 2) {
             mostrarNotificacion(
-                `¡URGENTE! Tiene ${n} gestiones acumuladas sin tomar. La normativa no permite acumular más de 4 gestiones.`,
+                `¡URGENTE! Tiene ${n} gestiones acumuladas sin tomar. La normativa no permite acumular más de 2 gestiones.`,
                 'urgente'
             );
-        } else if (n >= 3) {
+        } else if (n >= 1) {
             mostrarNotificacion(
                 `Tiene ${n} gestiones acumuladas. Se recomienda coordinar sus vacaciones pendientes.`,
                 'advertencia'
@@ -192,7 +192,7 @@ function renderizarSaldos(saldos, gestionesConSaldo) {
 
     html += `
     <div class="saldo-card saldo-card-total">
-        <div class="saldo-label">TOTAL ADEUDADO <i class="material-symbols-outlined" title="Calculado automáticamente por la BD sumando únicamente las 4 gestiones. No incluye días negados para evitar doble conteo." style="font-size:14px;cursor:help;vertical-align:middle">info</i></div>
+        <div class="saldo-label">TOTAL ADEUDADO <i class="material-symbols-outlined" title="Calculado automáticamente por la BD sumando únicamente las gestiones activas (máx. 2). No incluye días negados para evitar doble conteo." style="font-size:14px;cursor:help;vertical-align:middle">info</i></div>
         <div class="saldo-value">${dias_adeudados} <span>días</span></div>
     </div>`;
 

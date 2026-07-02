@@ -23,4 +23,7 @@ urlpatterns = [
     # Solicitudes Rechazadas (RRHH)
     path('api/vacaciones/rechazadas/',                           api_views.SolicitudesRechazadasView.as_view(),    name='vac_rechazadas'),
     path('api/vacaciones/rechazadas/pdf/<int:id_formulario>/',   api_views.DescargarPDFRechazadaView.as_view(),   name='vac_pdf_rechazada'),
+    # Alerta de gestiones a punto de perder días (RRHH)
+    path('api/vacaciones/alerta-gestiones-riesgo/', api_views.AlertaGestionesPorPerderView.as_view(), name='vac_alerta_gestiones_riesgo'),
+    path('api/vacaciones/alerta-poblar-hoy/',       api_views.AlertaPoblarHoyView.as_view(),           name='vac_alerta_poblar_hoy'),
 ]

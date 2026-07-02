@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.urls import reverse
@@ -10,11 +10,12 @@ from vacations.utils import (
     calcular_anios_antiguedad,
     calcular_gestioneS_pendientes,
     dias_por_antiguedad,
+    aplicar_limite_gestiones_activas,
 )
 from vacations.api_views import _calcular_retorno
 from core.models import Feriado
 from vacations.models import GestionVacacion, JerarquiaAprobacion, SolicitudVacacion
-from core.test_utils import hacer_usuario_y_funcionario, hacer_gestion, hacer_cargo
+from core.test_utils import hacer_usuario_y_funcionario, hacer_gestion, hacer_cargo, hacer_funcionario
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -236,6 +237,103 @@ class TestCalcularGestionesPendientes(TestCase):
         gs      = calcular_gestioneS_pendientes(ingreso, hoy)
         gestiones_dict = {g[1]: g[2] for g in gs}
         self.assertEqual(gestiones_dict.get(2025), Decimal('20'))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Tope de gestiones activas (4→2) y evicción a días perdidos
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAplicarLimiteGestionesActivas(TestCase):
+
+    def _funcionario(self, ci='90000001'):
+        _, f = hacer_usuario_y_funcionario(ci=ci, fecha_ingreso=date(2015, 1, 1))
+        return f
+
+    def test_tres_activas_evictona_la_mas_antigua_por_anio(self):
+        gv = hacer_gestion(self._funcionario(), anio1=2023, dias1=Decimal('15'))
+        gv.anio_gestion2 = 2024
+        gv.dias_gestion2 = Decimal('15')
+        gv.anio_gestion3 = 2025
+        gv.dias_gestion3 = Decimal('20')
+
+        evictadas = aplicar_limite_gestiones_activas(gv)
+
+        self.assertEqual(len(evictadas), 1)
+        self.assertEqual(evictadas[0]['anio'], 2023)
+        self.assertIsNone(gv.anio_gestion1)
+        self.assertEqual(gv.dias_gestion1, Decimal('0'))
+        self.assertEqual(gv.dias_perdidos, Decimal('15'))
+        self.assertEqual(gv.anio_gestion2, 2024)
+        self.assertEqual(gv.anio_gestion3, 2025)
+
+    def test_exactamente_dos_activas_no_evictona(self):
+        gv = hacer_gestion(self._funcionario(), anio1=2024, dias1=Decimal('15'))
+        gv.anio_gestion2 = 2025
+        gv.dias_gestion2 = Decimal('15')
+
+        evictadas = aplicar_limite_gestiones_activas(gv)
+
+        self.assertEqual(evictadas, [])
+        self.assertEqual(gv.dias_perdidos, Decimal('0'))
+
+    def test_cero_o_una_activa_no_evictona(self):
+        gv = GestionVacacion(cod_funcionario=self._funcionario())
+        self.assertEqual(aplicar_limite_gestiones_activas(gv), [])
+
+        gv2 = hacer_gestion(self._funcionario(ci='90000002'), anio1=2025, dias1=Decimal('15'))
+        self.assertEqual(aplicar_limite_gestiones_activas(gv2), [])
+
+    def test_evict_por_anio_no_por_slot(self):
+        # slot 1 tiene el año más antiguo, slot 3 el más reciente: la evicción
+        # debe usar el año real, no la posición del slot.
+        gv = hacer_gestion(self._funcionario(), anio1=2022, dias1=Decimal('15'))
+        gv.anio_gestion2 = 2024
+        gv.dias_gestion2 = Decimal('15')
+        gv.anio_gestion3 = 2023
+        gv.dias_gestion3 = Decimal('20')
+
+        evictadas = aplicar_limite_gestiones_activas(gv)
+
+        self.assertEqual(len(evictadas), 1)
+        self.assertEqual(evictadas[0]['anio'], 2022)
+        self.assertEqual(evictadas[0]['slot'], 1)
+
+    def test_idempotente(self):
+        gv = hacer_gestion(self._funcionario(), anio1=2023, dias1=Decimal('15'))
+        gv.anio_gestion2 = 2024
+        gv.dias_gestion2 = Decimal('15')
+        gv.anio_gestion3 = 2025
+        gv.dias_gestion3 = Decimal('20')
+
+        aplicar_limite_gestiones_activas(gv)
+        perdidos_tras_primera = gv.dias_perdidos
+        evictadas_segunda = aplicar_limite_gestiones_activas(gv)
+
+        self.assertEqual(evictadas_segunda, [])
+        self.assertEqual(gv.dias_perdidos, perdidos_tras_primera)
+
+    def test_persistencia_en_bd(self):
+        gv = hacer_gestion(self._funcionario(), anio1=2023, dias1=Decimal('15'))
+        gv.anio_gestion2 = 2024
+        gv.dias_gestion2 = Decimal('15')
+        gv.anio_gestion3 = 2025
+        gv.dias_gestion3 = Decimal('20')
+        gv.save(update_fields=['anio_gestion2', 'dias_gestion2', 'anio_gestion3', 'dias_gestion3'])
+
+        evictadas = aplicar_limite_gestiones_activas(gv)
+        campos = {'dias_perdidos'}
+        for ev in evictadas:
+            campos.add(f"anio_gestion{ev['slot']}")
+            campos.add(f"dias_gestion{ev['slot']}")
+        gv.save(update_fields=list(campos))
+        gv.refresh_from_db()
+
+        self.assertEqual(gv.dias_perdidos, Decimal('15.0'))
+        self.assertIsNone(gv.anio_gestion1)
+        self.assertEqual(gv.dias_gestion1, Decimal('0.0'))
+        self.assertEqual(gv.anio_gestion2, 2024)
+        self.assertEqual(gv.anio_gestion3, 2025)
+        self.assertEqual(gv.dias_adeudados, Decimal('35.0'))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -476,3 +574,248 @@ class TestHistorialRRHHAPI(APITestCase):
         data = r.json()
         self.assertIn('solicitudes', data)
         self.assertIn('usuario', data)
+
+
+class TestAcreditarGestionAPI(APITestCase):
+    """POST /api/vacaciones/acreditar-gestion/ — tope de 2 gestiones activas."""
+
+    def setUp(self):
+        # Evita que el signal de auto-poblado (vacations/apps.py, dispara en el
+        # primer request HTTP del proceso) toque los funcionarios de prueba.
+        import vacations.apps as vacations_apps
+        vacations_apps._primer_request_ejecutado = True
+
+        self.user_rrhh, self.func_rrhh = hacer_usuario_y_funcionario(
+            ci='66666666', nombre='RRHH-Test', roles=['RRHH']
+        )
+        self.user_normal, _ = hacer_usuario_y_funcionario(ci='77777777', nombre='Normal')
+        self.url = reverse('vac_acreditar_gestion')
+
+    def test_sin_rol_rrhh_devuelve_403(self):
+        self.client.force_login(self.user_normal)
+        r = self.client.post(self.url, {'cod_funcionario': 'F1', 'anio_gestion': 2023})
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tercera_gestion_evictona_la_mas_antigua(self):
+        f = hacer_funcionario(ci='88888888', nombre='Ana', fecha_ingreso=date(2015, 1, 1))
+        gv = hacer_gestion(f, anio1=2023, dias1=Decimal('15'))
+        gv.anio_gestion2 = 2024
+        gv.dias_gestion2 = Decimal('15')
+        gv.save(update_fields=['anio_gestion2', 'dias_gestion2'])
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.post(self.url, {'cod_funcionario': f.cod_funcionario, 'anio_gestion': 2025})
+
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        data = r.json()
+        self.assertEqual(len(data['gestiones_perdidas']), 1)
+        self.assertEqual(data['gestiones_perdidas'][0]['anio'], 2023)
+
+        gv.refresh_from_db()
+        self.assertIsNone(gv.anio_gestion1)
+        self.assertEqual(gv.dias_perdidos, Decimal('15.0'))
+        self.assertEqual(gv.anio_gestion2, 2024)
+        self.assertIn(2025, [gv.anio_gestion3, gv.anio_gestion4])
+
+    def test_segunda_gestion_no_evictona(self):
+        f = hacer_funcionario(ci='99999999', nombre='Beto', fecha_ingreso=date(2015, 1, 1))
+        gv = hacer_gestion(f, anio1=2024, dias1=Decimal('15'))
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.post(self.url, {'cod_funcionario': f.cod_funcionario, 'anio_gestion': 2025})
+
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        data = r.json()
+        self.assertEqual(data['gestiones_perdidas'], [])
+
+        gv.refresh_from_db()
+        self.assertEqual(gv.dias_perdidos, Decimal('0.0'))
+        self.assertEqual(gv.anio_gestion1, 2024)
+
+
+class TestAlertaGestionesRiesgoAPI(APITestCase):
+    """GET /api/vacaciones/alerta-gestiones-riesgo/ — funcionarios con 2
+    gestiones activas y una nueva ya elegible pero sin acreditar todavía."""
+
+    def setUp(self):
+        import vacations.apps as vacations_apps
+        vacations_apps._primer_request_ejecutado = True
+
+        self.user_rrhh, self.func_rrhh = hacer_usuario_y_funcionario(
+            ci='11111101', nombre='RRHH-Test', roles=['RRHH']
+        )
+        self.user_normal, _ = hacer_usuario_y_funcionario(ci='11111102', nombre='Normal')
+        self.url = reverse('vac_alerta_gestiones_riesgo')
+
+    def test_sin_rol_rrhh_devuelve_403(self):
+        self.client.force_login(self.user_normal)
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_funcionario_al_tope_y_desactualizado_aparece_en_riesgo(self):
+        f = hacer_funcionario(ci='11111103', nombre='Carla', fecha_ingreso=date(2015, 1, 1))
+        gv = hacer_gestion(f, anio1=2024, dias1=Decimal('15'))
+        gv.anio_gestion2 = 2025
+        gv.dias_gestion2 = Decimal('15')
+        gv.save(update_fields=['anio_gestion2', 'dias_gestion2'])
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.get(self.url)
+
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        data = r.json()
+        cis = [row['ci'] for row in data['funcionarios']]
+        self.assertIn('11111103', cis)
+        fila = next(row for row in data['funcionarios'] if row['ci'] == '11111103')
+        self.assertEqual(fila['anio_en_riesgo'], 2024)
+        self.assertEqual(fila['dias'], 15.0)
+        self.assertEqual(fila['fecha_limite'], '01/01/2026')
+
+    def test_funcionario_al_dia_no_aparece(self):
+        f = hacer_funcionario(ci='11111104', nombre='Diego', fecha_ingreso=date(2015, 1, 1))
+        gv = hacer_gestion(f, anio1=2025, dias1=Decimal('15'))
+        gv.anio_gestion2 = 2026
+        gv.dias_gestion2 = Decimal('15')
+        gv.save(update_fields=['anio_gestion2', 'dias_gestion2'])
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.get(self.url)
+
+        cis = [row['ci'] for row in r.json()['funcionarios']]
+        self.assertNotIn('11111104', cis)
+
+    def test_funcionario_bajo_el_tope_no_aparece(self):
+        f = hacer_funcionario(ci='11111105', nombre='Elena', fecha_ingreso=date(2015, 1, 1))
+        hacer_gestion(f, anio1=2026, dias1=Decimal('15'))
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.get(self.url)
+
+        cis = [row['ci'] for row in r.json()['funcionarios']]
+        self.assertNotIn('11111105', cis)
+
+    def test_aniversario_dentro_de_un_mes_aparece_con_anticipo(self):
+        # Hoy es 2026-07-02; aniversario 2026-07-20 cae dentro de la ventana
+        # de 1 mes de anticipo, aunque todavía no llegó.
+        hoy = date.today()
+        aniversario_futuro = hoy + timedelta(days=18)
+        f = hacer_funcionario(
+            ci='11111106', nombre='Fabi',
+            fecha_ingreso=date(2015, aniversario_futuro.month, aniversario_futuro.day),
+        )
+        gv = hacer_gestion(f, anio1=hoy.year - 2, dias1=Decimal('15'))
+        gv.anio_gestion2 = hoy.year - 1
+        gv.dias_gestion2 = Decimal('15')
+        gv.save(update_fields=['anio_gestion2', 'dias_gestion2'])
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.get(self.url)
+
+        cis = [row['ci'] for row in r.json()['funcionarios']]
+        self.assertIn('11111106', cis)
+        fila = next(row for row in r.json()['funcionarios'] if row['ci'] == '11111106')
+        self.assertEqual(fila['fecha_limite'], aniversario_futuro.strftime('%d/%m/%Y'))
+
+    def test_aniversario_fuera_de_la_ventana_de_un_mes_no_aparece(self):
+        # Aniversario a 60 días: fuera de la ventana de anticipo de 1 mes.
+        hoy = date.today()
+        aniversario_lejano = hoy + timedelta(days=60)
+        f = hacer_funcionario(
+            ci='11111107', nombre='Gabo',
+            fecha_ingreso=date(2015, aniversario_lejano.month, aniversario_lejano.day),
+        )
+        gv = hacer_gestion(f, anio1=hoy.year - 2, dias1=Decimal('15'))
+        gv.anio_gestion2 = hoy.year - 1
+        gv.dias_gestion2 = Decimal('15')
+        gv.save(update_fields=['anio_gestion2', 'dias_gestion2'])
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.get(self.url)
+
+        cis = [row['ci'] for row in r.json()['funcionarios']]
+        self.assertNotIn('11111107', cis)
+
+
+class TestAlertaPoblarHoyAPI(APITestCase):
+    """GET /api/vacaciones/alerta-poblar-hoy/ — aniversarios ya cumplidos
+    (ajustados a día hábil) cuya gestión aún no se acreditó."""
+
+    def setUp(self):
+        import vacations.apps as vacations_apps
+        vacations_apps._primer_request_ejecutado = True
+
+        self.user_rrhh, self.func_rrhh = hacer_usuario_y_funcionario(
+            ci='11111201', nombre='RRHH-Test2', roles=['RRHH']
+        )
+        self.user_normal, _ = hacer_usuario_y_funcionario(ci='11111202', nombre='Normal2')
+        self.url = reverse('vac_alerta_poblar_hoy')
+
+    def test_sin_rol_rrhh_devuelve_403(self):
+        self.client.force_login(self.user_normal)
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_aniversario_hoy_sin_acreditar_aparece(self):
+        hoy = date.today()
+        f = hacer_funcionario(
+            ci='11111203', nombre='Flor',
+            fecha_ingreso=date(hoy.year - 5, hoy.month, hoy.day),
+        )
+        hacer_gestion(f, anio1=hoy.year - 1, dias1=Decimal('15'))
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.get(self.url)
+
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        cis = [row['ci'] for row in r.json()['funcionarios']]
+        self.assertIn('11111203', cis)
+        fila = next(row for row in r.json()['funcionarios'] if row['ci'] == '11111203')
+        self.assertEqual(fila['anio_pendiente'], hoy.year)
+        self.assertEqual(fila['aniversario'], hoy.strftime('%d/%m/%Y'))
+
+    def test_funcionario_ya_acreditado_no_aparece(self):
+        hoy = date.today()
+        f = hacer_funcionario(
+            ci='11111205', nombre='Hilda',
+            fecha_ingreso=date(hoy.year - 5, hoy.month, hoy.day),
+        )
+        hacer_gestion(f, anio1=hoy.year, dias1=Decimal('15'))
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.get(self.url)
+
+        cis = [row['ci'] for row in r.json()['funcionarios']]
+        self.assertNotIn('11111205', cis)
+
+    def test_aniversario_futuro_no_aparece(self):
+        hoy = date.today()
+        futuro = hoy + timedelta(days=10)
+        f = hacer_funcionario(
+            ci='11111206', nombre='Ivan',
+            fecha_ingreso=date(hoy.year - 5, futuro.month, futuro.day),
+        )
+        hacer_gestion(f, anio1=hoy.year - 1, dias1=Decimal('15'))
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.get(self.url)
+
+        cis = [row['ci'] for row in r.json()['funcionarios']]
+        self.assertNotIn('11111206', cis)
+
+    def test_aniversario_en_feriado_ayer_aparece_hoy_ajustado(self):
+        hoy   = date.today()
+        ayer  = hoy - timedelta(days=1)
+        Feriado.objects.create(fecha=ayer, descripcion='Feriado de prueba', tipo='Nacional')
+
+        f = hacer_funcionario(
+            ci='11111207', nombre='Julia',
+            fecha_ingreso=date(hoy.year - 5, ayer.month, ayer.day),
+        )
+        hacer_gestion(f, anio1=hoy.year - 1, dias1=Decimal('15'))
+
+        self.client.force_login(self.user_rrhh)
+        r = self.client.get(self.url)
+
+        fila = next((row for row in r.json()['funcionarios'] if row['ci'] == '11111207'), None)
+        self.assertIsNotNone(fila)
+        self.assertEqual(fila['aniversario'], ayer.strftime('%d/%m/%Y'))

@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let filtroContrato     = '';
     let filtroUnidad       = '';
     let filtroUnidadNombre = '';
+    let puedeVerDiasPerdidos = false;
 
     const toggleChk      = document.getElementById('toggleGestionUnica');
     const grupoUnico     = document.getElementById('grupoGestionUnica');
@@ -73,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ══════════════════════════════════════════════
     async function cargarFuncionarios(params = {}) {
         const tbody = document.getElementById('tablaBody');
-        const cols  = modoUnico ? 8 : 11;
+        const cols  = (modoUnico ? 8 : 10) + (puedeVerDiasPerdidos ? 1 : 0);
         tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;padding:32px;color:#aaa">
             <i class="material-symbols-outlined" style="vertical-align:middle">hourglass_empty</i> Cargando…
         </td></tr>`;
@@ -88,6 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             todosFuncionarios = data.funcionarios;
             datosFiltrados    = [...todosFuncionarios];
+            puedeVerDiasPerdidos = !!data.puede_ver_dias_perdidos;
+            document.getElementById('thDiasPerdidos').style.display = puedeVerDiasPerdidos ? '' : 'none';
 
             // Determinar años de gestión desde los datos reales
             GESTIONES = determinarAniosGestiones(todosFuncionarios);
@@ -103,16 +106,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // ══════════════════════════════════════════════
     function determinarAniosGestiones(_funcionarios) {
         const base = new Date().getFullYear();
-        return [base, base - 1, base - 2, base - 3];
+        return [base, base - 1, base - 2];
     }
 
     function actualizarCabeceras() {
-        ['thG1','thG2','thG3','thG4'].forEach((id, i) => {
+        ['thG1','thG2','thG3'].forEach((id, i) => {
             const th = document.getElementById(id);
             th.textContent   = GESTIONES[i];
             th.style.display = '';
         });
-        thColspan.setAttribute('colspan', '4');
+        thColspan.setAttribute('colspan', '3');
     }
 
     // ══════════════════════════════════════════════
@@ -126,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `${datos.length} funcionario${datos.length !== 1 ? 's' : ''}`;
 
         const gestActivas = (modoUnico && gestionUnica !== null) ? [gestionUnica] : GESTIONES;
-        const numCols     = 6 + gestActivas.length + 1;
+        const numCols     = 6 + gestActivas.length + 1 + (puedeVerDiasPerdidos ? 1 : 0);
 
         if (datos.length === 0) {
             tbody.innerHTML = `<tr><td colspan="${numCols}" style="text-align:center;padding:32px;color:#aaa">
@@ -146,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td><span class="badge-area">${esc(f.unidad)}</span></td>
                 ${gestActivas.map(anio => celdaG(f, anio)).join('')}
                 <td><span class="dias-total">${fmt(calcTotalDias(f))}</span></td>
+                ${puedeVerDiasPerdidos ? `<td><span class="dias-total">${fmt(f.dias_perdidos || 0)}</span></td>` : ''}
             `;
             tbody.appendChild(tr);
         });
@@ -205,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function aplicarModoUnico() {
         thColspan.setAttribute('colspan', '1');
         document.getElementById('thG1').textContent = gestionUnica;
-        ['thG2','thG3','thG4'].forEach(id => (document.getElementById(id).style.display = 'none'));
+        ['thG2','thG3'].forEach(id => (document.getElementById(id).style.display = 'none'));
         renderTabla(datosFiltrados);
     }
 
@@ -295,6 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${esc(f.unidad)}</td>
                 ${tdsGest}
                 <td class="td-total">${fmt(calcTotalDias(f))}</td>
+                ${puedeVerDiasPerdidos ? `<td class="td-total">${fmt(f.dias_perdidos || 0)}</td>` : ''}
             </tr>`;
         }).join('');
 
@@ -354,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <th rowspan="2">Unidad Org.</th>
                 ${thsGestRow1}
                 <th rowspan="2">Total Días</th>
+                ${puedeVerDiasPerdidos ? '<th rowspan="2">Días Perdidos</th>' : ''}
             </tr>
             ${thsGestRow2 ? `<tr>${thsGestRow2}</tr>` : ''}
         </thead>

@@ -1,4 +1,164 @@
 /* base.css carga primero — aquí solo overrides del dashboard */
+
+/* ── Notificación flotante de gestiones en riesgo (RRHH / Admin) ── */
+.alerta-flotante {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 1100;
+    font-family: 'Montserrat', sans-serif;
+    user-select: none;
+}
+
+/* El widget de "a punto de perder días" debe quedar por encima del de
+   "hoy toca poblar" cuando ambos paneles están abiertos y se superponen. */
+#alertaGestionesRiesgo {
+    z-index: 1101;
+}
+#alertaGestionesRiesgo .alerta-panel {
+    z-index: 3;
+}
+
+.alerta-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #720035;
+    color: #fff;
+    padding: 10px 14px 10px 14px;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(114,0,53,0.4);
+    transition: background 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+    position: relative;
+    z-index: 2;
+}
+.alerta-trigger:hover {
+    background: #590029;
+    box-shadow: 0 6px 26px rgba(114,0,53,0.5);
+}
+.alerta-trigger-icon { font-size: 1.15em; line-height: 1; }
+.alerta-count {
+    background: #fff;
+    color: #720035;
+    border-radius: 50%;
+    min-width: 20px;
+    height: 20px;
+    font-size: 0.72em;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+.alerta-trigger-text { font-size: 0.8em; font-weight: 600; }
+.alerta-close-btn {
+    background: rgba(255,255,255,0.18);
+    border: none;
+    cursor: pointer;
+    color: #fff;
+    padding: 3px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    margin-left: 2px;
+    line-height: 1;
+}
+.alerta-close-btn:hover { background: rgba(255,255,255,0.35); }
+.alerta-close-btn i { font-size: 15px; }
+
+/* Panel expandible */
+.alerta-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.16), 0 2px 8px rgba(114,0,53,0.1);
+    border: 1px solid rgba(114,0,53,0.12);
+    min-width: 560px;
+    max-width: 760px;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px) scale(0.98);
+    transition: opacity 0.22s ease, visibility 0.22s, transform 0.22s ease;
+    pointer-events: none;
+}
+.alerta-flotante:hover .alerta-panel,
+.alerta-flotante.open .alerta-panel {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.alerta-panel-header {
+    padding: 14px 18px 12px;
+    background: rgba(114,0,53,0.05);
+    border-bottom: 1px solid rgba(114,0,53,0.1);
+}
+.alerta-panel-title {
+    font-size: 0.88em;
+    font-weight: 700;
+    color: #271447;
+    margin: 0 0 2px;
+}
+.alerta-panel-sub { font-size: 0.74em; color: #999; margin: 0; }
+
+.alerta-panel-body {
+    padding: 0 18px 14px;
+    overflow-x: auto;
+    max-height: 380px;
+    overflow-y: auto;
+}
+.alerta-accion-btn {
+    background: #720035;
+    color: #fff;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.78em;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+.alerta-accion-btn:hover { background: #590029; }
+.alerta-accion-btn:disabled { opacity: 0.6; cursor: default; }
+.alerta-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.82em;
+    font-family: 'Montserrat', sans-serif;
+}
+.alerta-table th {
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 0.7em;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-pink-light);
+    border-bottom: 2px solid rgba(114,0,53,0.15);
+    white-space: nowrap;
+    background: none;
+}
+.alerta-table td {
+    padding: 7px 8px;
+    border-bottom: 1px solid #f3eaf0;
+    color: #444;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.alerta-table tr:last-child td { border-bottom: none; }
+.alerta-table tbody tr:hover td { background: rgba(114,0,53,0.04); }
+.alerta-dias { font-weight: 700; color: #720035; }
+.alerta-fecha-limite { font-weight: 700; color: #271447; }
+
 * { scrollbar-width: none; }
 
 body {

@@ -12,6 +12,7 @@ from employees.models import Funcionario, HistorialCargo
 from vacations.models import GestionVacacion, SolicitudVacacion
 
 _ROLES_REPORTE_P = {'RRHH', 'Auditoria', 'Administrador'}
+_ROLES_DIAS_PERDIDOS = {'RRHH', 'Administrador'}
 
 _ROL_AREA_LABEL = {
     'RRHH':          'RECURSOS HUMANOS',
@@ -81,6 +82,8 @@ class FuncionariosReporteView(APIView):
         if not (roles & _ROLES_REPORTE_P):
             return Response({'error': 'Sin acceso.'}, status=status.HTTP_403_FORBIDDEN)
 
+        puede_ver_dias_perdidos = bool(roles & _ROLES_DIAS_PERDIDOS)
+
         unidad_id = request.GET.get('unidad', '').strip()
         tipo_cont = request.GET.get('tipo_contrato', '').strip()
         nombre_b  = request.GET.get('funcionario', '').strip()
@@ -128,12 +131,12 @@ class FuncionariosReporteView(APIView):
                         anios_dict[anio] = dias
                 gestiones = [
                     {'anio': yr if yr in anios_dict else None, 'dias': anios_dict.get(yr, 0.0)}
-                    for yr in [current_year, current_year - 1, current_year - 2, current_year - 3]
+                    for yr in [current_year, current_year - 1, current_year - 2]
                 ]
             else:
-                gestiones = [{'anio': None, 'dias': 0.0} for _ in range(4)]
+                gestiones = [{'anio': None, 'dias': 0.0} for _ in range(3)]
 
-            result.append({
+            row = {
                 'cod':              f.cod_funcionario,
                 'nombre_completo':  f"{f.ci.nombre} {f.ci.ap_paterno} {am}".strip(),
                 'apellidos_nombres':f"{f.ci.ap_paterno} {am} {f.ci.nombre}".strip(),
@@ -145,9 +148,18 @@ class FuncionariosReporteView(APIView):
                 'gestiones':        gestiones,
                 'dias_negados':     float(gv.dias_negados) if gv else 0.0,
                 'dias_adeudados':   float(gv.dias_adeudados or 0) if gv else 0.0,
-            })
+            }
+            if puede_ver_dias_perdidos:
+                row['dias_perdidos'] = float(gv.dias_perdidos) if gv else 0.0
+            result.append(row)
 
-        return Response({'funcionarios': result, 'total': len(result)})
+        result.sort(key=lambda r: r['dias_adeudados'], reverse=True)
+
+        return Response({
+            'funcionarios': result,
+            'total': len(result),
+            'puede_ver_dias_perdidos': puede_ver_dias_perdidos,
+        })
 
 
 class HistorialReporteView(APIView):

@@ -68,6 +68,46 @@ def calcular_gestioneS_pendientes(fecha_ingreso: date, hoy: date = None):
     return result
 
 
+LIMITE_GESTIONES_ACTIVAS = 2
+
+
+def aplicar_limite_gestiones_activas(gv, limite: int = LIMITE_GESTIONES_ACTIVAS) -> list:
+    """
+    Recorta las gestiones activas (anio_gestion1..4) al límite dado, moviendo
+    el exceso -empezando por la gestión con año más antiguo- a gv.dias_perdidos.
+
+    Ordena por año real (no por número de slot): AcreditarGestionView asigna
+    el primer slot vacío que encuentra, así que el número de slot no siempre
+    refleja antigüedad real.
+
+    Opera en memoria sobre `gv`; no llama a gv.save() (responsabilidad del
+    caller, que decide qué campos persistir).
+
+    Idempotente: si ya hay <= limite gestiones activas, no hace nada y
+    retorna [].
+
+    Retorna la lista de evicciones aplicadas: [{'slot', 'anio', 'dias'}, ...]
+    """
+    ocupados = [
+        (i, getattr(gv, f'anio_gestion{i}'), getattr(gv, f'dias_gestion{i}'))
+        for i in range(1, 5)
+        if getattr(gv, f'anio_gestion{i}') is not None
+    ]
+    exceso = len(ocupados) - limite
+    if exceso <= 0:
+        return []
+
+    ocupados.sort(key=lambda t: t[1])  # año ascendente = más antiguo primero
+
+    evictados = []
+    for slot, anio, dias in ocupados[:exceso]:
+        gv.dias_perdidos = (gv.dias_perdidos or Decimal('0')) + (dias or Decimal('0'))
+        setattr(gv, f'anio_gestion{slot}', None)
+        setattr(gv, f'dias_gestion{slot}', Decimal('0'))
+        evictados.append({'slot': slot, 'anio': anio, 'dias': dias})
+    return evictados
+
+
 def poblar_gestion_vacacion(funcionario):
     """
     Crea o completa el GestionVacacion del funcionario con las gestiones que
@@ -121,9 +161,20 @@ def poblar_gestion_vacacion(funcionario):
         anios_existentes.add(anio)
         acreditadas += 1
 
+    evictadas = aplicar_limite_gestiones_activas(gv)
+    if evictadas:
+        campos_a_guardar.append('dias_perdidos')
+        for ev in evictadas:
+            campos_a_guardar += [f"anio_gestion{ev['slot']}", f"dias_gestion{ev['slot']}"]
+
     if es_nueva:
         gv.save()
     elif campos_a_guardar:
         gv.save(update_fields=campos_a_guardar)
 
-    return {'acreditadas': acreditadas, 'ya_existentes': ya_existentes, 'sin_elegibilidad': False}
+    return {
+        'acreditadas': acreditadas,
+        'ya_existentes': ya_existentes,
+        'sin_elegibilidad': False,
+        'evictadas': evictadas,
+    }

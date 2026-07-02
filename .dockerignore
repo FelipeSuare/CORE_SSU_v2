@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.docker
+.git/
+logs/
+*.log
+README.md
+.claude/
+db_init/

@@ -28,6 +28,7 @@ class GestionVacacion(models.Model):
     dias_gestion4 = models.DecimalField(max_digits=4, decimal_places=1, default=0)
     anio_gestion4 = models.IntegerField(blank=True, null=True)
     dias_negados = models.DecimalField(max_digits=4, decimal_places=1, default=0)
+    dias_perdidos = models.DecimalField(max_digits=4, decimal_places=1, default=0)
     dias_adeudados = models.GeneratedField(
         expression=(
             Coalesce('dias_gestion1', Value(Decimal('0'))) +
