@@ -18,9 +18,9 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            background: #fdecea;
-            color: #c62828;
-            border: 1px solid #ef9a9a;
+            background: rgba(114,0,53,0.08);
+            color: #720035;
+            border: 1px solid rgba(114,0,53,0.28);
             border-radius: 6px;
             padding: 2px 8px;
             font-size: 0.78em;
@@ -36,7 +36,7 @@
         }
         .counter-badge {
             display: inline-block;
-            background: #c62828;
+            background: #720035;
             color: #fff;
             border-radius: 20px;
             padding: 2px 10px;
@@ -51,11 +51,11 @@
     <div class="main-container">
         <div class="header-wrapper">
             <header class="module-header">
-                <i class="material-symbols-outlined" style="color:#c62828">cancel</i>
+                <i class="material-symbols-outlined">cancel</i>
                 <div>
                     <h1 class="module-title">
                         Solicitudes Rechazadas
-                        <span class="counter-badge" id="totalBadge">0</span>
+                        {% comment %} <span class="counter-badge" id="totalBadge">0</span> {% endcomment %}
                     </h1>
                     <p class="module-subtitle">Registro de solicitudes de vacación que fueron rechazadas</p>
                 </div>
@@ -142,13 +142,13 @@
     </div>
 
     <!-- Modal PDF rechazada -->
-    <div class="modal-overlay" id="modalPDF" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;">
-        <div class="form-modal" style="background:#fff;border-radius:12px;padding:32px;max-width:460px;width:90%">
-            <h2 class="modal-title" style="margin-bottom:16px;font-size:1.1em;display:flex;align-items:center;gap:8px">
-                <i class="material-symbols-outlined" style="color:#720035">picture_as_pdf</i> Descargar Formulario de Rechazo
+    <div class="modal-overlay" id="modalPDF">
+        <div class="form-modal">
+            <h2 class="modal-title">
+                <i class="material-symbols-outlined">picture_as_pdf</i> Descargar Formulario de Rechazo
             </h2>
             <p id="modalPDFMensaje" style="margin-bottom:24px;color:#444;line-height:1.6;font-size:0.9em"></p>
-            <div style="display:flex;gap:12px;justify-content:flex-end">
+            <div class="form-actions">
                 <button class="btn btn-secondary" id="btnCancelarPDF">Cancelar</button>
                 <button class="btn btn-primary" id="btnConfirmarPDF">
                     <i class="material-symbols-outlined">download</i> Descargar

@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('modalPDF').addEventListener('click', e => {
-        if (e.target === document.getElementById('modalPDF')) cerrarModal();
+        if (e.target.classList.contains('modal-overlay')) cerrarModal();
     });
 });
 
@@ -109,9 +109,8 @@ function renderTable(solicitudes) {
                     data-id="${s.id}"
                     data-nombre="${esc(s.funcionario)}"
                     data-fecha="${fmtFecha(s.fecha_solicitud)}"
-                    title="Descargar PDF"
-                    style="background:none;border:none;cursor:pointer;color:#720035;padding:4px">
-                    <i class="material-symbols-outlined" style="font-size:22px">picture_as_pdf</i>
+                    title="Descargar PDF">
+                    <i class="material-symbols-outlined">picture_as_pdf</i>
                 </button>
             </td>
         </tr>
@@ -123,18 +122,28 @@ function abrirModal(id, nombre, fecha) {
     _pendientePDF = id;
     document.getElementById('modalPDFMensaje').innerHTML =
         `¿Desea descargar el formulario de rechazo de la solicitud <strong>${fecha}</strong> del funcionario <strong>${esc(nombre)}</strong>?`;
-    document.getElementById('modalPDF').style.display = 'flex';
+    const overlay = document.getElementById('modalPDF');
+    overlay.classList.add('active');
+    overlay.querySelector('.form-modal').classList.add('active');
 }
 
 function cerrarModal() {
-    document.getElementById('modalPDF').style.display = 'none';
+    const overlay = document.getElementById('modalPDF');
+    overlay.classList.remove('active');
+    overlay.querySelector('.form-modal').classList.remove('active');
     _pendientePDF = null;
 }
 
 function confirmarDescarga() {
     if (!_pendientePDF) return;
-    window.location.href = `${API_PDF}${_pendientePDF}/`;
+    const id = _pendientePDF;
     cerrarModal();
+    const a = document.createElement('a');
+    a.href = `${API_PDF}${id}/`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 0);
 }
 
 // ── Helpers ───────────────────────────────────────────────────
