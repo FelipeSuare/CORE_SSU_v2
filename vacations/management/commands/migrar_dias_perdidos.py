@@ -1,3 +1,5 @@
+import sys
+
 from django.core.management.base import BaseCommand
 
 from vacations.models import GestionVacacion
@@ -25,6 +27,13 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # En Windows, la consola por defecto usa cp1252 y no puede imprimir
+        # tildes/flechas; forzar UTF-8 evita un UnicodeEncodeError a mitad
+        # de la corrida (que RRHH vería como un crash sin sentido).
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, 'reconfigure'):
+                stream.reconfigure(encoding='utf-8', errors='replace')
+
         qs = GestionVacacion.objects.select_related('cod_funcionario__ci')
         if options['cod']:
             qs = qs.filter(cod_funcionario__cod_funcionario=options['cod'])

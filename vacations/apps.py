@@ -15,14 +15,25 @@ class VacationsConfig(AppConfig):
 
 def _auto_poblar_vacaciones(sender, **kwargs):
     """
-    Se ejecuta automáticamente después de 'manage.py migrate'.
-    - Si el funcionario no tiene gestiones: las crea.
-    - Si las tiene pero son incorrectas (algoritmo viejo) y nadie ha consumido
-      días todavía: las corrige.
-    - Si ya hay días consumidos: no toca nada (respeta el historial).
+    Se ejecuta automáticamente después de 'manage.py migrate' y en el primer
+    request tras un deploy/reinicio.
+    - Si el funcionario no tiene gestiones: las crea (poblar_gestion_vacacion
+    ya aplica el tope de gestiones activas y evictúa a dias_perdidos si
+    corresponde).
+
+    IMPORTANTE: ya NO se "corrige" (reset + repoblar) a funcionarios que ya
+    tienen un GestionVacacion existente, aunque sus años no coincidan con los
+    4 años candidatos que calcula calcular_gestioneS_pendientes. Con el tope
+    de 2 gestiones activas, un funcionario correctamente al día NUNCA va a
+    tener los 4 años candidatos completos -solo los 2 activos-, así que esa
+    comparación siempre daría "incorrecto" y este signal repoblaría (y
+    evictuaría a dias_perdidos) en cada reinicio del servidor, duplicando el
+    descuento cada vez. La acreditación de gestiones nuevas para funcionarios
+    ya existentes debe hacerse explícitamente (RRHH: botón "Poblar ahora",
+    AcreditarGestionView, o manage.py poblar_vacaciones), nunca de forma
+    silenciosa en cada arranque.
     """
     try:
-        from decimal import Decimal
         from employees.models import Funcionario
         from vacations.models import GestionVacacion
         from vacations.utils import poblar_gestion_vacacion, calcular_gestioneS_pendientes
@@ -32,43 +43,7 @@ def _auto_poblar_vacaciones(sender, **kwargs):
             if not esperadas:
                 continue  # Sin antigüedad suficiente
 
-            try:
-                gv = GestionVacacion.objects.get(cod_funcionario=f)
-
-                # Años que deberían estar almacenados según el algoritmo correcto
-                anios_esperados = {anio for _, anio, _ in esperadas}
-
-                # Años que están almacenados actualmente
-                anios_actuales = {
-                    getattr(gv, f'anio_gestion{i}')
-                    for i in range(1, 5)
-                    if getattr(gv, f'anio_gestion{i}') is not None
-                }
-
-                if anios_actuales == anios_esperados:
-                    continue  # Ya está correcto
-
-                # Solo corregir si el funcionario nunca tuvo una solicitud aprobada
-                # (significa que el saldo nunca fue tocado)
-                from vacations.models import SolicitudVacacion
-                if SolicitudVacacion.objects.filter(
-                    cod_funcionario=f, estado='APROBADA'
-                ).exists():
-                    continue  # Ya consumió días, no tocar
-
-                # Datos incorrectos y sin consumos: resetear y repoblar
-                for i in range(1, 5):
-                    setattr(gv, f'anio_gestion{i}', None)
-                    setattr(gv, f'dias_gestion{i}', Decimal('0'))
-                gv.save(update_fields=[
-                    'anio_gestion1', 'dias_gestion1',
-                    'anio_gestion2', 'dias_gestion2',
-                    'anio_gestion3', 'dias_gestion3',
-                    'anio_gestion4', 'dias_gestion4',
-                ])
-                poblar_gestion_vacacion(f)
-
-            except GestionVacacion.DoesNotExist:
+            if not GestionVacacion.objects.filter(cod_funcionario=f).exists():
                 poblar_gestion_vacacion(f)
 
         # Crear usuario Django si no existe (para poder iniciar sesión)
