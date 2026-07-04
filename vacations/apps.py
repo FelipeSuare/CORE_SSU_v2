@@ -1,4 +1,11 @@
+import logging
+import sys
+import threading
+from datetime import date
+
 from django.apps import AppConfig
+
+logger = logging.getLogger(__name__)
 
 
 class VacationsConfig(AppConfig):
@@ -11,6 +18,9 @@ class VacationsConfig(AppConfig):
         # En el primer request (no en migrate) también se ejecuta,
         # así funciona al clonar y arrancar sin necesidad de migrate adicional
         request_started.connect(_auto_poblar_vacaciones_primer_request)
+        # Acreditación automática diaria de gestiones por aniversario (reemplaza
+        # el botón "Poblar ahora" de la notificación de dashboard, desactivada).
+        request_started.connect(_poblar_vacaciones_diario)
 
 
 def _auto_poblar_vacaciones(sender, **kwargs):
@@ -66,3 +76,44 @@ def _auto_poblar_vacaciones_primer_request(sender, **kwargs):
         return
     _primer_request_ejecutado = True
     _auto_poblar_vacaciones(sender=sender)
+
+
+_ultima_fecha_poblado_diario = None
+
+
+def _poblar_vacaciones_diario(sender, **kwargs):
+    """
+    Acredita automáticamente las gestiones de vacación de todos los funcionarios
+    activos cuyo aniversario ya se cumplió, una vez por día calendario
+    (enganchado al primer request que llega ese día). Reemplaza al botón manual
+    "Poblar ahora" de la notificación de dashboard, que fue desactivada.
+
+    Idempotente: poblar_gestion_vacacion() solo rellena slots vacíos y aplica
+    la evicción a dias_perdidos si corresponde, nunca sobreescribe una gestión
+    ya acreditada, así que no importa si corre más de una vez el mismo día
+    (ej. despliegues con varios workers).
+    """
+    if 'test' in sys.argv:
+        return  # Evita hilos de fondo compitiendo con la transacción de cada test
+
+    global _ultima_fecha_poblado_diario
+    hoy = date.today()
+    if _ultima_fecha_poblado_diario == hoy:
+        return
+    _ultima_fecha_poblado_diario = hoy
+
+    def _tarea():
+        from django.db import close_old_connections
+        try:
+            from employees.models import Funcionario
+            from vacations.utils import poblar_gestion_vacacion, calcular_gestioneS_pendientes
+
+            for f in Funcionario.objects.filter(estado='ACTIVO'):
+                if calcular_gestioneS_pendientes(f.fecha_ingreso):
+                    poblar_gestion_vacacion(f)
+        except Exception:
+            logger.exception('Fallo el poblado diario automático de vacaciones')
+        finally:
+            close_old_connections()
+
+    threading.Thread(target=_tarea, daemon=True).start()

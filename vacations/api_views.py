@@ -1692,6 +1692,7 @@ class AlertaGestionesPorPerderView(APIView):
                 'anio_en_riesgo':  anio_riesgo,
                 'dias':            float(dias_riesgo or 0),
                 'fecha_limite':    fecha_limite.strftime('%d/%m/%Y'),
+                'vencido':         fecha_limite < hoy,
                 '_fecha_limite_dt': fecha_limite,
             })
 

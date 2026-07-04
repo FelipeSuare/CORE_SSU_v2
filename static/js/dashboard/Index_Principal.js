@@ -178,17 +178,20 @@ function _csrfToken() {
 
 async function verificarAlertasVacaciones() {
     try {
-        const [resRiesgo, resPoblar] = await Promise.all([
+        // Notificación "Hoy toca poblar vacaciones" desactivada a pedido del usuario (2026-07-03).
+        // El endpoint, mostrarAlertaPoblarHoy() y el fetch siguen intactos; para reactivar,
+        // descomentar el fetch de abajo y las dos líneas marcadas.
+        const [resRiesgo /*, resPoblar */] = await Promise.all([
             fetch('/api/vacaciones/alerta-gestiones-riesgo/'),
-            fetch('/api/vacaciones/alerta-poblar-hoy/'),
+            // fetch('/api/vacaciones/alerta-poblar-hoy/'),
         ]);
 
         // 403 = no es RRHH/Admin, ignorar silenciosamente
         const riesgo = resRiesgo.ok ? (await resRiesgo.json()).funcionarios || [] : [];
-        const poblar = resPoblar.ok ? (await resPoblar.json()).funcionarios || [] : [];
+        // const poblar = resPoblar.ok ? (await resPoblar.json()).funcionarios || [] : [];
 
         if (riesgo.length) mostrarAlertaRiesgo(riesgo);
-        if (poblar.length) mostrarAlertaPoblarHoy(poblar);
+        // if (poblar.length) mostrarAlertaPoblarHoy(poblar);
     } catch (_) {}
 }
 
@@ -200,7 +203,10 @@ function mostrarAlertaRiesgo(funcionarios) {
             <td>${_esc(f.unidad)}</td>
             <td>${_esc(String(f.anio_en_riesgo))}</td>
             <td><span class="alerta-dias">${f.dias} días</span></td>
-            <td><span class="alerta-fecha-limite">${_esc(f.fecha_limite)}</span></td>
+            <td>
+                <span class="alerta-fecha-limite${f.vencido ? ' alerta-fecha-vencida' : ''}">${_esc(f.fecha_limite)}</span>
+                ${f.vencido ? '<span class="alerta-badge-vencido">VENCIDO</span>' : ''}
+            </td>
         </tr>`);
 
     crearWidgetAlerta({

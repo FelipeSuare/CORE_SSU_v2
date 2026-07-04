@@ -158,6 +158,19 @@
 .alerta-table tbody tr:hover td { background: rgba(114,0,53,0.04); }
 .alerta-dias { font-weight: 700; color: #720035; }
 .alerta-fecha-limite { font-weight: 700; color: #271447; }
+.alerta-fecha-vencida { color: #a10000; }
+.alerta-badge-vencido {
+    display: inline-block;
+    margin-left: 6px;
+    background: #a10000;
+    color: #fff;
+    font-size: 0.68em;
+    font-weight: 800;
+    letter-spacing: .4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    vertical-align: middle;
+}
 
 * { scrollbar-width: none; }
 

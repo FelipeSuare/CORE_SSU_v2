@@ -532,6 +532,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function descargarPDFDesdeHTML(htmlCompleto, filename, orientation = 'landscape') {
+        if (typeof html2pdf === 'undefined') {
+            alert('No se pudo cargar el generador de PDF (posible bloqueo de red, firewall o extensión del navegador). Verifique su conexión e intente de nuevo.');
+            return;
+        }
+
         const iframe = document.createElement('iframe');
         iframe.style.position = 'fixed';
         iframe.style.right    = '0';
@@ -541,20 +546,31 @@ document.addEventListener('DOMContentLoaded', () => {
         iframe.style.border   = '0';
         document.body.appendChild(iframe);
 
+        const limpiar = () => {
+            if (iframe.parentNode) document.body.removeChild(iframe);
+        };
+
         const doc = iframe.contentDocument || iframe.contentWindow.document;
         doc.open();
         doc.write(htmlCompleto);
         doc.close();
 
         iframe.onload = () => {
-            html2pdf().from(doc.body).set({
-                margin: 0,
-                filename,
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'pt', format: 'a4', orientation },
-            }).save().finally(() => {
-                document.body.removeChild(iframe);
-            });
+            try {
+                html2pdf().from(doc.body).set({
+                    margin: 0,
+                    filename,
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'pt', format: 'a4', orientation },
+                }).save().catch(err => {
+                    console.error('Error generando PDF:', err);
+                    alert('No se pudo generar el PDF. Intente nuevamente.');
+                }).finally(limpiar);
+            } catch (err) {
+                console.error('Error generando PDF:', err);
+                alert('No se pudo generar el PDF. Intente nuevamente.');
+                limpiar();
+            }
         };
     }
 
