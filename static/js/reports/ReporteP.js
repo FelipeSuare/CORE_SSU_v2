@@ -379,36 +379,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
         }).join('');
 
-        abrirVentanaPDF(`<!DOCTYPE html>
+        descargarPDFDesdeHTML(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Montserrat',Arial,sans-serif;padding:36px 44px;font-size:10px;color:#222;}
-    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;padding-bottom:12px;border-bottom:2px solid rgb(39,20,71);}
-    .inst-nombre{font-size:11px;font-weight:700;color:rgb(39,20,71);text-transform:uppercase;line-height:1.5;}
-    .inst-fecha{font-size:10px;color:#555;text-align:right;line-height:1.6;}
+    body{font-family:'Montserrat',Arial,sans-serif;padding:36px 44px;font-size:10px;color:#333;background:#fff;}
+    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;padding-bottom:12px;border-bottom:2px solid #1b2559;}
+    .inst-nombre{font-size:13px;font-weight:700;color:#1b2559;text-transform:uppercase;line-height:1.6;}
+    .inst-fecha{font-size:10px;color:#777;text-align:right;line-height:1.6;}
     .titulo{text-align:center;margin-bottom:20px;}
-    .titulo h2{background:rgb(39,20,71);color:#fff;display:inline-block;padding:8px 28px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border-radius:4px;}
-    .datos{display:grid;grid-template-columns:1fr 1fr;gap:6px 30px;background:#f8f5fb;border:1px solid #ddd;border-radius:6px;padding:12px 18px;margin-bottom:20px;}
+    .titulo h2{color:rgb(114,0,53);font-size:17px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+    .datos{display:grid;grid-template-columns:1fr 1fr;gap:6px 30px;background:#f4f5fb;border:1px solid #e3e5ef;border-radius:6px;padding:12px 18px;margin-bottom:20px;}
     .dato{display:flex;gap:6px;align-items:baseline;}
     .dato-label{font-weight:700;color:rgb(114,0,53);font-size:9px;text-transform:uppercase;min-width:85px;}
-    .dato-valor{font-weight:600;color:rgb(39,20,71);font-size:10px;}
+    .dato-valor{font-weight:600;color:#1b2559;font-size:10px;}
     .bloque{margin-bottom:16px;}
-    .bloque-header{background:rgb(39,20,71);color:#fff;padding:7px 14px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between;font-weight:700;font-size:9.5px;}
-    .bloque-header span:last-child{font-weight:400;opacity:0.8;}
+    .bloque-header{background:#dde1f2;color:#1b2559;padding:7px 14px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between;font-weight:700;font-size:9.5px;}
+    .bloque-header span:last-child{font-weight:400;opacity:0.7;}
     table{width:100%;border-collapse:collapse;font-size:9.5px;}
-    thead{background:linear-gradient(90deg,rgb(39,20,71),rgb(114,0,53));}
-    thead th{color:#fff;padding:7px 10px;text-align:center;font-weight:700;text-transform:uppercase;border-right:1px solid rgba(255,255,255,.15);}
-    thead th:last-child{border-right:none;}
-    td{padding:8px 10px;border-bottom:1px solid #f0e6ec;text-align:center;}
-    tbody tr:nth-child(even) td{background:#fdf6fa;}
+    thead th{background:#dde1f2;color:#1b2559;padding:7px 10px;text-align:center;font-weight:700;text-transform:uppercase;border:1px solid #eceefa;}
+    td{padding:8px 10px;border:1px solid #eceefa;text-align:center;}
+    tbody tr:nth-child(even) td{background:#fdf3f7;}
 </style></head><body>
     <div class="inst-header">
         <div style="display:flex;align-items:center;gap:14px;">
             <img src="/static/img/login/LOGOSSU.png" style="height:54px;width:auto;">
             <div class="inst-nombre">SEGURO SOCIAL UNIVERSITARIO<br>
-                <span style="font-weight:400;font-size:10px;color:#555">${areaLabel}</span>
+                <span style="font-weight:400;font-size:10px;color:#888;letter-spacing:.5px">${areaLabel}</span>
             </div>
         </div>
         <div class="inst-fecha">${fechaStr}</div>
@@ -422,8 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="dato-valor" style="color:rgb(114,0,53)">${fmt(data.dias_adeudados)} días</span></div>
     </div>
     ${bloques}
-    <script>window.onload=()=>window.print();<\/script>
-</body></html>`);
+</body></html>`, `Historial_${_nombreArchivo(data.nombre_completo)}.pdf`, 'portrait');
     }
 
     // ══════════════════════════════════════════════
@@ -449,44 +446,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const firmaRRHH = nombreRRHH || 'Encargada de RR.HH.';
 
-        abrirVentanaPDF(`<!DOCTYPE html>
+        descargarPDFDesdeHTML(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Montserrat',Arial,sans-serif;background:#fff;padding:40px 48px;color:#1a1a1a;font-size:10.5px;}
-    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:14px;border-bottom:2px solid rgb(39,20,71);}
-    .inst-nombre{font-size:11px;font-weight:700;color:rgb(39,20,71);text-transform:uppercase;letter-spacing:0.5px;line-height:1.5;}
+    body{font-family:'Montserrat',Arial,sans-serif;background:#fff;padding:40px 48px;color:#333;font-size:10.5px;}
+    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:14px;border-bottom:2px solid #1b2559;}
+    .inst-nombre{font-size:14px;font-weight:700;color:#1b2559;text-transform:uppercase;letter-spacing:0.5px;line-height:1.6;}
     .planilla-titulo{text-align:center;margin-bottom:22px;}
-    .planilla-titulo h2{background:rgb(39,20,71);color:#fff;display:inline-block;padding:9px 32px;font-size:12.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;border-radius:4px;}
+    .planilla-titulo h2{color:rgb(114,0,53);font-size:20px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;}
     table{width:100%;border-collapse:collapse;margin-bottom:22px;font-size:10px;}
-    thead{background:linear-gradient(90deg,rgb(39,20,71),rgb(114,0,53));}
-    th{color:#fff;padding:9px 10px;text-align:center;font-weight:700;font-size:9.5px;text-transform:uppercase;border-right:1px solid rgba(255,255,255,.15);line-height:1.4;}
-    th:last-child{border-right:none;}
-    td{padding:10px;border-bottom:1px solid #f0e6ec;text-align:center;vertical-align:middle;font-weight:600;}
-    tbody tr:nth-child(even) td{background:#fdf6fa;}
-    td.td-nombre{text-align:left;font-weight:700;}
-    td.td-total{font-size:13px;font-weight:700;color:rgb(114,0,53);background:#f8f5fb;}
-    .nota-firma{font-size:9.5px;color:#555;font-style:italic;margin-bottom:16px;line-height:1.6;padding-left:12px;}
-    .fecha-acta{font-size:10px;color:#555;text-align:right;margin-bottom:36px;}
+    th{background:#dde1f2;color:#1b2559;padding:10px 10px;text-align:center;font-weight:700;font-size:9.5px;text-transform:uppercase;border:1px solid #eceefa;line-height:1.4;}
+    td{padding:11px 10px;border:1px solid #eceefa;text-align:center;vertical-align:middle;font-weight:600;color:#333;}
+    tbody tr td{background:#fdf3f7;}
+    td.td-nombre{text-align:left;font-weight:700;color:#1b2559;}
+    td.td-total{font-size:15px;font-weight:800;color:rgb(114,0,53);}
+    .nota-firma{font-size:9.5px;color:#666;font-style:italic;margin-bottom:16px;line-height:1.6;padding-left:12px;}
+    .fecha-acta{font-size:10px;color:#777;text-align:right;margin-bottom:36px;text-transform:uppercase;}
     .firmas{display:flex;justify-content:space-between;margin-top:20px;}
     .firma-bloque{width:42%;text-align:center;}
-    .firma-linea{border-top:1.5px solid #333;margin-bottom:8px;}
-    .firma-nombre{font-weight:700;font-size:10px;text-transform:uppercase;color:rgb(39,20,71);}
+    .firma-linea{border-top:1.5px solid rgb(114,0,53);margin-bottom:8px;}
+    .firma-nombre{font-weight:700;font-size:10px;text-transform:uppercase;color:#1b2559;}
     .firma-cargo{font-size:9px;color:#666;margin-top:2px;}
-    .firma-rol{font-size:9px;color:rgb(114,0,53);font-weight:600;text-transform:uppercase;margin-top:2px;}
+    .firma-rol{font-size:9px;color:rgb(114,0,53);font-weight:700;text-transform:uppercase;margin-top:2px;}
 </style></head><body>
     <div class="inst-header">
         <div style="display:flex;align-items:center;gap:14px;">
             <img src="/static/img/login/LOGOSSU.png" style="height:54px;width:auto;">
             <div class="inst-nombre">SEGURO SOCIAL UNIVERSITARIO<br>
-                <span style="font-weight:400;font-size:10px;color:#555">${areaLabel}</span>
+                <span style="font-weight:400;font-size:10px;color:#888;letter-spacing:.5px">${areaLabel}</span>
             </div>
         </div>
         <p class="fecha-acta">${fechaStr}</p>
     </div>
     <div class="planilla-titulo"><h2>VACACIONES PERSONAL</h2></div>
-    
+
     <table>
         <thead>
             <tr>
@@ -523,21 +518,44 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="firma-cargo">${f.cargo}</div>
         </div>
     </div>
-    <script>window.onload=()=>window.print();<\/script>
-</body></html>`);
+</body></html>`, `Reporte_Personal_${_nombreArchivo(f.apellidos_nombres)}.pdf`, 'landscape');
     }
 
     // ══════════════════════════════════════════════
     // UTILIDADES
     // ══════════════════════════════════════════════
-    function abrirVentanaPDF(html) {
-        const ventana = window.open('', '_blank');
-        if (!ventana) {
-            alert('El navegador bloqueó la ventana emergente. Permita ventanas emergentes para este sitio e intente de nuevo.');
-            return;
-        }
-        ventana.document.write(html);
-        ventana.document.close();
+    function _nombreArchivo(str) {
+        return String(str || 'funcionario')
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-zA-Z0-9 _-]/g, '')
+            .trim().replace(/\s+/g, '_');
+    }
+
+    function descargarPDFDesdeHTML(htmlCompleto, filename, orientation = 'landscape') {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right    = '0';
+        iframe.style.bottom   = '0';
+        iframe.style.width    = '0';
+        iframe.style.height   = '0';
+        iframe.style.border   = '0';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(htmlCompleto);
+        doc.close();
+
+        iframe.onload = () => {
+            html2pdf().from(doc.body).set({
+                margin: 0,
+                filename,
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'pt', format: 'a4', orientation },
+            }).save().finally(() => {
+                document.body.removeChild(iframe);
+            });
+        };
     }
 
     function fmt(n) {

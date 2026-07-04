@@ -306,46 +306,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const htmlPDF = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Montserrat',Arial,sans-serif;padding:28px 36px;font-size:9px;color:#1a1a1a;}
-    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:10px;border-bottom:2px solid rgb(39,20,71);}
-    .inst-nombre{font-size:11px;font-weight:700;color:rgb(39,20,71);text-transform:uppercase;letter-spacing:.5px;line-height:1.5;}
-    .inst-fecha{font-size:9px;color:#555;text-align:right;line-height:1.6;}
+    body{font-family:'Montserrat',Arial,sans-serif;padding:28px 36px;font-size:9px;color:#333;background:#fff;}
+    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:10px;border-bottom:2px solid #1b2559;}
+    .inst-nombre{font-size:13px;font-weight:700;color:#1b2559;text-transform:uppercase;letter-spacing:.5px;line-height:1.6;}
+    .inst-fecha{font-size:9px;color:#777;text-align:right;line-height:1.6;}
     .titulo{text-align:center;margin-bottom:14px;}
-    .titulo h2{background:rgb(39,20,71);color:#fff;display:inline-block;padding:7px 26px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border-radius:4px;}
-    .resumen{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;font-size:9px;}
-    .resumen-total{font-weight:700;color:rgb(39,20,71);}
-    .resumen-sep{color:#bbb;}
+    .titulo h2{color:rgb(114,0,53);font-size:19px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+    .resumen{margin-bottom:14px;font-size:10px;color:#333;}
+    .resumen-total-num{font-weight:800;color:rgb(114,0,53);}
+    .resumen-sep{color:#bbb;margin:0 6px;}
     .resumen-filtro{color:rgb(114,0,53);font-weight:600;}
     table{width:100%;border-collapse:collapse;font-size:8px;margin-bottom:18px;}
-    thead{background:linear-gradient(90deg,rgb(39,20,71),rgb(114,0,53));}
-    thead th{color:#fff;padding:6px 5px;text-align:center;font-weight:700;font-size:7.5px;text-transform:uppercase;letter-spacing:.3px;border-right:1px solid rgba(255,255,255,.15);line-height:1.4;}
-    thead th:last-child{border-right:none;}
-    tbody td{padding:6px 5px;border-bottom:1px solid #f0e6ec;text-align:center;vertical-align:middle;}
-    tbody tr:nth-child(even) td{background:#fdf6fa;}
-    .td-num{color:#888;font-size:7.5px;width:24px;}
-    .td-nombre{text-align:left!important;font-weight:700;color:rgb(39,20,71);padding-left:7px!important;}
-    .td-dias{font-weight:700;color:rgb(39,20,71);}
-    .td-total{font-weight:700;color:rgb(114,0,53);font-size:9.5px;background:#f8f5fb;}
+    thead th{background:#dde1f2;color:#1b2559;padding:8px 5px;text-align:center;font-weight:700;font-size:7.5px;text-transform:uppercase;letter-spacing:.3px;border:1px solid #eceefa;line-height:1.4;}
+    tbody td{padding:7px 5px;border:1px solid #eceefa;text-align:center;vertical-align:middle;}
+    tbody tr:nth-child(even) td{background:#fdf3f7;}
+    .td-num{color:#999;font-size:7.5px;width:24px;}
+    .td-nombre{text-align:left!important;font-weight:700;color:#1b2559;padding-left:10px!important;}
+    .td-dias{font-weight:700;color:#1b2559;}
+    .td-total{font-weight:800;color:rgb(114,0,53);font-size:9.5px;}
     .firma-rrhh{margin-top:28px;width:220px;text-align:center;}
-    .firma-linea{border-top:1.5px solid #333;margin-bottom:6px;}
-    .firma-nombre{font-weight:700;font-size:9px;text-transform:uppercase;color:rgb(39,20,71);letter-spacing:.3px;}
-    .firma-rol{font-size:8px;color:rgb(114,0,53);font-weight:600;text-transform:uppercase;margin-top:2px;}
+    .firma-linea{border-top:1.5px solid rgb(114,0,53);margin-bottom:6px;}
+    .firma-nombre{font-weight:700;font-size:9px;text-transform:uppercase;color:#1b2559;letter-spacing:.3px;}
+    .firma-rol{font-size:8px;color:rgb(114,0,53);font-weight:700;text-transform:uppercase;margin-top:2px;}
     @media print{body{padding:16px 24px;}}
 </style></head><body>
     <div class="inst-header">
         <div style="display:flex;align-items:center;gap:14px;">
             <img src="/static/img/login/LOGOSSU.png" style="height:54px;width:auto;">
             <div class="inst-nombre">SEGURO SOCIAL UNIVERSITARIO<br>
-                <span style="font-weight:400;font-size:10px;color:#555">${areaLabel}</span>
+                <span style="font-weight:400;font-size:10px;color:#888;letter-spacing:.5px">${areaLabel}</span>
             </div>
         </div>
         <div class="inst-fecha">${fechaStr}</div>
     </div>
     <div class="titulo"><h2>REPORTE GENERAL</h2></div>
     <div class="resumen">
-        <span class="resumen-total">Total funcionarios: ${datos.length}</span>
+        <span>Total funcionarios: <span class="resumen-total-num">${datos.length}</span></span>
         ${filtrosLabel ? `<span class="resumen-sep">|</span><span class="resumen-filtro">${filtrosLabel}</span>` : ''}
     </div>
     <table>
@@ -370,16 +368,12 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="firma-nombre">${nombreRRHH || 'Encargada de RR.HH.'}</div>
         <div class="firma-rol">ENCARGADA DE RR.HH</div>
     </div>
-    <script>window.onload=()=>window.print();<\/script>
 </body></html>`;
 
-        const ventana = window.open('', '_blank');
-        if (!ventana) {
-            alert('El navegador bloqueó la ventana emergente. Permita ventanas emergentes para este sitio e intente de nuevo.');
-            return;
-        }
-        ventana.document.write(htmlPDF);
-        ventana.document.close();
+        const dd    = String(hoy.getDate()).padStart(2, '0');
+        const mm    = String(hoy.getMonth() + 1).padStart(2, '0');
+        const yyyy  = hoy.getFullYear();
+        descargarPDFDesdeHTML(htmlPDF, `Reporte_General_${dd}-${mm}-${yyyy}.pdf`, 'landscape');
     }
 
     // ══════════════════════════════════════════════
@@ -396,6 +390,36 @@ document.addEventListener('DOMContentLoaded', () => {
     function nombreMes(n) {
         return ['enero','febrero','marzo','abril','mayo','junio',
                 'julio','agosto','septiembre','octubre','noviembre','diciembre'][n];
+    }
+
+    // Descarga un PDF directamente (sin abrir pestaña ni diálogo de impresión)
+    // a partir de un documento HTML completo, usando html2pdf.js sobre un
+    // iframe oculto para no filtrar los estilos del PDF a la página actual.
+    function descargarPDFDesdeHTML(htmlCompleto, filename, orientation = 'landscape') {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right    = '0';
+        iframe.style.bottom   = '0';
+        iframe.style.width    = '0';
+        iframe.style.height   = '0';
+        iframe.style.border   = '0';
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(htmlCompleto);
+        doc.close();
+
+        iframe.onload = () => {
+            html2pdf().from(doc.body).set({
+                margin: 0,
+                filename,
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'pt', format: 'a4', orientation },
+            }).save().finally(() => {
+                document.body.removeChild(iframe);
+            });
+        };
     }
 
     init();
