@@ -426,99 +426,198 @@ document.addEventListener('DOMContentLoaded', () => {
     // ══════════════════════════════════════════════
     // PDF: ACTA DE VACACIONES
     // ══════════════════════════════════════════════
-    function generarActaPDF(f) {
-        const hoy      = new Date();
-        const dd       = String(hoy.getDate()).padStart(2, '0');
-        const mm       = String(hoy.getMonth() + 1).padStart(2, '0');
-        const yyyy     = hoy.getFullYear();
+    async function generarActaPDF(f) {
+        const hoy = new Date();
+        const dd = String(hoy.getDate()).padStart(2, '0');
+        const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+        const yyyy = hoy.getFullYear();
         const fechaStr = `TRINIDAD ${dd}/${mm}/${yyyy}`;
 
-        // Solo gestiones con año real (lógica sección 5.2)
-        const gestionesReales = f.gestiones.filter(g => g.anio !== null);
-
-        const thsGestion = gestionesReales.map(g =>
-            `<th>GESTIÓN<br>${g.anio}</th>`).join('');
-        const tdsGestion = gestionesReales.map(g =>
-            `<td>${fmt(g.dias)}</td>`).join('');
-
-        const thNeg = f.dias_negados > 0 ? `<th>VACACIONES<br>NEGADAS</th>` : '';
-        const tdNeg = f.dias_negados > 0 ? `<td>${fmt(f.dias_negados)}</td>` : '';
+        let gestionesReales = f.gestiones.filter(g => g.anio !== null && g.anio < hoy.getFullYear());
+        if (gestionesReales.length === 0) {
+            gestionesReales = f.gestiones.filter(g => g.anio !== null);
+        }
 
         const firmaRRHH = nombreRRHH || 'Encargada de RR.HH.';
 
-        descargarPDFDesdeHTML(`<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8">
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
-    *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Montserrat',Arial,sans-serif;background:#fff;padding:40px 48px;color:#333;font-size:10.5px;}
-    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:14px;border-bottom:2px solid #1b2559;}
-    .inst-nombre{font-size:14px;font-weight:700;color:#1b2559;text-transform:uppercase;letter-spacing:0.5px;line-height:1.6;}
-    .planilla-titulo{text-align:center;margin-bottom:22px;}
-    .planilla-titulo h2{color:rgb(114,0,53);font-size:20px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;}
-    table{width:100%;border-collapse:collapse;margin-bottom:22px;font-size:10px;}
-    th{background:#dde1f2;color:#1b2559;padding:10px 10px;text-align:center;font-weight:700;font-size:9.5px;text-transform:uppercase;border:1px solid #eceefa;line-height:1.4;}
-    td{padding:11px 10px;border:1px solid #eceefa;text-align:center;vertical-align:middle;font-weight:600;color:#333;}
-    tbody tr td{background:#fdf3f7;}
-    td.td-nombre{text-align:left;font-weight:700;color:#1b2559;}
-    td.td-total{font-size:15px;font-weight:800;color:rgb(114,0,53);}
-    .nota-firma{font-size:9.5px;color:#666;font-style:italic;margin-bottom:16px;line-height:1.6;padding-left:12px;}
-    .fecha-acta{font-size:10px;color:#777;text-align:right;margin-bottom:36px;text-transform:uppercase;}
-    .firmas{display:flex;justify-content:space-between;margin-top:20px;}
-    .firma-bloque{width:42%;text-align:center;}
-    .firma-linea{border-top:1.5px solid rgb(114,0,53);margin-bottom:8px;}
-    .firma-nombre{font-weight:700;font-size:10px;text-transform:uppercase;color:#1b2559;}
-    .firma-cargo{font-size:9px;color:#666;margin-top:2px;}
-    .firma-rol{font-size:9px;color:rgb(114,0,53);font-weight:700;text-transform:uppercase;margin-top:2px;}
-</style></head><body>
-    <div class="inst-header">
-        <div style="display:flex;align-items:center;gap:14px;">
-            <img src="/static/img/login/LOGOSSU.png" style="height:54px;width:auto;">
-            <div class="inst-nombre">SEGURO SOCIAL UNIVERSITARIO<br>
-                <span style="font-weight:400;font-size:10px;color:#888;letter-spacing:.5px">${areaLabel}</span>
-            </div>
-        </div>
-        <p class="fecha-acta">${fechaStr}</p>
-    </div>
-    <div class="planilla-titulo"><h2>VACACIONES PERSONAL</h2></div>
+        const jsPDFCtor = window.jspdf?.jsPDF || window.jsPDF;
+        if (!jsPDFCtor) {
+            console.error('No se encontró jsPDF en el bundle cargado.');
+            alert('No se pudo generar el PDF porque no está disponible el motor de exportación.');
+            return;
+        }
 
-    <table>
-        <thead>
-            <tr>
-                <th>APELLIDOS Y NOMBRES</th>
-                <th>CARGO</th>
-                <th>FECHA DE INGRESO</th>
-                ${thsGestion}
-                ${thNeg}
-                <th>ADEUDADO</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td class="td-nombre">${f.apellidos_nombres}</td>
-                <td>${f.cargo}</td>
-                <td>${f.fecha_ingreso}</td>
-                ${tdsGestion}
-                ${tdNeg}
-                <td class="td-total">${fmt(f.dias_adeudados)}</td>
-            </tr>
-        </tbody>
-    </table>
-    <p class="nota-firma">Firmo la presente planilla estando de acuerdo con el cálculo de vacaciones que se ha realizado hasta la fecha que indica arriba.</p>
-    
-    <div class="firmas">
-        <div class="firma-bloque">
-            <div class="firma-linea"></div>
-            <div class="firma-nombre">${firmaRRHH}</div>
-            <div class="firma-rol">ENCARGADA DE RR.HH</div>
-        </div>
-        <div class="firma-bloque">
-            <div class="firma-linea"></div>
-            <div class="firma-nombre">${f.nombre_firma}</div>
-            <div class="firma-cargo">${f.cargo}</div>
-        </div>
-    </div>
-</body></html>`, `Reporte_Personal_${_nombreArchivo(f.apellidos_nombres)}.pdf`, 'landscape');
+        try {
+            const doc = new jsPDFCtor({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const left = 10;
+            const right = 10;
+            const contentWidth = pageWidth - left - right;
+            const top = 9;
+
+            const logoData = await cargarImagenBase64('/static/img/login/LOGOSSU.png');
+
+            // Encabezado
+            doc.addImage(logoData, 'PNG', left, top, 20, 20);
+            doc.setTextColor(31, 36, 101);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.text('SEGURO SOCIAL UNIVERSITARIO', 34, 16);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(138, 141, 152);
+            doc.setFontSize(10);
+            doc.text(areaLabel, 34, 22);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(126, 126, 132);
+            doc.setFontSize(9.5);
+            doc.text(fechaStr, pageWidth - right, 16, { align: 'right' });
+            doc.setDrawColor(31, 36, 101);
+            doc.setLineWidth(0.8);
+            doc.line(left, 31, pageWidth - right, 31);
+
+            // Título
+            doc.setTextColor(161, 24, 75);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(19);
+            doc.text('VACACIONES PERSONAL', pageWidth / 2, 45, { align: 'center' });
+
+            // Tabla
+            const fixedWidths = {
+                nombre: 71,
+                cargo: 64,
+                ingreso: 31,
+                adeudado: 23,
+            };
+            const gestionesCount = Math.max(gestionesReales.length, 1);
+            const gestionWidth = (contentWidth - fixedWidths.nombre - fixedWidths.cargo - fixedWidths.ingreso - fixedWidths.adeudado) / gestionesCount;
+            const headerY = 53;
+            const headerH = 15;
+
+            const columns = [
+                { label: 'APELLIDOS Y NOMBRES', width: fixedWidths.nombre, key: 'nombre' },
+                { label: 'CARGO', width: fixedWidths.cargo, key: 'cargo' },
+                { label: 'FECHA DE INGRESO', width: fixedWidths.ingreso, key: 'ingreso' },
+                ...gestionesReales.map(g => ({ label: `GESTIÓN\n${g.anio}`, width: gestionWidth, key: `gestion-${g.anio}` })),
+                { label: 'ADEUDADO', width: fixedWidths.adeudado, key: 'adeudado' },
+            ];
+
+            const rowValues = [
+                { text: f.apellidos_nombres, type: 'left' },
+                { text: f.cargo, type: 'left' },
+                { text: f.fecha_ingreso, type: 'center' },
+                ...gestionesReales.map(g => ({ text: fmt(g.dias), type: 'center' })),
+                { text: fmt(f.dias_adeudados), type: 'total' },
+            ];
+
+            const rowY = headerY + headerH;
+            const rowH = 21;
+
+            let x = left;
+            columns.forEach(col => {
+                doc.setFillColor(216, 216, 236);
+                doc.setDrawColor(203, 205, 226);
+                doc.setLineWidth(0.18);
+                doc.roundedRect(x, headerY, col.width, headerH, 2, 2, 'FD');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(8.3);
+                doc.setTextColor(43, 47, 109);
+                const headerLines = col.label.split('\n');
+                doc.text(headerLines, x + col.width / 2, headerY + (headerH / 2), {
+                    align: 'center',
+                    baseline: 'middle',
+                });
+                x += col.width;
+            });
+
+            x = left;
+            columns.forEach((col, index) => {
+                doc.setFillColor(252, 247, 249);
+                doc.setDrawColor(223, 224, 238);
+                doc.setLineWidth(0.15);
+                doc.roundedRect(x, rowY, col.width, rowH, 2, 2, 'FD');
+
+                const value = rowValues[index];
+                if (value.type === 'total') {
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(15);
+                    doc.setTextColor(161, 24, 75);
+                    doc.text(value.text, x + col.width / 2, rowY + (rowH / 2), { align: 'center', baseline: 'middle' });
+                } else if (index === 0 || index === 1) {
+                    doc.setFont('helvetica', index === 0 ? 'bold' : 'normal');
+                    doc.setFontSize(index === 0 ? 9.8 : 9.2);
+                    doc.setTextColor(index === 0 ? 31 : 57, index === 0 ? 36 : 65, index === 0 ? 101 : 109);
+                    const lines = doc.splitTextToSize(value.text, col.width - 4);
+                    const textY = rowY + (rowH / 2) - (lines.length > 1 ? 1.5 : 0.2);
+                    doc.text(lines, index === 0 ? x + 2.5 : x + col.width / 2, textY, {
+                        baseline: 'middle',
+                        align: index === 0 ? 'left' : 'center',
+                    });
+                } else if (index === 2 || index >= 3) {
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(9.1);
+                    doc.setTextColor(50, 60, 110);
+                    doc.text(value.text, x + col.width / 2, rowY + (rowH / 2), { align: 'center', baseline: 'middle' });
+                }
+                x += col.width;
+            });
+
+            // Nota
+            doc.setTextColor(123, 123, 127);
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(9.8);
+            const nota = 'Firmo la presente planilla estando de acuerdo con el cálculo de vacaciones que se ha realizado hasta la fecha que indica arriba.';
+            const notaLines = doc.splitTextToSize(nota, contentWidth - 24);
+            doc.text(notaLines, pageWidth / 2, 103, { align: 'center' });
+
+            // Firmas
+            const lineY = pageHeight - 25;
+            const sigWidth = 76;
+            const leftSigX = 22;
+            const rightSigX = pageWidth - 22 - sigWidth;
+
+            doc.setDrawColor(161, 24, 75);
+            doc.setLineWidth(0.45);
+            doc.line(leftSigX, lineY, leftSigX + sigWidth, lineY);
+            doc.line(rightSigX, lineY, rightSigX + sigWidth, lineY);
+
+            doc.setTextColor(31, 36, 101);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10.2);
+            doc.text(firmaRRHH || 'Encargada de RR.HH.', leftSigX + sigWidth / 2, lineY + 9, { align: 'center' });
+            doc.setTextColor(161, 24, 75);
+            doc.setFontSize(9.5);
+            doc.text('ENCARGADA DE RR.HH', leftSigX + sigWidth / 2, lineY + 14, { align: 'center' });
+
+            doc.setTextColor(31, 36, 101);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10.2);
+            doc.text(f.nombre_firma, rightSigX + sigWidth / 2, lineY + 9, { align: 'center' });
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(92, 94, 110);
+            doc.setFontSize(9.3);
+            const cargoFirma = doc.splitTextToSize(f.cargo || '', sigWidth + 4);
+            doc.text(cargoFirma, rightSigX + sigWidth / 2, lineY + 14, { align: 'center' });
+
+            doc.save(`Reporte_Personal_${_nombreArchivo(f.apellidos_nombres)}.pdf`);
+        } catch (err) {
+            console.error('Error generando PDF del acta:', err);
+            alert('No se pudo generar el PDF. Intente nuevamente.');
+        }
+    }
+
+    async function cargarImagenBase64(url) {
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) {
+            throw new Error(`No se pudo cargar la imagen: ${url}`);
+        }
+        const blob = await resp.blob();
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
     }
 
     // ══════════════════════════════════════════════
@@ -550,28 +649,50 @@ document.addEventListener('DOMContentLoaded', () => {
             if (iframe.parentNode) document.body.removeChild(iframe);
         };
 
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(htmlCompleto);
-        doc.close();
-
         iframe.onload = () => {
-            try {
-                html2pdf().from(doc.body).set({
-                    margin: 0,
-                    filename,
-                    html2canvas: { scale: 2, useCORS: true },
-                    jsPDF: { unit: 'pt', format: 'a4', orientation },
-                }).save().catch(err => {
+            (async () => {
+                try {
+                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+
+                    if (doc.fonts && doc.fonts.ready) {
+                        await doc.fonts.ready;
+                    }
+
+                    const imagenes = Array.from(doc.images || []).map(img => {
+                        if (img.complete) return Promise.resolve();
+                        return new Promise(resolve => {
+                            img.onload = resolve;
+                            img.onerror = resolve;
+                        });
+                    });
+
+                    if (imagenes.length > 0) {
+                        await Promise.all(imagenes);
+                    }
+
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+                    await html2pdf().from(doc.body).set({
+                        margin: 0,
+                        filename,
+                        html2canvas: { scale: 2, useCORS: true },
+                        jsPDF: { unit: 'pt', format: 'a4', orientation },
+                    }).save();
+                } catch (err) {
                     console.error('Error generando PDF:', err);
                     alert('No se pudo generar el PDF. Intente nuevamente.');
-                }).finally(limpiar);
-            } catch (err) {
-                console.error('Error generando PDF:', err);
-                alert('No se pudo generar el PDF. Intente nuevamente.');
-                limpiar();
-            }
+                } finally {
+                    limpiar();
+                }
+            })();
         };
+
+        const htmlConBase = htmlCompleto.replace(
+            '<head>',
+            `<head><base href="${window.location.origin}/">`
+        );
+
+        iframe.srcdoc = htmlConBase;
     }
 
     function fmt(n) {

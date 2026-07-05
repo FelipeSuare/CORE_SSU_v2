@@ -258,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
         generarPDFGeneral(datosFiltrados);
     });
 
-    function generarPDFGeneral(datos) {
+    async function generarPDFGeneral(datos) {
         const hoy      = new Date();
         const fechaStr = `Trinidad, ${hoy.getDate()} de ${nombreMes(hoy.getMonth())} de ${hoy.getFullYear()}`;
 
@@ -279,101 +279,241 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filtroUnidadNombre) filtrosPartes.push(`Área: ${filtroUnidadNombre}`);
         if (modoUnico && gestionUnica !== null) filtrosPartes.push(`Gestión: ${gestionUnica}`);
         const filtrosLabel = filtrosPartes.join(' — ');
+        const jsPDFCtor = window.jspdf?.jsPDF || window.jsPDF;
+        if (!jsPDFCtor) {
+            alert('No se pudo generar el PDF porque no está disponible el motor de exportación.');
+            return;
+        }
 
-        // Filas de datos
-        const filas = datos.map((f, idx) => {
-            const tdsGest = gestActivas.map(anio => {
-                const g    = f.gestiones.find(g => g.anio === anio);
-                const dias = g ? g.dias : 0;
-                return dias > 0
-                    ? `<td class="td-dias">${fmt(dias)}</td>`
-                    : `<td style="color:#bbb">—</td>`;
-            }).join('');
+        try {
+            const doc = new jsPDFCtor({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const marginX = 10;
+            const contentWidth = pageWidth - (marginX * 2);
+            const logoData = await cargarImagenBase64('/static/img/login/LOGOSSU.png');
 
-            return `<tr>
-                <td class="td-num">${idx + 1}</td>
-                <td class="td-nombre">${esc(f.apellidos_nombres)}</td>
-                <td>${esc(f.cargo)}</td>
-                <td>${f.fecha_ingreso}</td>
-                <td>${esc(f.tipo_contrato)}</td>
-                <td>${esc(f.unidad)}</td>
-                ${tdsGest}
-                <td class="td-total">${fmt(calcTotalDias(f))}</td>
-                ${puedeVerDiasPerdidos ? `<td class="td-total">${fmt(f.dias_perdidos || 0)}</td>` : ''}
-            </tr>`;
-        }).join('');
+            const fixedWidths = {
+                num: 11,
+                nombre: 38,
+                cargo: 41,
+                fecha: 21,
+                contrato: 21,
+                unidad: 24,
+                total: 16,
+                perdidos: puedeVerDiasPerdidos ? 16 : 0,
+            };
+            const fixedSum = fixedWidths.num + fixedWidths.nombre + fixedWidths.cargo + fixedWidths.fecha + fixedWidths.contrato + fixedWidths.unidad + fixedWidths.total + fixedWidths.perdidos;
+            const gestWidth = gestActivas.length > 0 ? (contentWidth - fixedSum) / gestActivas.length : 0;
+            const firstHeaderY = 54;
+            const firstTopHeaderH = gestActivas.length > 1 ? 12 : 24;
+            const firstSubHeaderH = gestActivas.length > 1 ? 12 : 0;
+            const firstRowY = firstHeaderY + firstTopHeaderH + firstSubHeaderH;
+            const repeatRowY = 10;
 
-        const htmlPDF = `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8">
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
-    *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Montserrat',Arial,sans-serif;padding:28px 36px;font-size:9px;color:#333;background:#fff;}
-    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;padding-bottom:10px;border-bottom:2px solid #1b2559;}
-    .inst-nombre{font-size:13px;font-weight:700;color:#1b2559;text-transform:uppercase;letter-spacing:.5px;line-height:1.6;}
-    .inst-fecha{font-size:9px;color:#777;text-align:right;line-height:1.6;}
-    .titulo{text-align:center;margin-bottom:14px;}
-    .titulo h2{color:rgb(114,0,53);font-size:19px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
-    .resumen{margin-bottom:14px;font-size:10px;color:#333;}
-    .resumen-total-num{font-weight:800;color:rgb(114,0,53);}
-    .resumen-sep{color:#bbb;margin:0 6px;}
-    .resumen-filtro{color:rgb(114,0,53);font-weight:600;}
-    table{width:100%;border-collapse:collapse;font-size:8px;margin-bottom:18px;}
-    thead th{background:#dde1f2;color:#1b2559;padding:8px 5px;text-align:center;font-weight:700;font-size:7.5px;text-transform:uppercase;letter-spacing:.3px;border:1px solid #eceefa;line-height:1.4;}
-    tbody td{padding:7px 5px;border:1px solid #eceefa;text-align:center;vertical-align:middle;}
-    tbody tr:nth-child(even) td{background:#fdf3f7;}
-    .td-num{color:#999;font-size:7.5px;width:24px;}
-    .td-nombre{text-align:left!important;font-weight:700;color:#1b2559;padding-left:10px!important;}
-    .td-dias{font-weight:700;color:#1b2559;}
-    .td-total{font-weight:800;color:rgb(114,0,53);font-size:9.5px;}
-    .firma-rrhh{margin-top:28px;width:220px;text-align:center;}
-    .firma-linea{border-top:1.5px solid rgb(114,0,53);margin-bottom:6px;}
-    .firma-nombre{font-weight:700;font-size:9px;text-transform:uppercase;color:#1b2559;letter-spacing:.3px;}
-    .firma-rol{font-size:8px;color:rgb(114,0,53);font-weight:700;text-transform:uppercase;margin-top:2px;}
-    @media print{body{padding:16px 24px;}}
-</style></head><body>
-    <div class="inst-header">
-        <div style="display:flex;align-items:center;gap:14px;">
-            <img src="/static/img/login/LOGOSSU.png" style="height:54px;width:auto;">
-            <div class="inst-nombre">SEGURO SOCIAL UNIVERSITARIO<br>
-                <span style="font-weight:400;font-size:10px;color:#888;letter-spacing:.5px">${areaLabel}</span>
-            </div>
-        </div>
-        <div class="inst-fecha">${fechaStr}</div>
-    </div>
-    <div class="titulo"><h2>REPORTE GENERAL</h2></div>
-    <div class="resumen">
-        <span>Total funcionarios: <span class="resumen-total-num">${datos.length}</span></span>
-        ${filtrosLabel ? `<span class="resumen-sep">|</span><span class="resumen-filtro">${filtrosLabel}</span>` : ''}
-    </div>
-    <table>
-        <thead>
-            <tr>
-                <th rowspan="2">Nº</th>
-                <th rowspan="2">Apellidos y Nombres</th>
-                <th rowspan="2">Cargo</th>
-                <th rowspan="2">Fecha Ingreso</th>
-                <th rowspan="2">Contrato</th>
-                <th rowspan="2">Unidad Org.</th>
-                ${thsGestRow1}
-                <th rowspan="2">Total Días</th>
-                ${puedeVerDiasPerdidos ? '<th rowspan="2">Días Perdidos</th>' : ''}
-            </tr>
-            ${thsGestRow2 ? `<tr>${thsGestRow2}</tr>` : ''}
-        </thead>
-        <tbody>${filas}</tbody>
-    </table>
-    <div class="firma-rrhh">
-        <div class="firma-linea"></div>
-        <div class="firma-nombre">${nombreRRHH || 'Encargada de RR.HH.'}</div>
-        <div class="firma-rol">ENCARGADA DE RR.HH</div>
-    </div>
-</body></html>`;
+            const rows = datos.map((f, idx) => ({
+                idx: idx + 1,
+                nombre: f.apellidos_nombres,
+                cargo: f.cargo,
+                fecha: f.fecha_ingreso,
+                contrato: f.tipo_contrato,
+                unidad: f.unidad,
+                gestiones: gestActivas.map(anio => {
+                    const g = f.gestiones.find(item => item.anio === anio);
+                    return g ? g.dias : 0;
+                }),
+                total: calcTotalDias(f),
+                perdidos: puedeVerDiasPerdidos ? (f.dias_perdidos || 0) : null,
+            }));
 
-        const dd    = String(hoy.getDate()).padStart(2, '0');
-        const mm    = String(hoy.getMonth() + 1).padStart(2, '0');
-        const yyyy  = hoy.getFullYear();
-        descargarPDFDesdeHTML(htmlPDF, `Reporte_General_${dd}-${mm}-${yyyy}.pdf`, 'landscape');
+            const drawDocumentHeader = () => {
+                doc.addImage(logoData, 'PNG', marginX, 10, 16, 16);
+                doc.setTextColor(31, 36, 101);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(14);
+                doc.text('SEGURO SOCIAL UNIVERSITARIO', 28, 16);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(130, 130, 138);
+                doc.setFontSize(9.5);
+                doc.text(areaLabel, 28, 22);
+                doc.setTextColor(126, 126, 132);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.text(fechaStr, pageWidth - marginX, 14, { align: 'right' });
+                doc.setDrawColor(31, 36, 101);
+                doc.setLineWidth(0.8);
+                doc.line(marginX, 30, pageWidth - marginX, 30);
+
+                doc.setTextColor(161, 24, 75);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(18);
+                doc.text('REPORTE GENERAL', pageWidth / 2, 42, { align: 'center' });
+
+                doc.setTextColor(31, 36, 101);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10.5);
+                doc.text(`Total funcionarios: ${datos.length}`, marginX, 48);
+                if (filtrosLabel) {
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(114, 0, 53);
+                    doc.setFontSize(9.5);
+                    doc.text(filtrosLabel, marginX + 52, 48);
+                }
+            };
+
+            const drawTableHeader = (headerY, headerTopH, headerSubH) => {
+                let x = marginX;
+                const topHeaderFill = [217, 215, 234];
+                const border = [206, 210, 225];
+
+                const baseHeaders = [
+                    { key: 'num', label: 'Nº', width: fixedWidths.num },
+                    { key: 'nombre', label: 'APELLIDOS Y\nNOMBRES', width: fixedWidths.nombre },
+                    { key: 'cargo', label: 'CARGO', width: fixedWidths.cargo },
+                    { key: 'fecha', label: 'FECHA\nINGRESO', width: fixedWidths.fecha },
+                    { key: 'contrato', label: 'CONTRATO', width: fixedWidths.contrato },
+                    { key: 'unidad', label: 'UNIDAD\nORG.', width: fixedWidths.unidad },
+                ];
+
+                baseHeaders.forEach(col => {
+                    doc.setFillColor(...topHeaderFill);
+                    doc.setDrawColor(...border);
+                    doc.setLineWidth(0.2);
+                    doc.rect(x, headerY, col.width, headerTopH + headerSubH, 'FD');
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(8.2);
+                    doc.setTextColor(43, 47, 109);
+                    doc.text(col.label.split('\n'), x + col.width / 2, headerY + ((headerTopH + headerSubH) / 2), {
+                        align: 'center',
+                        baseline: 'middle',
+                    });
+                    x += col.width;
+                });
+
+                const gestWidthTotal = gestWidth * gestActivas.length;
+                doc.setFillColor(...topHeaderFill);
+                doc.setDrawColor(...border);
+                doc.setLineWidth(0.2);
+                doc.rect(x, headerY, gestWidthTotal, headerTopH, 'FD');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(8.4);
+                doc.setTextColor(43, 47, 109);
+                if (gestActivas.length > 1) {
+                    doc.text('DÍAS PENDIENTES POR\nGESTIÓN', x + gestWidthTotal / 2, headerY + (headerTopH / 2), { align: 'center', baseline: 'middle' });
+                    let gx = x;
+                    gestActivas.forEach(anio => {
+                        doc.setFillColor(...topHeaderFill);
+                        doc.setDrawColor(...border);
+                        doc.rect(gx, headerY + headerTopH, gestWidth, headerSubH, 'FD');
+                        doc.setFontSize(8.2);
+                        doc.text(`GESTIÓN\n${anio}`.split('\n'), gx + gestWidth / 2, headerY + headerTopH + (headerSubH / 2), {
+                            align: 'center',
+                            baseline: 'middle',
+                        });
+                        gx += gestWidth;
+                    });
+                } else {
+                    doc.text(`GESTIÓN\n${gestActivas[0]}`.split('\n'), x + gestWidthTotal / 2, headerY + (headerTopH / 2), {
+                        align: 'center',
+                        baseline: 'middle',
+                    });
+                }
+                x += gestWidthTotal;
+
+                doc.setFillColor(...topHeaderFill);
+                doc.setDrawColor(...border);
+                doc.rect(x, headerY, fixedWidths.total, headerTopH + headerSubH, 'FD');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(8.2);
+                doc.text('TOTAL\nDÍAS'.split('\n'), x + fixedWidths.total / 2, headerY + ((headerTopH + headerSubH) / 2), {
+                    align: 'center',
+                    baseline: 'middle',
+                });
+                x += fixedWidths.total;
+
+                if (puedeVerDiasPerdidos) {
+                    doc.setFillColor(...topHeaderFill);
+                    doc.setDrawColor(...border);
+                    doc.rect(x, headerY, fixedWidths.perdidos, headerTopH + headerSubH, 'FD');
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(8.2);
+                    doc.text('DÍAS\nPERDIDOS'.split('\n'), x + fixedWidths.perdidos / 2, headerY + ((headerTopH + headerSubH) / 2), {
+                        align: 'center',
+                        baseline: 'middle',
+                    });
+                }
+            };
+
+            const drawRow = (row, y, index, rowStartY) => {
+                const fill = index % 2 === 0 ? [255, 255, 255] : [252, 247, 249];
+                const border = [228, 229, 237];
+
+                const cellData = [
+                    { width: fixedWidths.num, text: String(row.idx), align: 'center', color: [153, 153, 153], bold: false, fontSize: 8.4 },
+                    { width: fixedWidths.nombre, text: row.nombre, align: 'left', color: [27, 37, 89], bold: true, fontSize: 8.2 },
+                    { width: fixedWidths.cargo, text: row.cargo, align: 'center', color: [55, 59, 94], bold: false, fontSize: 7.9 },
+                    { width: fixedWidths.fecha, text: row.fecha, align: 'center', color: [55, 59, 94], bold: false, fontSize: 8.4 },
+                    { width: fixedWidths.contrato, text: row.contrato, align: 'center', color: [55, 59, 94], bold: false, fontSize: 7.8 },
+                    { width: fixedWidths.unidad, text: row.unidad, align: 'center', color: [55, 59, 94], bold: false, fontSize: 8.1 },
+                    ...row.gestiones.map(dias => ({ width: gestWidth, text: dias > 0 ? fmt(dias) : '—', align: 'center', color: dias > 0 ? [27, 37, 89] : [187, 187, 187], bold: dias > 0, fontSize: 8.6 })),
+                    { width: fixedWidths.total, text: fmt(row.total), align: 'center', color: [114, 0, 53], bold: true, fontSize: 8.4 },
+                    ...(puedeVerDiasPerdidos ? [{ width: fixedWidths.perdidos, text: fmt(row.perdidos || 0), align: 'center', color: [114, 0, 53], bold: true, fontSize: 8.4 }] : []),
+                ];
+
+                let rowHeight = 9;
+                cellData.forEach(cell => {
+                    doc.setFont('helvetica', cell.bold ? 'bold' : 'normal');
+                    doc.setFontSize(cell.fontSize);
+                    const lines = doc.splitTextToSize(cell.text, cell.width - 4);
+                    rowHeight = Math.max(rowHeight, (lines.length * (cell.fontSize * 0.42)) + 4.2);
+                });
+
+                if (y + rowHeight > pageHeight - 10) {
+                    doc.addPage();
+                    y = rowStartY;
+                }
+
+                let x = marginX;
+                cellData.forEach(cell => {
+                    doc.setFillColor(...fill);
+                    doc.setDrawColor(...border);
+                    doc.setLineWidth(0.15);
+                    doc.rect(x, y, cell.width, rowHeight, 'FD');
+
+                    doc.setFont('helvetica', cell.bold ? 'bold' : 'normal');
+                    doc.setFontSize(cell.fontSize);
+                    doc.setTextColor(...cell.color);
+                    const lines = doc.splitTextToSize(cell.text, cell.width - 4);
+                    const lineHeight = cell.fontSize * 0.42;
+                    const blockHeight = lines.length * lineHeight;
+                    const startY = y + ((rowHeight - blockHeight) / 2) + lineHeight;
+
+                    doc.text(lines, cell.align === 'left' ? (x + 2.5) : (x + (cell.width / 2)), startY, {
+                        align: cell.align,
+                        baseline: 'middle',
+                    });
+                    x += cell.width;
+                });
+
+                return y + rowHeight;
+            };
+
+            drawDocumentHeader();
+            drawTableHeader(firstHeaderY, firstTopHeaderH, firstSubHeaderH);
+
+            let currentY = firstRowY;
+            rows.forEach((row, index) => {
+                currentY = drawRow(row, currentY, index, repeatRowY);
+            });
+
+            const dd    = String(hoy.getDate()).padStart(2, '0');
+            const mm    = String(hoy.getMonth() + 1).padStart(2, '0');
+            const yyyy  = hoy.getFullYear();
+            doc.save(`Reporte_General_${dd}-${mm}-${yyyy}.pdf`);
+        } catch (err) {
+            console.error('Error generando PDF general:', err);
+            alert('No se pudo generar el PDF. Intente nuevamente.');
+        }
     }
 
     // ══════════════════════════════════════════════
@@ -392,6 +532,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 'julio','agosto','septiembre','octubre','noviembre','diciembre'][n];
     }
 
+    async function cargarImagenBase64(url) {
+        const resp = await fetch(url, { cache: 'no-store' });
+        if (!resp.ok) {
+            throw new Error(`No se pudo cargar la imagen: ${url}`);
+        }
+        const blob = await resp.blob();
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
     // Descarga un PDF directamente (sin abrir pestaña ni diálogo de impresión)
     // a partir de un documento HTML completo, usando html2pdf.js sobre un
     // iframe oculto para no filtrar los estilos del PDF a la página actual.
@@ -402,40 +556,65 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right    = '0';
-        iframe.style.bottom   = '0';
-        iframe.style.width    = '0';
-        iframe.style.height   = '0';
+        iframe.style.position = 'absolute';
+        iframe.style.left     = '-9999px';
+        iframe.style.top      = '0';
+        iframe.style.width    = orientation === 'landscape' ? '1122px' : '794px';
+        iframe.style.height   = orientation === 'landscape' ? '794px' : '1122px';
         iframe.style.border   = '0';
+        iframe.style.backgroundColor = '#ffffff';
         document.body.appendChild(iframe);
 
         const limpiar = () => {
             if (iframe.parentNode) document.body.removeChild(iframe);
         };
 
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(htmlCompleto);
-        doc.close();
-
         iframe.onload = () => {
-            try {
-                html2pdf().from(doc.body).set({
-                    margin: 0,
-                    filename,
-                    html2canvas: { scale: 2, useCORS: true },
-                    jsPDF: { unit: 'pt', format: 'a4', orientation },
-                }).save().catch(err => {
+            (async () => {
+                try {
+                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+
+                    if (doc.fonts && doc.fonts.ready) {
+                        await doc.fonts.ready;
+                    }
+
+                    const imagenes = Array.from(doc.images || []).map(img => {
+                        if (img.complete) return Promise.resolve();
+                        return new Promise(resolve => {
+                            img.onload = resolve;
+                            img.onerror = resolve;
+                        });
+                    });
+
+                    if (imagenes.length > 0) {
+                        await Promise.all(imagenes);
+                    }
+
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+                    const objetivo = doc.getElementById('rg-general-pdf') || doc.body;
+                    await html2pdf().from(objetivo).set({
+                        margin: 0,
+                        filename,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                        jsPDF: { unit: 'pt', format: 'a4', orientation },
+                    }).save();
+                } catch (err) {
                     console.error('Error generando PDF:', err);
                     alert('No se pudo generar el PDF. Intente nuevamente.');
-                }).finally(limpiar);
-            } catch (err) {
-                console.error('Error generando PDF:', err);
-                alert('No se pudo generar el PDF. Intente nuevamente.');
-                limpiar();
-            }
+                } finally {
+                    limpiar();
+                }
+            })();
         };
+
+        const htmlConBase = htmlCompleto.replace(
+            '<head>',
+            `<head><base href="${window.location.origin}/">`
+        );
+
+        iframe.srcdoc = htmlConBase;
     }
 
     init();

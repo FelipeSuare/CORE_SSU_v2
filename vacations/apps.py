@@ -3,7 +3,9 @@ import sys
 import threading
 from datetime import date
 
+from django.conf import settings
 from django.apps import AppConfig
+from django.core.management import call_command
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +20,12 @@ class VacationsConfig(AppConfig):
         # En el primer request (no en migrate) también se ejecuta,
         # así funciona al clonar y arrancar sin necesidad de migrate adicional
         request_started.connect(_auto_poblar_vacaciones_primer_request)
-        # Acreditación automática diaria de gestiones por aniversario (reemplaza
-        # el botón "Poblar ahora" de la notificación de dashboard, desactivada).
-        request_started.connect(_poblar_vacaciones_diario)
+        # request_started.connect(_corregir_dias_perdidos_primer_request)
+        # La acreditación diaria automática queda desactivada en DEBUG porque
+        # en el servidor de desarrollo se dispara al primer request de cada
+        # arranque y puede volver a tocar saldos cuando solo se está probando.
+        if not settings.DEBUG:
+            request_started.connect(_poblar_vacaciones_diario)
 
 
 def _auto_poblar_vacaciones(sender, **kwargs):
@@ -76,6 +81,28 @@ def _auto_poblar_vacaciones_primer_request(sender, **kwargs):
         return
     _primer_request_ejecutado = True
     _auto_poblar_vacaciones(sender=sender)
+
+
+_correccion_dias_perdidos_ejecutada = False
+
+
+def _corregir_dias_perdidos_primer_request(sender, **kwargs):
+    """Ejecuta la corrección de dias_perdidos una sola vez por proceso."""
+    if 'test' in sys.argv:
+        return
+
+    global _correccion_dias_perdidos_ejecutada
+    if _correccion_dias_perdidos_ejecutada:
+        return
+    _correccion_dias_perdidos_ejecutada = True
+
+    def _tarea():
+        try:
+            call_command('corregir_dias_perdidos', verbosity=0)
+        except Exception:
+            logger.exception('Fallo la correccion automatica de dias perdidos')
+
+    threading.Thread(target=_tarea, daemon=True).start()
 
 
 _ultima_fecha_poblado_diario = None
