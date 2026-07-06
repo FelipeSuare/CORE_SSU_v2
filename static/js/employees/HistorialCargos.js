@@ -170,8 +170,8 @@ function renderizarCargos() {
 
         const tdSaldoAnterior = mostrarSaldoAnt
             ? `<td class="td-saldo-ant">
-                   <span class="dias-badge dias-ant">${c.saldo_anterior} días</span>
-               </td>` : '';
+                    <span class="dias-badge dias-ant">${c.saldo_anterior} días</span>
+                </td>` : '';
         const tdsGestiones = c.gestiones.map(g =>
             `<td>${g.saldo > 0
                 ? `<span class="dias-badge dias-con-saldo">${g.saldo} días</span>`
@@ -512,7 +512,7 @@ function generarPlanillaPDF() {
 ${bloquesPDF}
 
 <p class="nota">
-    El "Total días" de cada cargo es la suma de sus 4 gestiones propias únicamente.<br>
+    El "Total días" de cada cargo es la suma de sus 2 gestiones propias únicamente.<br>
     El "Saldo Días Anterior" no se incluye en ese cálculo — se muestra como referencia de auditoría.
 </p>
 

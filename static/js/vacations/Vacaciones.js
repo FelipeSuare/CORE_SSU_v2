@@ -352,12 +352,15 @@ function manejarEnvioFormulario(e) {
 
 function poblarModal(diasTomar, saldoTotal, motivo) {
     const rd = retornoData || {};
-    const saldoRestante = (saldoTotal - diasTomar).toFixed(1);
+    const efectivos = rd.dias_efectivos !== undefined ? rd.dias_efectivos : diasTomar;
+    const saldoRestante = (saldoTotal - efectivos).toFixed(1);
 
     document.getElementById('summaryDiasNoHabiles').textContent =
         rd.dias_no_habiles !== undefined ? rd.dias_no_habiles : '—';
     document.getElementById('summaryDiasCumpleanos').textContent =
         rd.dias_cumpleanos !== undefined ? rd.dias_cumpleanos : '—';
+    document.getElementById('summaryDiasEfectivos').textContent =
+        rd.dias_efectivos !== undefined ? rd.dias_efectivos.toFixed(1) : diasTomar.toFixed(1);
     document.getElementById('summaryDiasFestivos').textContent =
         rd.dias_feriados !== undefined ? rd.dias_feriados : '—';
 
@@ -396,7 +399,7 @@ async function enviarSolicitud() {
             body: JSON.stringify({
                 fecha_salida:      fechaSalidaInput.value,
                 fecha_retorno:     fechaRetornoInput.value,
-                dias_solicitados:  parseFloat(diasTomarInput.value),
+                dias_solicitados:  (retornoData?.dias_efectivos ?? parseFloat(diasTomarInput.value)),
                 motivo_vacacion:   motivoVacacionTextarea.value.trim(),
             }),
         });

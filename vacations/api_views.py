@@ -153,14 +153,19 @@ def _siguiente_dia_habil(fecha, feriados_set):
     return fecha
 
 
-def _sumar_meses(fecha, meses):
-    """Suma `meses` calendario a `fecha`, recortando al último día del mes
-    destino si el día original no existe ahí (ej. 31 de enero + 1 mes)."""
-    mes_total = fecha.month - 1 + meses
-    anio = fecha.year + mes_total // 12
-    mes  = mes_total % 12 + 1
-    ultimo_dia_mes = calendar.monthrange(anio, mes)[1]
-    return date(anio, mes, min(fecha.day, ultimo_dia_mes))
+def _contar_cumples_en_periodo(fecha_salida, fecha_retorno, fecha_nacimiento, feriados_set):
+    """Cuenta cumpleaños del empleado que caen en día hábil dentro del período
+    de vacaciones (excluye fecha_retorno). Cada uno descuenta 0.5 días."""
+    if not fecha_nacimiento:
+        return 0
+    count = 0
+    actual = fecha_salida
+    while actual < fecha_retorno:
+        if actual.weekday() < 5 and actual not in feriados_set:
+            if actual.month == fecha_nacimiento.month and actual.day == fecha_nacimiento.day:
+                count += 1
+        actual += timedelta(days=1)
+    return count
 
 
 def _get_usuario_rrhh(request):
@@ -335,13 +340,18 @@ class CalcularRetornoView(APIView):
         fecha_retorno   = result['fecha_retorno']
         fecha_conclusion = fecha_retorno - timedelta(days=1)
 
+        cumples    = result['dias_cumpleanos']
+        efectivos  = float(dias - Decimal(str(cumples)) * Decimal('0.5'))
+
         return Response({
             'fecha_retorno':    fecha_retorno.strftime('%Y-%m-%d'),
             'fecha_conclusion': fecha_conclusion.strftime('%Y-%m-%d'),
             'dias_fines_semana': result['dias_fines_semana'],
             'dias_feriados':    result['dias_feriados'],
-            'dias_cumpleanos':  result['dias_cumpleanos'],
+            'dias_cumpleanos':  cumples,
             'dias_no_habiles':  result['dias_fines_semana'] + result['dias_feriados'],
+            'dias_solicitados':  float(dias),
+            'dias_efectivos':   efectivos,
         })
 
 
@@ -403,6 +413,11 @@ class CrearSolicitudView(APIView):
                 {'error': 'No se encontró el registro de gestión de vacaciones.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        feriados_set = set(Feriado.objects.values_list('fecha', flat=True))
+        cumples      = _contar_cumples_en_periodo(fecha_salida, fecha_retorno, f.ci.fecha_nacimiento, feriados_set)
+        descuento    = Decimal(str(cumples)) * Decimal('0.5')
+        dias         = dias - descuento
 
         saldo_total = gv.dias_adeudados or Decimal('0')
         if dias > saldo_total:
@@ -1619,6 +1634,16 @@ class DescargarPDFRechazadaView(APIView):
 # ══════════════════════════════════════════════════════════════════════════════
 
 _ANTICIPO_RIESGO_MESES = 1
+
+
+def _sumar_meses(fecha, meses):
+    """Suma N meses a una fecha controlando límite de día del mes."""
+    mes_total = fecha.month - 1 + meses
+    anio = fecha.year + mes_total // 12
+    mes = mes_total % 12 + 1
+    dia = min(fecha.day, [31, 29 if anio % 4 == 0 and (anio % 100 != 0 or anio % 400 == 0) else 28,
+                          31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mes - 1])
+    return date(anio, mes, dia)
 
 
 class AlertaGestionesPorPerderView(APIView):

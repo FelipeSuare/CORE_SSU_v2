@@ -639,14 +639,14 @@ class HistorialCargosView(APIView):
                 gestiones = [
                     {'anio': getattr(gv, f'anio_gestion{n}'),
                      'saldo': float(getattr(gv, f'dias_gestion{n}') or 0)}
-                    for n in range(1, 5)
+                    for n in range(1, 3)
                 ] if gv else [{'anio': None, 'saldo': 0.0}] * 4
                 saldo_total = float(gv.dias_adeudados or 0) if gv else 0.0
             else:
                 gestiones = [
                     {'anio':  getattr(hc, f'anio_gestion{n}_al_salir'),
                      'saldo': float(getattr(hc, f'saldo_gestion{n}_al_salir') or 0)}
-                    for n in range(1, 5)
+                    for n in range(1, 3)
                 ]
                 saldo_total = sum(g['saldo'] for g in gestiones)
 
@@ -821,7 +821,7 @@ def _generar_pdf_vacaciones_baja(f, gv, cargo):
             return label, f'{dias:.1f} días'
         return f'Gestión {n}:', '0.0 días'
 
-    g = [gest_row(n) for n in range(1, 5)]
+    g = [gest_row(n) for n in range(1, 3)]
     total = f'{float(gv.dias_adeudados or 0):.1f}' if gv else '0.0'
 
     wa, wb = W * 0.40, W * 0.60
