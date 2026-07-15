@@ -23,9 +23,10 @@ class TestListarFuncionariosAPI(APITestCase):
         self.url = reverse('funcionarios_lista')
 
     def test_requiere_autenticacion(self):
-        # SessionAuthentication sin sesión → 403 (sin WWW-Authenticate header)
+        # El middleware ControlAccesoRoles intercepta antes que DRF y redirige
+        # al login (302) a cualquier usuario no autenticado, incluidas las APIs.
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(r.status_code, status.HTTP_302_FOUND)
 
     def test_cualquier_usuario_autenticado_puede_listar(self):
         # La vista no tiene restricción de rol; solo requiere login
@@ -52,11 +53,10 @@ class TestListarFuncionariosAPI(APITestCase):
 
 
 class TestNuevoFuncionarioAPI(APITestCase):
-    """POST /funcionarios/nuevo/ — crea Persona + Funcionario (sin check de rol)."""
+    """POST /funcionarios/nuevo/ — crea Persona + Funcionario (requiere rol RRHH)."""
 
     def setUp(self):
-        # La vista no requiere rol especial — basta con estar autenticado
-        self.user, _ = hacer_usuario_y_funcionario(ci='20000001', nombre='Usuario')
+        self.user, _ = hacer_usuario_y_funcionario(ci='20000001', nombre='Usuario', roles=['RRHH'])
         self.client.force_login(self.user)
         self.unidad = hacer_unidad('Unidad Registro')
         self.url = reverse('funcionarios_nuevo')
@@ -99,24 +99,30 @@ class TestNuevoFuncionarioAPI(APITestCase):
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_requiere_autenticacion(self):
+        # El middleware ControlAccesoRoles intercepta antes que DRF y redirige
+        # al login (302) a cualquier usuario no autenticado, incluidas las APIs.
         self.client.logout()
         r = self.client.post(self.url, self._payload('70000001'), format='json')
-        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(r.status_code, status.HTTP_302_FOUND)
 
 
 class TestToggleEstadoAPI(APITestCase):
-    """POST /funcionarios/<cod>/estado/ — activa/desactiva funcionario."""
+    """POST /funcionarios/<cod>/estado/ — activa/desactiva funcionario (requiere rol RRHH)."""
 
     def setUp(self):
-        self.user, _ = hacer_usuario_y_funcionario(ci='80000001', nombre='RRHH Toggle')
+        self.user, _ = hacer_usuario_y_funcionario(ci='80000001', nombre='RRHH Toggle', roles=['RRHH'])
         _, self.objetivo = hacer_usuario_y_funcionario(ci='80000002', nombre='Objetivo')
         hacer_cargo(self.objetivo)
         self.client.force_login(self.user)
         self.url = reverse('funcionarios_estado', kwargs={'cod': self.objetivo.cod_funcionario})
 
     def test_desactiva_funcionario_activo(self):
-        # Para desactivar se requiere fecha_baja
-        r = self.client.post(self.url, {'fecha_baja': '2025-06-01'}, format='json')
+        # Para desactivar se requieren fecha_baja y tipo_baja
+        r = self.client.post(
+            self.url,
+            {'fecha_baja': '2025-06-01', 'tipo_baja': 'Renuncia'},
+            format='json',
+        )
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.objetivo.refresh_from_db()
         self.assertEqual(self.objetivo.estado, 'INACTIVO')

@@ -167,7 +167,7 @@ class RecuperarNuevaView(APIView):
             persona     = Persona.objects.get(ci=ci)
             funcionario = Funcionario.objects.get(ci=persona)
             user        = User.objects.get(username=ci)
-        except Exception:
+        except (Persona.DoesNotExist, Funcionario.DoesNotExist, User.DoesNotExist):
             return Response(
                 {'error': 'No se encontró el registro del funcionario.'},
                 status=status.HTTP_404_NOT_FOUND,

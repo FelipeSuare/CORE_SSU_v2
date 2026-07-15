@@ -5,6 +5,12 @@ const CSRF_TOKEN       = document.querySelector('meta[name="csrf-token"]').conte
 const URL_SOLICITUDES  = '/api/vacaciones/para-aprobar/';
 const URL_DECISION     = '/api/vacaciones/decision/';
 
+function esc(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ══════════════════════════════════════════════════════════════
 //  ESTADO DEL MÓDULO
 // ══════════════════════════════════════════════════════════════
@@ -122,8 +128,8 @@ function renderizarTabla() {
 
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td data-label="Funcionario">${sol.funcionario}</td>
-            <td data-label="Cargo">${sol.cargo}</td>
+            <td data-label="Funcionario">${esc(sol.funcionario)}</td>
+            <td data-label="Cargo">${esc(sol.cargo)}</td>
             <td data-label="Fecha Solicitud">${formatearFecha(sol.fecha_solicitud)}</td>
             <td data-label="Período Vacacional">
                 ${formatearFecha(sol.fecha_salida)} – ${formatearFecha(sol.fecha_retorno)}
@@ -232,8 +238,8 @@ function flujoDetallado(flujo) {
             <div class="flow-icon ${estado}">
                 <i class="material-symbols-outlined">${icon}</i>
             </div>
-            <div class="flow-label">${paso.label}</div>
-            <div class="flow-name">${paso.nombre_aprobador}</div>
+            <div class="flow-label">${esc(paso.label)}</div>
+            <div class="flow-name">${esc(paso.nombre_aprobador)}</div>
             ${fechaHtml}
         </div>${arrow}`;
     }).join('');
@@ -291,10 +297,10 @@ async function abrirModalConfirmacion() {
         : '¿Está seguro de RECHAZAR esta solicitud de vacación?';
 
     document.getElementById('confirmDetalles').innerHTML = `
-        <p><strong>Funcionario:</strong> ${s.funcionario}</p>
+        <p><strong>Funcionario:</strong> ${esc(s.funcionario)}</p>
         <p><strong>Días:</strong> ${s.dias}</p>
         <p><strong>Período:</strong> ${formatearFecha(s.fecha_salida)} – ${formatearFecha(s.fecha_retorno)}</p>
-        ${comentarios ? `<p><strong>Comentarios:</strong> ${comentarios}</p>` : ''}
+        ${comentarios ? `<p><strong>Comentarios:</strong> ${esc(comentarios)}</p>` : ''}
     `;
 
     modalConfirmacion.classList.add('show');

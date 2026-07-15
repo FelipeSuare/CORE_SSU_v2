@@ -413,8 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
     <div class="titulo"><h2>HISTORIAL SOLICITUDES${rangoLabel}</h2></div>
     <div class="datos">
-        <div class="dato"><span class="dato-label">Funcionario:</span><span class="dato-valor">${data.nombre_completo}</span></div>
-        <div class="dato"><span class="dato-label">Cargo:</span><span class="dato-valor">${data.cargo}</span></div>
+        <div class="dato"><span class="dato-label">Funcionario:</span><span class="dato-valor">${esc(data.nombre_completo)}</span></div>
+        <div class="dato"><span class="dato-label">Cargo:</span><span class="dato-valor">${esc(data.cargo)}</span></div>
         <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${data.fecha_ingreso}</span></div>
         <div class="dato"><span class="dato-label">Días disponibles:</span>
             <span class="dato-valor" style="color:rgb(114,0,53)">${fmt(data.dias_adeudados)} días</span></div>

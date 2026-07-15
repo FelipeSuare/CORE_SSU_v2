@@ -3,6 +3,9 @@
 venv/
 env/
 
+
+graphify-out/
+
 # Variables de entorno (contiene credenciales de BD)
 .env
 .env.docker

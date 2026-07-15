@@ -406,7 +406,7 @@ def recuperar_nueva_contrasena(request):
         persona     = Persona.objects.get(ci=ci)
         funcionario = Funcionario.objects.get(ci=persona)
         user        = User.objects.get(username=ci)
-    except Exception:
+    except (Persona.DoesNotExist, Funcionario.DoesNotExist, User.DoesNotExist):
         return JsonResponse({'error': 'No se encontró el registro del funcionario.'}, status=404)
 
     funcionario.contrasena_hash = make_password(nueva)

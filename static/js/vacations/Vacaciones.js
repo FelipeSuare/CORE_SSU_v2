@@ -8,6 +8,12 @@ const URL_RETORNO     = '/api/vacaciones/calcular-retorno/';
 const URL_CREAR       = '/api/vacaciones/crear/';
 const URL_SEGUIMIENTO = '/api/vacaciones/seguimiento/';
 
+function esc(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ══════════════════════════════════════════════════════════════
 //  ELEMENTOS DEL DOM  (se inicializan dentro de DOMContentLoaded)
 // ══════════════════════════════════════════════════════════════
@@ -471,7 +477,7 @@ async function cargarSeguimiento() {
         }
 
         let html = `<p style="font-size:0.82em;color:#720035;font-weight:700;margin-bottom:8px">
-                        ${data.codigo} — <span style="font-weight:500">${data.estado}</span>
+                        ${esc(data.codigo)} — <span style="font-weight:500">${esc(data.estado)}</span>
                     </p>
                     <ul class="timeline">`;
 
@@ -482,7 +488,7 @@ async function cargarSeguimiento() {
             const icon   = iconMap[paso.estado] || 'more_horiz';
             const text   = statusText[paso.estado] || paso.estado.toUpperCase();
             const coment = paso.comentarios
-                ? `<p class="timeline-comments">${paso.comentarios}</p>`
+                ? `<p class="timeline-comments">${esc(paso.comentarios)}</p>`
                 : '';
 
             html += `
@@ -491,8 +497,8 @@ async function cargarSeguimiento() {
                     <i class="material-symbols-outlined">${icon}</i>
                 </div>
                 <div class="timeline-content ${paso.estado}">
-                    <p class="timeline-role">${paso.nivel}</p>
-                    <p class="timeline-name">${paso.responsable}</p>
+                    <p class="timeline-role">${esc(paso.nivel)}</p>
+                    <p class="timeline-name">${esc(paso.responsable)}</p>
                     <span class="timeline-status ${paso.estado}">${text}</span>
                     <p class="timeline-date">${paso.fecha ? formatearFecha(paso.fecha) : '--/--/----'}</p>
                     ${coment}

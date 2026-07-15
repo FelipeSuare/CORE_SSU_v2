@@ -64,6 +64,12 @@ function _csrf() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 }
 
+function esc(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ======================================== FUNCIONES DE RENDERIZADO ========================================
 
 function crearFilaTabla(solicitud) {
@@ -76,8 +82,8 @@ function crearFilaTabla(solicitud) {
         : '<span style="color: #999;">—</span>';
 
     row.innerHTML = `
-        <td data-label="Funcionario">${solicitud.funcionario}</td>
-        <td data-label="Cargo">${solicitud.cargo}</td>
+        <td data-label="Funcionario">${esc(solicitud.funcionario)}</td>
+        <td data-label="Cargo">${esc(solicitud.cargo)}</td>
         <td data-label="Fecha Inicio">${formatearFecha(solicitud.fechaInicio)}</td>
         <td data-label="Fecha Final">${formatearFecha(solicitud.fechaFinal)}</td>
         <td data-label="Días Totales">${solicitud.diasTotales}</td>

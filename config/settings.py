@@ -152,6 +152,16 @@ CSRF_COOKIE_HTTPONLY = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
+# Cabeceras adicionales solo en producción (DEBUG=False): en desarrollo local
+# sin HTTPS, forzar estas cabeceras rompería el acceso por http://localhost.
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
 # Tests
 TEST_RUNNER = 'core.test_runner.ManagedTestRunner'
 

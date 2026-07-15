@@ -350,10 +350,11 @@ class TestCalcularRetornoAPI(APITestCase):
         self.url = reverse('vac_calcular_retorno')
 
     def test_requiere_autenticacion(self):
-        # SessionAuthentication sin sesión activa → 403 (sin WWW-Authenticate header)
+        # El middleware ControlAccesoRoles intercepta antes que DRF y redirige
+        # al login (302) a cualquier usuario no autenticado, incluidas las APIs.
         self.client.logout()
         r = self.client.post(self.url, {'fecha_salida': '2024-01-08', 'dias_solicitados': '5'})
-        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(r.status_code, status.HTTP_302_FOUND)
 
     def test_datos_incompletos_devuelve_400(self):
         r = self.client.post(self.url, {'fecha_salida': '2024-01-08'})
@@ -423,9 +424,11 @@ class TestDatosFormularioAPI(APITestCase):
         self.url = reverse('vac_datos')
 
     def test_requiere_autenticacion(self):
+        # El middleware ControlAccesoRoles intercepta antes que DRF y redirige
+        # al login (302) a cualquier usuario no autenticado, incluidas las APIs.
         self.client.logout()
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(r.status_code, status.HTTP_302_FOUND)
 
     def test_devuelve_datos_del_funcionario(self):
         r = self.client.get(self.url)
@@ -476,9 +479,13 @@ class TestCrearSolicitudAPI(APITestCase):
         self.url = reverse('vac_crear')
 
     def _payload_valido(self, dias='5'):
+        # Fechas relativas a "hoy" para que el test no quede obsoleto con el paso del tiempo
+        # (la vista rechaza fecha_salida en el pasado).
+        salida  = date.today() + timedelta(days=30)
+        retorno = salida + timedelta(days=7)
         return {
-            'fecha_salida':   '2025-02-03',
-            'fecha_retorno':  '2025-02-10',
+            'fecha_salida':   salida.isoformat(),
+            'fecha_retorno':  retorno.isoformat(),
             'dias_solicitados': dias,
             'motivo_vacacion': 'Vacaciones anuales por descanso familiar',
         }

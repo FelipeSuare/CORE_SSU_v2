@@ -225,7 +225,7 @@ function generarPlanillaPDF() {
         const nivelesHtml = nivelCols.map(c => {
             const n = s[`nivel${c.db_nivel}`];
             return n
-                ? `<td style="text-align:center;font-size:0.82em">${n.nombre}<br><small>${formatearFecha(n.fecha)}</small></td>`
+                ? `<td style="text-align:center;font-size:0.82em">${_escHtml(n.nombre)}<br><small>${formatearFecha(n.fecha)}</small></td>`
                 : `<td style="text-align:center"><span style="color:#bbb">—</span></td>`;
         }).join('');
 
@@ -242,12 +242,12 @@ function generarPlanillaPDF() {
             <td>${formatearFecha(s.fecha_solicitud)}</td>
             <td>${formatearFecha(s.fecha_salida)} al ${formatearFecha(s.fecha_retorno)}</td>
             <td style="text-align:center"><strong>${s.dias}</strong></td>
-            <td style="text-align:left">${s.motivo}</td>
+            <td style="text-align:left">${_escHtml(s.motivo)}</td>
             <td style="text-align:center">
                 <span style="background:${bg};color:${color};padding:3px 10px;border-radius:12px;font-size:0.78em;font-weight:700;border:1px solid ${color}">${s.estado}</span>
             </td>
             ${nivelesHtml}
-            <td style="text-align:left;font-size:0.82em">${s.observaciones ?? '<span style="color:#bbb">—</span>'}</td>
+            <td style="text-align:left;font-size:0.82em">${s.observaciones ? _escHtml(s.observaciones) : '<span style="color:#bbb">—</span>'}</td>
         </tr>`;
     }).join('');
 
@@ -291,7 +291,7 @@ function generarPlanillaPDF() {
         </div>
     </div>
     <p style="font-weight:700;font-size:12px;color:rgb(39,20,71);margin-top:6px">HISTORIAL DE SOLICITUDES DE VACACIONES</p>
-    <p style="font-size:10px;color:rgb(114,0,53);font-weight:600">${USUARIO_ACTUAL.nombre} &nbsp;·&nbsp; C.I. ${USUARIO_ACTUAL.ci}</p>
+    <p style="font-size:10px;color:rgb(114,0,53);font-weight:600">${_escHtml(USUARIO_ACTUAL.nombre)} &nbsp;·&nbsp; C.I. ${_escHtml(USUARIO_ACTUAL.ci)}</p>
 </div>
 <div class="resumen">
     <div class="resumen-item"><span class="val">${total}</span><span class="lbl">Total Solicitudes</span></div>

@@ -461,7 +461,8 @@ class CrearSolicitudView(APIView):
 
                 gv.save(update_fields=['dias_gestion1', 'dias_gestion2', 'dias_gestion3', 'dias_gestion4'])
 
-        except Exception as e:
+        except Exception:
+            logger.exception('Error al registrar solicitud de vacación para funcionario %s', f.cod_funcionario)
             return Response(
                 {'error': 'Error al registrar la solicitud. Intente nuevamente.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -991,6 +992,7 @@ class RegistrarDecisionView(APIView):
                     solicitud.save(update_fields=['estado'])
 
         except Exception:
+            logger.exception('Error al registrar decisión de solicitud #%s', id_formulario)
             return Response(
                 {'error': 'Error al procesar la decisión. Intente nuevamente.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1479,6 +1481,7 @@ class RegistrarAnulacionView(APIView):
                     solicitud.save(update_fields=['estado'])
 
         except Exception:
+            logger.exception('Error al registrar anulación/ajuste de solicitud #%s', id_formulario)
             return Response(
                 {'error': 'Error al registrar la anulación. Intente nuevamente.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

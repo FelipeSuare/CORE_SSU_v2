@@ -6,14 +6,14 @@ from rest_framework.test import APITestCase
 from django.test import TestCase
 
 from core.models import Feriado
+from core.test_utils import hacer_usuario_y_funcionario
 
 
 class TestFeriadosListAPI(APITestCase):
     """GET /api/core/feriados/ — lista con filtros."""
 
     def setUp(self):
-        from django.contrib.auth.models import User
-        self.user = User.objects.create_user('rrhh_test', password='pass')
+        self.user, _ = hacer_usuario_y_funcionario(ci='rrhh_test', nombre='RRHH Test')
         self.client.force_login(self.user)
         self.url = reverse('feriados_lista')
 
@@ -25,9 +25,11 @@ class TestFeriadosListAPI(APITestCase):
         ])
 
     def test_requiere_autenticacion(self):
+        # El middleware ControlAccesoRoles intercepta antes que DRF y redirige
+        # al login (302) a cualquier usuario no autenticado, incluidas las APIs.
         self.client.logout()
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(r.status_code, status.HTTP_302_FOUND)
 
     def test_lista_todos_los_feriados(self):
         r = self.client.get(self.url)
@@ -64,11 +66,12 @@ class TestFeriadosListAPI(APITestCase):
 
 
 class TestFeriadosCreateAPI(APITestCase):
-    """POST /api/core/feriados/agregar/ — creación con validación."""
+    """POST /api/core/feriados/agregar/ — creación con validación (requiere rol RRHH)."""
 
     def setUp(self):
-        from django.contrib.auth.models import User
-        self.user = User.objects.create_user('rrhh_create', password='pass')
+        self.user, _ = hacer_usuario_y_funcionario(
+            ci='rrhh_create', nombre='RRHH Create', roles=['RRHH']
+        )
         self.client.force_login(self.user)
         self.url = reverse('feriados_agregar')
 
@@ -110,11 +113,12 @@ class TestFeriadosCreateAPI(APITestCase):
 
 
 class TestFeriadoEditAPI(APITestCase):
-    """POST /api/core/feriados/<id>/editar/ — edición."""
+    """POST /api/core/feriados/<id>/editar/ — edición (requiere rol RRHH)."""
 
     def setUp(self):
-        from django.contrib.auth.models import User
-        self.user = User.objects.create_user('rrhh_edit', password='pass')
+        self.user, _ = hacer_usuario_y_funcionario(
+            ci='rrhh_edit', nombre='RRHH Edit', roles=['RRHH']
+        )
         self.client.force_login(self.user)
         self.feriado = Feriado.objects.create(
             fecha=date(2024, 11, 2), descripcion='Día de Difuntos', tipo='Nacional'
@@ -151,11 +155,12 @@ class TestFeriadoEditAPI(APITestCase):
 
 
 class TestFeriadoDeleteAPI(APITestCase):
-    """POST /api/core/feriados/<id>/eliminar/ — baja."""
+    """POST /api/core/feriados/<id>/eliminar/ — baja (requiere rol RRHH)."""
 
     def setUp(self):
-        from django.contrib.auth.models import User
-        self.user = User.objects.create_user('rrhh_del', password='pass')
+        self.user, _ = hacer_usuario_y_funcionario(
+            ci='rrhh_del', nombre='RRHH Del', roles=['RRHH']
+        )
         self.client.force_login(self.user)
         self.feriado = Feriado.objects.create(
             fecha=date(2024, 9, 15), descripcion='Para eliminar', tipo='Institucional'

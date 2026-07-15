@@ -108,7 +108,7 @@ function renderizarTabla(lista) {
             : `<span class="antiguedad-badge">${f.antiguedad}</span>`;
         const colTipoBaja = esInactivo
             ? `<td>${f.tipo_baja
-                ? `<span class="role-badge-mini" style="background:${_colorTipoBaja(f.tipo_baja)}">${f.tipo_baja}</span>`
+                ? `<span class="role-badge-mini" style="background:${_colorTipoBaja(f.tipo_baja)}">${_escHtml(f.tipo_baja)}</span>`
                 : '<span style="color:#bbb;font-size:.85em">—</span>'}</td>`
             : '';
         const colPDF = esInactivo
@@ -120,12 +120,12 @@ function renderizarTabla(lista) {
             : '';
         return `
         <tr data-cod="${f.cod}" data-fecha-ingreso="${f.fecha_ingreso || ''}">
-            <td style="font-weight:700;color:var(--color-pink-dark)">${f.ci}</td>
+            <td style="font-weight:700;color:var(--color-pink-dark)">${_escHtml(f.ci)}</td>
             <td>
-                <div style="font-weight:700;color:var(--color-purple-dark)">${f.nombre} ${f.ap_paterno} ${f.ap_materno}</div>
-                <div style="font-size:0.82em;color:rgba(114,0,53,.75);margin-top:3px">${f.cargo}</div>
+                <div style="font-weight:700;color:var(--color-purple-dark)">${_escHtml(f.nombre)} ${_escHtml(f.ap_paterno)} ${_escHtml(f.ap_materno)}</div>
+                <div style="font-size:0.82em;color:rgba(114,0,53,.75);margin-top:3px">${_escHtml(f.cargo)}</div>
             </td>
-            <td>${f.unidad || '-'}</td>
+            <td>${_escHtml(f.unidad) || '-'}</td>
             <td>${fechaFmt}</td>
             <td>${col5}</td>
             <td>${etiquetaTipo(f.tipo_funcionario)}</td>
@@ -195,13 +195,16 @@ async function _fetchSugerencias(texto) {
                 </div>`;
         } else {
             dropdown.innerHTML = hits.map(f => `
-                <div class="sug-item" onclick="seleccionarSugerencia('${_escHtml(f.nombre_completo)}')">
+                <div class="sug-item" data-nombre="${_escHtml(f.nombre_completo)}">
                     <i class="material-symbols-outlined sug-icon">person</i>
                     <div>
                         <div class="sug-nombre">${_resaltar(_escHtml(f.nombre_completo), texto)}</div>
                         <div class="sug-ci">C.I. ${_resaltar(_escHtml(f.ci), texto)}</div>
                     </div>
                 </div>`).join('');
+            dropdown.querySelectorAll('.sug-item[data-nombre]').forEach(el => {
+                el.addEventListener('click', () => seleccionarSugerencia(el.dataset.nombre));
+            });
         }
         dropdown.style.display = 'block';
     } catch (err) {
@@ -522,7 +525,7 @@ async function actualizarJerarquia() {
             return `<option value="">${ph}</option><option value="" disabled style="color:#aaa">— Sin aprobadores disponibles —</option>`;
         }
         return `<option value="">${ph}</option>` +
-            lista.map(f => `<option value="${f.cod}">${f.nombre} — ${f.cargo}</option>`).join('');
+            lista.map(f => `<option value="${f.cod}">${_escHtml(f.nombre)} — ${_escHtml(f.cargo)}</option>`).join('');
     }
 
     function campo(labelBase, rolKey, icono, selId, niv) {
