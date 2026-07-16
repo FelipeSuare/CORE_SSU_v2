@@ -13,7 +13,7 @@
     margin-bottom: 28px;
 }
 .module-header { display: flex; align-items: center; gap: 14px; margin-bottom: 0; padding: 0; }
-.module-header i { font-size: 3.5em; color: var(--color-purple-dark); }
+.module-header > i { font-size: 4em; color: var(--color-purple-dark); }
 .module-subtitle { font-size: 0.82em; margin-top: 2px; opacity: 0.85; }
 
 /* ── FILTROS (compact) ── */
@@ -224,7 +224,7 @@ tbody tr:hover td { background: rgba(249,201,201,0.22); transition: background 0
 .historial-bloque-header .badge { background: rgba(114,0,53,0.1); color: var(--color-pink-dark); border-radius: 20px; padding: 2px 10px; font-weight: 600; font-size: 0.82em; }
 .historial-table-wrap { overflow-x: auto; }
 .historial-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 420px; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(39,20,71,0.07); margin-bottom: 6px; }
-.historial-table thead { background: #1e1e52; }
+.historial-table thead { background: var(--color-table-header-gradient); }
 .historial-table thead tr th:first-child { border-radius: 12px 0 0 0; }
 .historial-table thead tr th:last-child  { border-radius: 0 12px 0 0; }
 .historial-table thead th { padding: 10px 12px; color: #fff; font-size: 0.76em; text-transform: uppercase; text-align: center; font-weight: 600; letter-spacing: 0.3px; border-right: 1px solid rgba(255,255,255,0.12); }

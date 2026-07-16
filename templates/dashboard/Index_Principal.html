@@ -60,60 +60,79 @@
         </div>
 
         <ul class="sidebar-menu">
+            {% if 'perfil' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="Perfil.html" data-page="perfil-funcionario">
                     <i class="material-symbols-outlined">badge</i>
                     <span>Perfil Funcionario</span>
                 </a>
             </li>
+            {% endif %}
+            {% if 'contrasena' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="Contrasena.html" data-page="cambio-contrasena">
                     <i class="material-symbols-outlined">key</i>
                     <span>Cambio de Contraseña</span>
                 </a>
             </li>
+            {% endif %}
+            {% if 'funcionarios' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="Funcionarios.html" data-page="gestion-funcionarios">
                     <i class="material-symbols-outlined">groups</i>
                     <span>Gestión de Funcionarios</span>
                 </a>
             </li>
+            {% endif %}
+            {% if 'feriados' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="Feriados.html" data-page="gestion-feriados">
                     <i class="material-symbols-outlined">calendar_month</i>
                     <span>Gestión de Feriados</span>
                 </a>
             </li>
+            {% endif %}
+            {% if 'vacaciones' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="Vacaciones.html" data-page="solicitud-vacaciones">
                     <i class="material-symbols-outlined">beach_access</i>
                     <span>Solicitud de Vacación</span>
                 </a>
             </li>
+            {% endif %}
+            {% if 'aprobacion' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="Aprobacion.html" data-page="aprobacion-rechazo">
                     <i class="material-symbols-outlined">check_circle</i>
                     <span>Aprobación y/o Rechazo</span>
                 </a>
             </li>
+            {% endif %}
+            {% if 'formulario_vac' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="FormularioVac.html" data-page="formulario-solicitud">
                     <i class="material-symbols-outlined">edit_document</i>
                     <span>Historial Solicitud Vacación</span>
                 </a>
             </li>
+            {% endif %}
+            {% if 'solicitudes_rechazadas' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="SolicitudesRechazadas.html" data-page="solicitudes-rechazadas">
                     <i class="material-symbols-outlined">cancel</i>
                     <span>Solicitudes Rechazadas</span>
                 </a>
             </li>
+            {% endif %}
+            {% if 'anulacion' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="Anulacion.html" data-page="anulacion-ajuste">
                     <i class="material-symbols-outlined">undo</i>
                     <span>Anulación y Ajuste</span>
                 </a>
             </li>
+            {% endif %}
+            {% if 'reporte_p' in modulos_permitidos or 'reporte_g' in modulos_permitidos %}
             <li class="menu-item has-submenu">
                 <a href="#" class="submenu-toggle">
                     <i class="material-symbols-outlined">description</i>
@@ -121,22 +140,31 @@
                     <i class="material-symbols-outlined arrow">expand_more</i>
                 </a>
                 <ul class="submenu">
+                    {% if 'reporte_p' in modulos_permitidos %}
                     <li><a href="ReporteP.html" data-page="reporte-personal"><i class="material-symbols-outlined">person</i> Personal</a></li>
+                    {% endif %}
+                    {% if 'reporte_g' in modulos_permitidos %}
                     <li><a href="ReporteG.html" data-page="reporte-general"><i class="material-symbols-outlined">groups</i> General</a></li>
+                    {% endif %}
                 </ul>
             </li>
+            {% endif %}
+            {% if 'solicitudes' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="Solicitudes.html" data-page="solicitudes-anteriores">
                     <i class="material-symbols-outlined">history</i>
                     <span>Solicitudes Anteriores y Actuales</span>
                 </a>
             </li>
+            {% endif %}
+            {% if 'historial_cargos' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="HistorialCargos.html" data-page="historial-cargos">
                     <i class="material-symbols-outlined">work</i>
                     <span>Historial de Cargos Anteriores</span>
                 </a>
             </li>
+            {% endif %}
         </ul>
 
         <button class="btn-logout">

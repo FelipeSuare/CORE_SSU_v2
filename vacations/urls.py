@@ -26,4 +26,6 @@ urlpatterns = [
     # Alerta de gestiones a punto de perder días (RRHH)
     path('api/vacaciones/alerta-gestiones-riesgo/', api_views.AlertaGestionesPorPerderView.as_view(), name='vac_alerta_gestiones_riesgo'),
     path('api/vacaciones/alerta-poblar-hoy/',       api_views.AlertaPoblarHoyView.as_view(),           name='vac_alerta_poblar_hoy'),
+    # Alerta para Jefe de Area / Gerentes: gestiones vencidas de su gente a cargo
+    path('api/vacaciones/alerta-jefe-area/', api_views.AlertaGestionesJefeAreaView.as_view(), name='vac_alerta_jefe_area'),
 ]

@@ -328,34 +328,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const drawDocumentHeader = () => {
                 doc.addImage(logoData, 'PNG', marginX, 10, 16, 16);
-                doc.setTextColor(31, 36, 101);
+                doc.setTextColor(...PDF_THEME.navyHeaderText);
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(14);
                 doc.text('SEGURO SOCIAL UNIVERSITARIO', 28, 16);
                 doc.setFont('helvetica', 'normal');
-                doc.setTextColor(130, 130, 138);
+                doc.setTextColor(...PDF_THEME.grayLabel);
                 doc.setFontSize(9.5);
                 doc.text(areaLabel, 28, 22);
-                doc.setTextColor(126, 126, 132);
+                doc.setTextColor(...PDF_THEME.grayDate);
                 doc.setFont('helvetica', 'normal');
                 doc.setFontSize(9);
                 doc.text(fechaStr, pageWidth - marginX, 14, { align: 'right' });
-                doc.setDrawColor(31, 36, 101);
+                doc.setDrawColor(...PDF_THEME.navyHeaderText);
                 doc.setLineWidth(0.8);
                 doc.line(marginX, 30, pageWidth - marginX, 30);
 
-                doc.setTextColor(161, 24, 75);
+                doc.setTextColor(...PDF_THEME.pinkTitle);
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(18);
                 doc.text('REPORTE GENERAL', pageWidth / 2, 42, { align: 'center' });
 
-                doc.setTextColor(31, 36, 101);
+                doc.setTextColor(...PDF_THEME.navyHeaderText);
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(10.5);
                 doc.text(`Total funcionarios: ${datos.length}`, marginX, 48);
                 if (filtrosLabel) {
                     doc.setFont('helvetica', 'normal');
-                    doc.setTextColor(114, 0, 53);
+                    doc.setTextColor(...PDF_THEME.pinkAccent);
                     doc.setFontSize(9.5);
                     doc.text(filtrosLabel, marginX + 52, 48);
                 }
@@ -363,8 +363,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const drawTableHeader = (headerY, headerTopH, headerSubH) => {
                 let x = marginX;
-                const topHeaderFill = [217, 215, 234];
-                const border = [206, 210, 225];
+                const topHeaderFill = PDF_THEME.headerFill;
+                const border = PDF_THEME.headerBorder;
 
                 const baseHeaders = [
                     { key: 'num', label: 'Nº', width: fixedWidths.num },
@@ -382,7 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     doc.rect(x, headerY, col.width, headerTopH + headerSubH, 'FD');
                     doc.setFont('helvetica', 'bold');
                     doc.setFontSize(8.2);
-                    doc.setTextColor(43, 47, 109);
+                    doc.setTextColor(...PDF_THEME.headerText);
                     doc.text(col.label.split('\n'), x + col.width / 2, headerY + ((headerTopH + headerSubH) / 2), {
                         align: 'center',
                         baseline: 'middle',
@@ -397,7 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 doc.rect(x, headerY, gestWidthTotal, headerTopH, 'FD');
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(8.4);
-                doc.setTextColor(43, 47, 109);
+                doc.setTextColor(...PDF_THEME.headerText);
                 if (gestActivas.length > 1) {
                     doc.text('DÍAS PENDIENTES POR\nGESTIÓN', x + gestWidthTotal / 2, headerY + (headerTopH / 2), { align: 'center', baseline: 'middle' });
                     let gx = x;
@@ -445,19 +445,19 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             const drawRow = (row, y, index, rowStartY) => {
-                const fill = index % 2 === 0 ? [255, 255, 255] : [252, 247, 249];
-                const border = [228, 229, 237];
+                const fill = index % 2 === 0 ? PDF_THEME.rowFillOdd : PDF_THEME.rowFillEven;
+                const border = PDF_THEME.rowBorder;
 
                 const cellData = [
-                    { width: fixedWidths.num, text: String(row.idx), align: 'center', color: [153, 153, 153], bold: false, fontSize: 8.4 },
-                    { width: fixedWidths.nombre, text: row.nombre, align: 'left', color: [27, 37, 89], bold: true, fontSize: 8.2 },
-                    { width: fixedWidths.cargo, text: row.cargo, align: 'center', color: [55, 59, 94], bold: false, fontSize: 7.9 },
-                    { width: fixedWidths.fecha, text: row.fecha, align: 'center', color: [55, 59, 94], bold: false, fontSize: 8.4 },
-                    { width: fixedWidths.contrato, text: row.contrato, align: 'center', color: [55, 59, 94], bold: false, fontSize: 7.8 },
-                    { width: fixedWidths.unidad, text: row.unidad, align: 'center', color: [55, 59, 94], bold: false, fontSize: 8.1 },
-                    ...row.gestiones.map(dias => ({ width: gestWidth, text: dias > 0 ? fmt(dias) : '—', align: 'center', color: dias > 0 ? [27, 37, 89] : [187, 187, 187], bold: dias > 0, fontSize: 8.6 })),
-                    { width: fixedWidths.total, text: fmt(row.total), align: 'center', color: [114, 0, 53], bold: true, fontSize: 8.4 },
-                    ...(puedeVerDiasPerdidos ? [{ width: fixedWidths.perdidos, text: fmt(row.perdidos || 0), align: 'center', color: [114, 0, 53], bold: true, fontSize: 8.4 }] : []),
+                    { width: fixedWidths.num, text: String(row.idx), align: 'center', color: PDF_THEME.textMuted, bold: false, fontSize: 8.4 },
+                    { width: fixedWidths.nombre, text: row.nombre, align: 'left', color: PDF_THEME.textNavyStrong, bold: true, fontSize: 8.2 },
+                    { width: fixedWidths.cargo, text: row.cargo, align: 'center', color: PDF_THEME.textNavyMuted, bold: false, fontSize: 7.9 },
+                    { width: fixedWidths.fecha, text: row.fecha, align: 'center', color: PDF_THEME.textNavyMuted, bold: false, fontSize: 8.4 },
+                    { width: fixedWidths.contrato, text: row.contrato, align: 'center', color: PDF_THEME.textNavyMuted, bold: false, fontSize: 7.8 },
+                    { width: fixedWidths.unidad, text: row.unidad, align: 'center', color: PDF_THEME.textNavyMuted, bold: false, fontSize: 8.1 },
+                    ...row.gestiones.map(dias => ({ width: gestWidth, text: dias > 0 ? fmt(dias) : '—', align: 'center', color: dias > 0 ? PDF_THEME.textNavyStrong : [187, 187, 187], bold: dias > 0, fontSize: 8.6 })),
+                    { width: fixedWidths.total, text: fmt(row.total), align: 'center', color: PDF_THEME.pinkAccent, bold: true, fontSize: 8.4 },
+                    ...(puedeVerDiasPerdidos ? [{ width: fixedWidths.perdidos, text: fmt(row.perdidos || 0), align: 'center', color: PDF_THEME.pinkAccent, bold: true, fontSize: 8.4 }] : []),
                 ];
 
                 let rowHeight = 9;

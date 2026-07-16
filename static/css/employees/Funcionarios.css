@@ -231,7 +231,7 @@ tbody tr:hover { background: rgba(249,201,201,0.2); }
 .input-wrapper { background: rgba(255,255,255,0.6); border-radius: 15px; padding: 9px 14px; border: 1px solid var(--color-pink-dark); margin-bottom: 5px; }
 .input-icon { margin-right: 10px; color: var(--color-purple-dark); }
 
-.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.modal-grid { padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .form-group-full { grid-column: 1 / -1; }
 
 /* ── SELECTOR DE ROLES ── */

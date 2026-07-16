@@ -4,25 +4,26 @@
   <meta charset="UTF-8">
   <title>Reporte de Funcionarios — SSU UAB</title>
   <style>
-    body   { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #222; }
-    h1     { font-size: 16px; color: #271447; margin-bottom: 4px; }
-    .sub   { font-size: 11px; color: #666; margin-bottom: 4px; }
-    .filtros { font-size: 11px; color: #720035; font-weight: 600; margin-bottom: 12px; }
+    /* Paleta igual a la de los PDFs de Reporte Personal/General — ver static/js/reports/pdf-theme.js (PDF_THEME.html) */
+    body   { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #373b5e; }
+    h1     { font-size: 16px; color: #1b2559; margin-bottom: 4px; }
+    .sub   { font-size: 11px; color: #7e7e84; margin-bottom: 4px; }
+    .filtros { font-size: 11px; color: rgb(114,0,53); font-weight: 600; margin-bottom: 12px; }
     .acciones { display: flex; gap: 8px; margin-bottom: 14px; }
   .btn-volver {
-    padding: 6px 14px; cursor: pointer; background: #271447; color: #fff;
+    padding: 6px 14px; cursor: pointer; background: #1b2559; color: #fff;
     border: none; border-radius: 5px; font-size: 11px; font-family: Arial, sans-serif;
     display: inline-flex; align-items: center; gap: 5px;
   }
   .btn-print {
-    padding: 6px 14px; cursor: pointer; background: #720035; color: #fff;
+    padding: 6px 14px; cursor: pointer; background: rgb(114,0,53); color: #fff;
     border: none; border-radius: 5px; font-size: 11px; font-family: Arial, sans-serif;
     display: inline-flex; align-items: center; gap: 5px;
   }
   table  { width: 100%; border-collapse: collapse; table-layout: fixed; }
   thead  {
-    background: linear-gradient(90deg, #271447, #720035);
-    color: #fff;
+    background: #dde1f2;
+    color: #1b2559;
   }
   thead th {
     padding: 10px 8px;
@@ -38,7 +39,7 @@
   }
   td {
     padding: 6px 8px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid #eceefa;
     vertical-align: top;
     word-break: break-word;
     overflow-wrap: break-word;
@@ -64,7 +65,7 @@
   col.col-estado  { width: 5%; }
   col.col-baja    { width: 8%; }
 
-  tr:nth-child(even) td { background: #fdf0f0; }
+  tr:nth-child(even) td { background: #fdf3f7; }
   .activo   { color: #1a6b30; font-weight: 700; }
   .inactivo { color: #900;    font-weight: 700; }
 
@@ -154,6 +155,15 @@
     {% endfor %}
   </tbody>
 </table>
+
+<script>
+    // Al abrir esta pestaña (vista previa de exportación), va directo al
+    // diálogo de impresión/guardar PDF. Al cerrarse ese diálogo -ya sea
+    // imprimiendo o cancelando- el navegador dispara "afterprint" una sola
+    // vez en ambos casos, así que se usa para cerrar la pestaña sola.
+    window.onafterprint = () => window.close();
+    window.print();
+</script>
 
 </body>
 </html>

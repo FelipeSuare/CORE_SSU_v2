@@ -379,34 +379,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
         }).join('');
 
+        const T = PDF_THEME.html;
         descargarPDFDesdeHTML(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Montserrat',Arial,sans-serif;padding:36px 44px;font-size:10px;color:#333;background:#fff;}
-    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;padding-bottom:12px;border-bottom:2px solid #1b2559;}
-    .inst-nombre{font-size:13px;font-weight:700;color:#1b2559;text-transform:uppercase;line-height:1.6;}
-    .inst-fecha{font-size:10px;color:#777;text-align:right;line-height:1.6;}
+    body{font-family:'Montserrat',Arial,sans-serif;padding:36px 44px;font-size:10px;color:${T.textNavyMuted};background:#fff;}
+    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;padding-bottom:12px;border-bottom:2px solid ${T.navy};}
+    .inst-nombre{font-size:13px;font-weight:700;color:${T.navy};text-transform:uppercase;line-height:1.6;}
+    .inst-fecha{font-size:10px;color:${T.grayDate};text-align:right;line-height:1.6;}
     .titulo{text-align:center;margin-bottom:20px;}
-    .titulo h2{color:rgb(114,0,53);font-size:17px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+    .titulo h2{color:${T.pink};font-size:17px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
     .datos{display:grid;grid-template-columns:1fr 1fr;gap:6px 30px;background:#f4f5fb;border:1px solid #e3e5ef;border-radius:6px;padding:12px 18px;margin-bottom:20px;}
     .dato{display:flex;gap:6px;align-items:baseline;}
-    .dato-label{font-weight:700;color:rgb(114,0,53);font-size:9px;text-transform:uppercase;min-width:85px;}
-    .dato-valor{font-weight:600;color:#1b2559;font-size:10px;}
+    .dato-label{font-weight:700;color:${T.pink};font-size:9px;text-transform:uppercase;min-width:85px;}
+    .dato-valor{font-weight:600;color:${T.navy};font-size:10px;}
     .bloque{margin-bottom:16px;}
-    .bloque-header{background:#dde1f2;color:#1b2559;padding:7px 14px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between;font-weight:700;font-size:9.5px;}
+    .bloque-header{background:${T.headerFillLight};color:${T.navy};padding:7px 14px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between;font-weight:700;font-size:9.5px;}
     .bloque-header span:last-child{font-weight:400;opacity:0.7;}
     table{width:100%;border-collapse:collapse;font-size:9.5px;}
-    thead th{background:#dde1f2;color:#1b2559;padding:7px 10px;text-align:center;font-weight:700;text-transform:uppercase;border:1px solid #eceefa;}
-    td{padding:8px 10px;border:1px solid #eceefa;text-align:center;}
-    tbody tr:nth-child(even) td{background:#fdf3f7;}
+    thead th{background:${T.headerFillLight};color:${T.navy};padding:7px 10px;text-align:center;font-weight:700;text-transform:uppercase;border:1px solid ${T.borderLight};}
+    td{padding:8px 10px;border:1px solid ${T.borderLight};text-align:center;}
+    tbody tr:nth-child(even) td{background:${T.rowFillEven};}
 </style></head><body>
     <div class="inst-header">
         <div style="display:flex;align-items:center;gap:14px;">
             <img src="/static/img/login/LOGOSSU.png" style="height:54px;width:auto;">
             <div class="inst-nombre">SEGURO SOCIAL UNIVERSITARIO<br>
-                <span style="font-weight:400;font-size:10px;color:#888;letter-spacing:.5px">${areaLabel}</span>
+                <span style="font-weight:400;font-size:10px;color:${T.grayLabel};letter-spacing:.5px">${areaLabel}</span>
             </div>
         </div>
         <div class="inst-fecha">${fechaStr}</div>
@@ -417,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="dato"><span class="dato-label">Cargo:</span><span class="dato-valor">${esc(data.cargo)}</span></div>
         <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${data.fecha_ingreso}</span></div>
         <div class="dato"><span class="dato-label">Días disponibles:</span>
-            <span class="dato-valor" style="color:rgb(114,0,53)">${fmt(data.dias_adeudados)} días</span></div>
+            <span class="dato-valor" style="color:${T.pink}">${fmt(data.dias_adeudados)} días</span></div>
     </div>
     ${bloques}
 </body></html>`, `Historial_${_nombreArchivo(data.nombre_completo)}.pdf`, 'portrait');
@@ -428,10 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ══════════════════════════════════════════════
     async function generarActaPDF(f) {
         const hoy = new Date();
-        const dd = String(hoy.getDate()).padStart(2, '0');
-        const mm = String(hoy.getMonth() + 1).padStart(2, '0');
-        const yyyy = hoy.getFullYear();
-        const fechaStr = `TRINIDAD ${dd}/${mm}/${yyyy}`;
+        const fechaStr = `Trinidad, ${hoy.getDate()} de ${nombreMes(hoy.getMonth())} de ${hoy.getFullYear()}`;
 
         let gestionesReales = f.gestiones.filter(g => g.anio !== null && g.anio < hoy.getFullYear());
         if (gestionesReales.length === 0) {
@@ -460,24 +458,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Encabezado
             doc.addImage(logoData, 'PNG', left, top, 20, 20);
-            doc.setTextColor(31, 36, 101);
+            doc.setTextColor(...PDF_THEME.navyHeaderText);
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(16);
             doc.text('SEGURO SOCIAL UNIVERSITARIO', 34, 16);
             doc.setFont('helvetica', 'normal');
-            doc.setTextColor(138, 141, 152);
+            doc.setTextColor(...PDF_THEME.grayLabel);
             doc.setFontSize(10);
             doc.text(areaLabel, 34, 22);
             doc.setFont('helvetica', 'bold');
-            doc.setTextColor(126, 126, 132);
+            doc.setTextColor(...PDF_THEME.grayDate);
             doc.setFontSize(9.5);
             doc.text(fechaStr, pageWidth - right, 16, { align: 'right' });
-            doc.setDrawColor(31, 36, 101);
+            doc.setDrawColor(...PDF_THEME.navyHeaderText);
             doc.setLineWidth(0.8);
             doc.line(left, 31, pageWidth - right, 31);
 
             // Título
-            doc.setTextColor(161, 24, 75);
+            doc.setTextColor(...PDF_THEME.pinkTitle);
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(19);
             doc.text('VACACIONES PERSONAL', pageWidth / 2, 45, { align: 'center' });
@@ -515,13 +513,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let x = left;
             columns.forEach(col => {
-                doc.setFillColor(216, 216, 236);
-                doc.setDrawColor(203, 205, 226);
+                doc.setFillColor(...PDF_THEME.headerFill);
+                doc.setDrawColor(...PDF_THEME.headerBorder);
                 doc.setLineWidth(0.18);
-                doc.roundedRect(x, headerY, col.width, headerH, 2, 2, 'FD');
+                doc.rect(x, headerY, col.width, headerH, 'FD');
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(8.3);
-                doc.setTextColor(43, 47, 109);
+                doc.setTextColor(...PDF_THEME.headerText);
                 const headerLines = col.label.split('\n');
                 doc.text(headerLines, x + col.width / 2, headerY + (headerH / 2), {
                     align: 'center',
@@ -532,21 +530,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             x = left;
             columns.forEach((col, index) => {
-                doc.setFillColor(252, 247, 249);
-                doc.setDrawColor(223, 224, 238);
+                doc.setFillColor(...PDF_THEME.rowFillEven);
+                doc.setDrawColor(...PDF_THEME.rowBorder);
                 doc.setLineWidth(0.15);
-                doc.roundedRect(x, rowY, col.width, rowH, 2, 2, 'FD');
+                doc.rect(x, rowY, col.width, rowH, 'FD');
 
                 const value = rowValues[index];
                 if (value.type === 'total') {
                     doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(15);
-                    doc.setTextColor(161, 24, 75);
+                    doc.setFontSize(10.5);
+                    doc.setTextColor(...PDF_THEME.pinkAccent);
                     doc.text(value.text, x + col.width / 2, rowY + (rowH / 2), { align: 'center', baseline: 'middle' });
                 } else if (index === 0 || index === 1) {
                     doc.setFont('helvetica', index === 0 ? 'bold' : 'normal');
                     doc.setFontSize(index === 0 ? 9.8 : 9.2);
-                    doc.setTextColor(index === 0 ? 31 : 57, index === 0 ? 36 : 65, index === 0 ? 101 : 109);
+                    doc.setTextColor(...(index === 0 ? PDF_THEME.textNavyStrong : PDF_THEME.textNavyMuted));
                     const lines = doc.splitTextToSize(value.text, col.width - 4);
                     const textY = rowY + (rowH / 2) - (lines.length > 1 ? 1.5 : 0.2);
                     doc.text(lines, index === 0 ? x + 2.5 : x + col.width / 2, textY, {
@@ -556,7 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (index === 2 || index >= 3) {
                     doc.setFont('helvetica', 'normal');
                     doc.setFontSize(9.1);
-                    doc.setTextColor(50, 60, 110);
+                    doc.setTextColor(...PDF_THEME.textNavyMuted);
                     doc.text(value.text, x + col.width / 2, rowY + (rowH / 2), { align: 'center', baseline: 'middle' });
                 }
                 x += col.width;
@@ -576,20 +574,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const leftSigX = 22;
             const rightSigX = pageWidth - 22 - sigWidth;
 
-            doc.setDrawColor(161, 24, 75);
+            doc.setDrawColor(...PDF_THEME.pinkTitle);
             doc.setLineWidth(0.45);
             doc.line(leftSigX, lineY, leftSigX + sigWidth, lineY);
             doc.line(rightSigX, lineY, rightSigX + sigWidth, lineY);
 
-            doc.setTextColor(31, 36, 101);
+            doc.setTextColor(...PDF_THEME.navyHeaderText);
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(10.2);
             doc.text(firmaRRHH || 'Encargada de RR.HH.', leftSigX + sigWidth / 2, lineY + 9, { align: 'center' });
-            doc.setTextColor(161, 24, 75);
+            doc.setTextColor(...PDF_THEME.pinkTitle);
             doc.setFontSize(9.5);
             doc.text('ENCARGADA DE RR.HH', leftSigX + sigWidth / 2, lineY + 14, { align: 'center' });
 
-            doc.setTextColor(31, 36, 101);
+            doc.setTextColor(...PDF_THEME.navyHeaderText);
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(10.2);
             doc.text(f.nombre_firma, rightSigX + sigWidth / 2, lineY + 9, { align: 'center' });

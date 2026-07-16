@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from core.models import UnidadOrganizacional
-from core.api_permissions import NoCambioPendiente, EsRRHH, EsFuncionarioActivo, EsAuditoria
+from core.api_permissions import NoCambioPendiente, EsRRHH, EsFuncionarioActivo, TieneRol
 from employees.models import Persona, Funcionario, HistorialCargo
 from accounts.models import Roles, FuncionarioRol
 from vacations.models import GestionVacacion, JerarquiaAprobacion
@@ -614,7 +614,7 @@ class BuscarFuncionariosView(APIView):
 
 
 class HistorialCargosView(APIView):
-    permission_classes = [NoCambioPendiente, EsAuditoria]
+    permission_classes = [NoCambioPendiente, TieneRol.para({'Administrador', 'Auditoria'})]
 
     def get(self, request, cod):
         from core.roles import obtener_roles

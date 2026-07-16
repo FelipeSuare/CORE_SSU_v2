@@ -341,3 +341,73 @@ function cerrarWidgetAlerta(id) {
 }
 
 document.addEventListener('DOMContentLoaded', verificarAlertasVacaciones);
+
+// ── Alertas para Jefe de Area / Gerentes (aprobadores): su gente a cargo ──
+// (1) Solicitudes de vacación pendientes de su aprobación
+// (2) Gestiones vencidas/por vencer de sus subordinados
+async function verificarAlertasJefeArea() {
+    try {
+        const [resPendientes, resGestiones] = await Promise.all([
+            fetch('/api/vacaciones/para-aprobar/'),
+            fetch('/api/vacaciones/alerta-jefe-area/'),
+        ]);
+
+        // 403 / sin rol de aprobador = ignorar silenciosamente
+        if (resPendientes.ok) {
+            const data = await resPendientes.json();
+            const pendientes = (data.solicitudes || []).filter(s => s.puede_actuar);
+            if (pendientes.length) mostrarAlertaSolicitudesPendientes(pendientes);
+        }
+
+        if (resGestiones.ok) {
+            const gestiones = (await resGestiones.json()).funcionarios || [];
+            if (gestiones.length) mostrarAlertaGestionesEquipo(gestiones);
+        }
+    } catch (_) {}
+}
+
+function mostrarAlertaSolicitudesPendientes(solicitudes) {
+    const filas = solicitudes.map(s => `
+        <tr data-cod="${_esc(s.cod_funcionario)}">
+            <td>${_esc(s.funcionario)}</td>
+            <td>${_esc(s.cargo)}</td>
+            <td>${_esc(s.fecha_solicitud)}</td>
+            <td>${s.dias} días</td>
+        </tr>`);
+
+    crearWidgetAlerta({
+        id:            'alertaSolicitudesPendientes',
+        offsetTop:     '80px',
+        titulo:        'Solicitudes de vacación pendientes de tu aprobación',
+        subtitulo:     'Funcionarios a tu cargo con una solicitud de vacación esperando tu decisión.',
+        headers:       ['Funcionario', 'Cargo', 'Fecha Solicitud', 'Días'],
+        filas,
+        contadorLabel: ' solicitudes esperando tu aprobación',
+    });
+}
+
+function mostrarAlertaGestionesEquipo(funcionarios) {
+    const filas = funcionarios.map(f => `
+        <tr data-cod="${_esc(f.cod)}">
+            <td>${_esc(f.nombre)}</td>
+            <td>${_esc(String(f.ci))}</td>
+            <td>${_esc(String(f.anio_en_riesgo))}</td>
+            <td><span class="alerta-dias">${f.dias} días</span></td>
+            <td>
+                <span class="alerta-fecha-limite${f.vencido ? ' alerta-fecha-vencida' : ''}">${_esc(f.fecha_limite)}</span>
+                ${f.vencido ? '<span class="alerta-badge-vencido">VENCIDO</span>' : ''}
+            </td>
+        </tr>`);
+
+    crearWidgetAlerta({
+        id:            'alertaGestionesEquipo',
+        offsetTop:     '160px',
+        titulo:        'Tu equipo: a punto de perder días de vacación',
+        subtitulo:     'Funcionarios a tu cargo que ya tienen sus 2 gestiones acumuladas y una nueva por acreditar: al acreditarla, la gestión más antigua se pierde en la fecha límite indicada.',
+        headers:       ['Funcionario', 'C.I.', 'Gestión en Riesgo', 'Días en Riesgo', 'Fecha Límite'],
+        filas,
+        contadorLabel: ' de tu equipo a punto de perder días',
+    });
+}
+
+document.addEventListener('DOMContentLoaded', verificarAlertasJefeArea);

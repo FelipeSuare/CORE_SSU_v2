@@ -213,7 +213,8 @@ async function _fetchSugerencias(texto) {
 }
 
 function seleccionarSugerencia(nombreCompleto) {
-    document.getElementById('searchInput').value = nombreCompleto;
+    clearTimeout(_debounceTimer);
+    document.getElementById('searchInput').value = '';
     cerrarDropdown();
     cargarTabla(nombreCompleto);
 }

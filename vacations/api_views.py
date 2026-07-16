@@ -1649,16 +1649,86 @@ def _sumar_meses(fecha, meses):
     return date(anio, mes, dia)
 
 
+def _calcular_alertas_gestiones_vencidas(funcionarios, hoy=None):
+    """
+    Funcionarios (de la lista/queryset dada) que ya tienen sus 2 gestiones
+    activas ocupadas (tope actual) y además ya son elegibles -o lo serán
+    dentro de _ANTICIPO_RIESGO_MESES, según su antigüedad- para una gestión
+    adicional que todavía no fue acreditada. La próxima acreditación
+    (automática vía 'poblar_vacaciones' o manual por RRHH) evictará su
+    gestión más antigua a días perdidos.
+
+    Compartida por AlertaGestionesPorPerderView (alcance RRHH: todos los
+    funcionarios) y AlertaGestionesJefeAreaView (alcance acotado a los
+    subordinados de un Jefe de Area vía JerarquiaAprobacion).
+    """
+    hoy       = hoy or date.today()
+    horizonte = _sumar_meses(hoy, _ANTICIPO_RIESGO_MESES)
+
+    gestiones_map = {
+        gv.cod_funcionario_id: gv
+        for gv in GestionVacacion.objects.filter(cod_funcionario__in=funcionarios)
+    }
+
+    alertas = []
+    for f in funcionarios:
+        gv = gestiones_map.get(f.cod_funcionario)
+        if not gv:
+            continue
+
+        ocupados = [
+            (i, getattr(gv, f'anio_gestion{i}'), getattr(gv, f'dias_gestion{i}'))
+            for i in range(1, 5)
+            if getattr(gv, f'anio_gestion{i}') is not None
+        ]
+        if len(ocupados) < LIMITE_GESTIONES_ACTIVAS:
+            continue
+
+        # Se simula "dentro de _ANTICIPO_RIESGO_MESES" para detectar el
+        # riesgo con antelación, no solo el día exacto del aniversario.
+        esperadas = calcular_gestioneS_pendientes(f.fecha_ingreso, horizonte)
+        if not esperadas:
+            continue
+        anio_mas_reciente_esperado = esperadas[-1][1]  # última tupla = más reciente
+        anios_actuales = {anio for _, anio, _ in ocupados}
+        if anio_mas_reciente_esperado in anios_actuales:
+            continue  # ya está al día, no hay gestión nueva pendiente de acreditar
+
+        # Fecha límite: el aniversario exacto en que se vuelve elegible
+        # para la gestión nueva -y por lo tanto el día desde el cual una
+        # acreditación evictaría la gestión más antigua-.
+        try:
+            fecha_limite = f.fecha_ingreso.replace(year=anio_mas_reciente_esperado)
+        except ValueError:
+            fecha_limite = date(anio_mas_reciente_esperado, 3, 1)
+
+        ocupados.sort(key=lambda t: t[1])  # año ascendente = más antigua primero
+        _, anio_riesgo, dias_riesgo = ocupados[0]
+
+        p = f.ci
+        alertas.append({
+            'nombre':          f"{p.nombre} {p.ap_paterno} {p.ap_materno or ''}".strip(),
+            'ci':              p.ci,
+            'cod':             f.cod_funcionario,
+            'unidad':          f.id_unidad.nombre if f.id_unidad else '—',
+            'anio_en_riesgo':  anio_riesgo,
+            'dias':            float(dias_riesgo or 0),
+            'fecha_limite':    fecha_limite.strftime('%d/%m/%Y'),
+            'vencido':         fecha_limite < hoy,
+            '_fecha_limite_dt': fecha_limite,
+        })
+
+    alertas.sort(key=lambda a: a['_fecha_limite_dt'])
+    for a in alertas:
+        del a['_fecha_limite_dt']
+
+    return alertas
+
+
 class AlertaGestionesPorPerderView(APIView):
     """
-    Funcionarios que ya tienen sus 2 gestiones activas ocupadas (tope actual)
-    y además ya son elegibles -o lo serán dentro de _ANTICIPO_RIESGO_MESES,
-    según su antigüedad- para una gestión adicional que todavía no fue
-    acreditada. La próxima acreditación (automática vía 'poblar_vacaciones' o
-    manual por RRHH) evictará su gestión más antigua a días perdidos, así que
-    se alerta a RRHH con antelación -incluyendo la fecha límite exacta- para
-    que le pida solicitar vacaciones antes de que eso ocurra. Solo
-    RRHH/Administrador.
+    Alerta de gestiones por vencer para RRHH, a nivel de todos los
+    funcionarios activos. Solo RRHH/Administrador.
     """
     permission_classes = [NoCambioPendiente, EsRRHH]
 
@@ -1667,68 +1737,39 @@ class AlertaGestionesPorPerderView(APIView):
         if not tiene_acceso:
             return Response({'error': 'Sin acceso.'}, status=status.HTTP_403_FORBIDDEN)
 
-        hoy       = date.today()
-        horizonte = _sumar_meses(hoy, _ANTICIPO_RIESGO_MESES)
-
         funcionarios = Funcionario.objects.filter(estado='ACTIVO').select_related('ci', 'id_unidad')
-        gestiones_map = {
-            gv.cod_funcionario_id: gv
-            for gv in GestionVacacion.objects.filter(cod_funcionario__in=funcionarios)
-        }
+        return Response({'funcionarios': _calcular_alertas_gestiones_vencidas(funcionarios)})
 
-        alertas = []
-        for f in funcionarios:
-            gv = gestiones_map.get(f.cod_funcionario)
-            if not gv:
-                continue
 
-            ocupados = [
-                (i, getattr(gv, f'anio_gestion{i}'), getattr(gv, f'dias_gestion{i}'))
-                for i in range(1, 5)
-                if getattr(gv, f'anio_gestion{i}') is not None
-            ]
-            if len(ocupados) < LIMITE_GESTIONES_ACTIVAS:
-                continue
+class AlertaGestionesJefeAreaView(APIView):
+    """
+    Misma alerta que AlertaGestionesPorPerderView, pero acotada a los
+    subordinados del aprobador autenticado (vía JerarquiaAprobacion activa),
+    para que un Jefe de Area/Gerente vea solo a su gente a cargo.
+    """
+    permission_classes = [NoCambioPendiente, EsAprobador]
 
-            # Se simula "dentro de _ANTICIPO_RIESGO_MESES" para detectar el
-            # riesgo con antelación, no solo el día exacto del aniversario.
-            esperadas = calcular_gestioneS_pendientes(f.fecha_ingreso, horizonte)
-            if not esperadas:
-                continue
-            anio_mas_reciente_esperado = esperadas[-1][1]  # última tupla = más reciente
-            anios_actuales = {anio for _, anio, _ in ocupados}
-            if anio_mas_reciente_esperado in anios_actuales:
-                continue  # ya está al día, no hay gestión nueva pendiente de acreditar
+    def get(self, request):
+        try:
+            aprobador = _get_funcionario(request)
+        except Funcionario.DoesNotExist:
+            return Response({'error': 'Funcionario no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
-            # Fecha límite: el aniversario exacto en que se vuelve elegible
-            # para la gestión nueva -y por lo tanto el día desde el cual una
-            # acreditación evictaría la gestión más antigua-.
-            try:
-                fecha_limite = f.fecha_ingreso.replace(year=anio_mas_reciente_esperado)
-            except ValueError:
-                fecha_limite = date(anio_mas_reciente_esperado, 3, 1)
+        roles = set(FuncionarioRol.objects.filter(
+            cod_funcionario=aprobador, activo=True
+        ).values_list('id_roles__tipo_rol', flat=True))
+        if not (roles & _ROLES_APROBADOR):
+            return Response({'funcionarios': []})
 
-            ocupados.sort(key=lambda t: t[1])  # año ascendente = más antigua primero
-            _, anio_riesgo, dias_riesgo = ocupados[0]
+        cod_subordinados = JerarquiaAprobacion.objects.filter(
+            cod_aprobador=aprobador, activo=True
+        ).values_list('cod_funcionario_id', flat=True)
 
-            p = f.ci
-            alertas.append({
-                'nombre':          f"{p.nombre} {p.ap_paterno} {p.ap_materno or ''}".strip(),
-                'ci':              p.ci,
-                'cod':             f.cod_funcionario,
-                'unidad':          f.id_unidad.nombre if f.id_unidad else '—',
-                'anio_en_riesgo':  anio_riesgo,
-                'dias':            float(dias_riesgo or 0),
-                'fecha_limite':    fecha_limite.strftime('%d/%m/%Y'),
-                'vencido':         fecha_limite < hoy,
-                '_fecha_limite_dt': fecha_limite,
-            })
+        subordinados = Funcionario.objects.filter(
+            estado='ACTIVO', cod_funcionario__in=cod_subordinados
+        ).select_related('ci', 'id_unidad')
 
-        alertas.sort(key=lambda a: a['_fecha_limite_dt'])
-        for a in alertas:
-            del a['_fecha_limite_dt']
-
-        return Response({'funcionarios': alertas})
+        return Response({'funcionarios': _calcular_alertas_gestiones_vencidas(subordinados)})
 
 
 # ══════════════════════════════════════════════════════════════════════════════

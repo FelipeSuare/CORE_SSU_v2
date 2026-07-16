@@ -92,6 +92,7 @@ function buscarFuncionarioManual() {
 }
 
 async function seleccionarFuncionario(cod) {
+    clearTimeout(_debounceTimer);
     document.getElementById('sugerenciasDropdown').style.display = 'none';
     await cargarFuncionario(cod);
 }
