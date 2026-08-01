@@ -1,10 +1,12 @@
 from datetime import date
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 
 from core.roles import obtener_roles
 from employees.api_views import _serializar_funcionario
 from employees.models import Funcionario
+from reports.api_views import _area_label_usuario
 
 _ROLES_EMPLOYEES = frozenset({'RRHH', 'Administrador'})
 _ROLES_HISTORIAL = frozenset({'Administrador', 'Auditoria'})
@@ -30,7 +32,7 @@ def historial_cargos_view(request):
 def exportar_funcionarios(request):
     roles = obtener_roles(request.user.username)
     if not (roles & _ROLES_EMPLOYEES):
-        return render(request, 'shared/sin_acceso.html', status=403)
+        return JsonResponse({'error': 'No tiene permisos para exportar funcionarios.'}, status=403)
 
     unidad = request.GET.get('unidad', '').strip()
     cargo  = request.GET.get('cargo', '').strip().lower()
@@ -58,8 +60,9 @@ def exportar_funcionarios(request):
     if estado in ('ACTIVO', 'INACTIVO'):
         filtros.append(f'Estado: {estado.capitalize()}')
 
-    return render(request, 'employees/ExportarFuncionarios.html', {
+    return JsonResponse({
         'funcionarios': filas,
         'fecha':        date.today().strftime('%d/%m/%Y'),
         'filtros':      filtros,
+        'area_label':   _area_label_usuario(roles),
     })

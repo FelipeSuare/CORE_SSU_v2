@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="{% staticv 'css/shared/profile-switcher.css' %}">
     <link rel="stylesheet" href="{% staticv 'css/employees/Funcionarios.css' %}">
     <link rel="stylesheet" href="{% staticv 'css/shared/notifications.css' %}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -256,7 +257,7 @@
             <div class="form-actions" style="margin-top:18px">
                 <button type="button" class="btn btn-cancel" onclick="cerrarModalExportar()">Cancelar</button>
                 <button type="button" class="btn btn-primary" onclick="confirmarExportar()">
-                    <i class="material-symbols-outlined">open_in_new</i> Exportar
+                    <i class="material-symbols-outlined">download</i> Exportar
                 </button>
             </div>
         </div>
@@ -326,6 +327,7 @@
         </div>
     </div>
 
+    <script src="{% staticv 'js/reports/pdf-theme.js' %}"></script>
     <script src="{% staticv 'js/employees/Funcionarios.js' %}"></script>
     <script src="{% staticv 'js/shared/profile-switcher.js' %}"></script>
     <script src="{% staticv 'js/shared/notifications.js' %}"></script>

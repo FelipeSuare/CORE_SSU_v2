@@ -362,7 +362,7 @@ function cerrarModalExportar() {
     }, 300);
 }
 
-function confirmarExportar() {
+async function confirmarExportar() {
     const unidad = document.getElementById('exportUnidad').value;
     const estado = document.getElementById('exportEstado').value;
     const cargo  = document.getElementById('exportCargo').value.trim();
@@ -373,8 +373,222 @@ function confirmarExportar() {
     if (cargo)  params.set('cargo',  cargo);
 
     const url = params.toString() ? `${URL_EXPORTAR}?${params}` : URL_EXPORTAR;
-    window.open(url, '_blank');
     cerrarModalExportar();
+
+    try {
+        const resp = await fetch(url, { headers: { 'X-CSRFToken': CSRF } });
+        const data = await resp.json();
+        if (data.error) {
+            AppDialog.alert(data.error, { title: 'Error', icon: 'error' });
+            return;
+        }
+        await generarFuncionariosPDF(data);
+    } catch (e) {
+        console.error('Error exportando funcionarios:', e);
+        AppDialog.alert('No se pudo generar el PDF. Intente nuevamente.', { title: 'Error', icon: 'wifi_off' });
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PDF: LISTADO DE FUNCIONARIOS
+// ═══════════════════════════════════════════════════════════════
+async function generarFuncionariosPDF(data) {
+    const funcionarios = data.funcionarios || [];
+    const areaLabel    = data.area_label || 'RECURSOS HUMANOS';
+    const filtrosLabel = (data.filtros || []).join('  ·  ');
+
+    const jsPDFCtor = window.jspdf?.jsPDF || window.jsPDF;
+    if (!jsPDFCtor) {
+        AppDialog.alert('No se pudo generar el PDF porque no está disponible el motor de exportación.', { title: 'Error', icon: 'error' });
+        return;
+    }
+
+    const hoy      = new Date();
+    const fechaStr = `Trinidad, ${hoy.getDate()} de ${_nombreMes(hoy.getMonth())} de ${hoy.getFullYear()}`;
+
+    const doc = new jsPDFCtor({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageWidth   = doc.internal.pageSize.getWidth();
+    const pageHeight  = doc.internal.pageSize.getHeight();
+    const marginX     = 10;
+    const contentWidth = pageWidth - (marginX * 2);
+
+    let logoData = null;
+    try {
+        logoData = await _cargarImagenBase64('/static/img/login/LOGOSSU.png');
+    } catch (e) {
+        console.error('No se pudo cargar el logo institucional:', e);
+    }
+
+    const columnas = [
+        { key: 'n',        label: 'N°',                    pct: 3,  align: 'center' },
+        { key: 'ci',       label: 'CI',                     pct: 7,  align: 'center' },
+        { key: 'nombre',   label: 'NOMBRES',                pct: 14, align: 'left'   },
+        { key: 'cargo',    label: 'CARGO',                  pct: 13, align: 'left'   },
+        { key: 'unidad',   label: 'UNIDAD',                 pct: 9,  align: 'center' },
+        { key: 'contrato', label: 'CONTRATO',                pct: 8,  align: 'center' },
+        { key: 'ingreso',  label: 'INGRESO',                pct: 7,  align: 'center' },
+        { key: 'antig',    label: 'ANTIGÜEDAD',             pct: 7,  align: 'center' },
+        { key: 'tipo',     label: 'TIPO',                   pct: 8,  align: 'center' },
+        { key: 'roles',    label: 'ROLES',                  pct: 12, align: 'left'   },
+        { key: 'estado',   label: 'ESTADO',                 pct: 6,  align: 'center' },
+        { key: 'baja',     label: 'FECHA BAJA',             pct: 6,  align: 'center' },
+    ];
+    const sumPct = columnas.reduce((acc, c) => acc + c.pct, 0);
+    columnas.forEach(c => { c.width = contentWidth * (c.pct / sumPct); });
+
+    const rows = funcionarios.map((f, idx) => ({
+        n:        String(idx + 1),
+        ci:       f.ci,
+        nombre:   `${f.nombre} ${f.ap_paterno} ${f.ap_materno || ''}`.trim(),
+        cargo:    f.cargo,
+        unidad:   f.unidad,
+        contrato: f.tipo_contrato,
+        ingreso:  f.fecha_ingreso,
+        antig:    f.antiguedad,
+        tipo:     f.tipo_funcionario,
+        roles:    (f.roles || []).join(', '),
+        estado:   f.estado,
+        baja:     f.fecha_baja || '—',
+        _activo:  f.estado === 'ACTIVO',
+    }));
+
+    const headerTopY = 10;
+    const titleY     = 42;
+    const tableTopY  = 54;
+    const headerRowH = 13;
+
+    const dibujarEncabezadoDocumento = () => {
+        if (logoData) doc.addImage(logoData, 'PNG', marginX, headerTopY, 16, 16);
+        doc.setTextColor(...PDF_THEME.navyHeaderText);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('SEGURO SOCIAL UNIVERSITARIO', marginX + 18, headerTopY + 6);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...PDF_THEME.grayLabel);
+        doc.setFontSize(9.5);
+        doc.text(areaLabel, marginX + 18, headerTopY + 12);
+        doc.setTextColor(...PDF_THEME.grayDate);
+        doc.setFontSize(9);
+        doc.text(fechaStr, pageWidth - marginX, headerTopY + 4, { align: 'right' });
+        doc.setDrawColor(...PDF_THEME.navyHeaderText);
+        doc.setLineWidth(0.8);
+        doc.line(marginX, headerTopY + 20, pageWidth - marginX, headerTopY + 20);
+
+        doc.setTextColor(...PDF_THEME.pinkTitle);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.text('REPORTE DE FUNCIONARIOS', pageWidth / 2, titleY, { align: 'center' });
+
+        doc.setTextColor(...PDF_THEME.navyHeaderText);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        doc.text(`Total funcionarios: ${funcionarios.length}`, marginX, titleY + 6);
+        if (filtrosLabel) {
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...PDF_THEME.pinkAccent);
+            doc.setFontSize(9.5);
+            doc.text(`Filtros: ${filtrosLabel}`, marginX + 55, titleY + 6);
+        }
+    };
+
+    const dibujarEncabezadoTabla = (y) => {
+        let x = marginX;
+        columnas.forEach(col => {
+            doc.setFillColor(...PDF_THEME.headerFill);
+            doc.setDrawColor(...PDF_THEME.headerBorder);
+            doc.setLineWidth(0.2);
+            doc.rect(x, y, col.width, headerRowH, 'FD');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(7.6);
+            doc.setTextColor(...PDF_THEME.headerText);
+            doc.text(col.label, x + col.width / 2, y + headerRowH / 2, { align: 'center', baseline: 'middle' });
+            x += col.width;
+        });
+        return y + headerRowH;
+    };
+
+    const dibujarFila = (row, y, index) => {
+        const fill = index % 2 === 0 ? PDF_THEME.rowFillOdd : PDF_THEME.rowFillEven;
+
+        let rowHeight = 7.5;
+        columnas.forEach(col => {
+            doc.setFont('helvetica', col.key === 'nombre' ? 'bold' : 'normal');
+            doc.setFontSize(7.6);
+            const lines = doc.splitTextToSize(String(row[col.key] ?? ''), col.width - 3);
+            rowHeight = Math.max(rowHeight, (lines.length * 3.1) + 3.5);
+        });
+
+        if (y + rowHeight > pageHeight - 12) {
+            doc.addPage();
+            y = tableTopY - headerRowH;
+            y = dibujarEncabezadoTabla(y);
+        }
+
+        let x = marginX;
+        columnas.forEach(col => {
+            doc.setFillColor(...fill);
+            doc.setDrawColor(...PDF_THEME.rowBorder);
+            doc.setLineWidth(0.15);
+            doc.rect(x, y, col.width, rowHeight, 'FD');
+
+            let color = PDF_THEME.textNavyMuted;
+            if (col.key === 'nombre') color = PDF_THEME.textNavyStrong;
+            if (col.key === 'estado') color = row._activo ? [26, 107, 48] : [153, 0, 0];
+
+            doc.setFont('helvetica', col.key === 'nombre' || col.key === 'estado' ? 'bold' : 'normal');
+            doc.setFontSize(7.6);
+            doc.setTextColor(...color);
+            const lines = doc.splitTextToSize(String(row[col.key] ?? ''), col.width - 3);
+            const lineHeight  = 3.1;
+            const blockHeight = lines.length * lineHeight;
+            const startY = y + ((rowHeight - blockHeight) / 2) + lineHeight - 0.6;
+            doc.text(lines, col.align === 'left' ? x + 1.8 : x + col.width / 2, startY, {
+                align: col.align,
+                baseline: 'middle',
+            });
+            x += col.width;
+        });
+
+        return y + rowHeight;
+    };
+
+    dibujarEncabezadoDocumento();
+    let currentY = dibujarEncabezadoTabla(tableTopY);
+
+    if (rows.length === 0) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(10);
+        doc.setTextColor(...PDF_THEME.textMuted);
+        doc.text('No se encontraron funcionarios con los filtros seleccionados.', pageWidth / 2, currentY + 14, { align: 'center' });
+    } else {
+        rows.forEach((row, index) => {
+            currentY = dibujarFila(row, currentY, index);
+        });
+    }
+
+    const dd   = String(hoy.getDate()).padStart(2, '0');
+    const mm   = String(hoy.getMonth() + 1).padStart(2, '0');
+    const yyyy = hoy.getFullYear();
+    doc.save(`Reporte_Funcionarios_${dd}-${mm}-${yyyy}.pdf`);
+}
+
+async function _cargarImagenBase64(url) {
+    const resp = await fetch(url, { cache: 'no-store' });
+    if (!resp.ok) {
+        throw new Error(`No se pudo cargar la imagen: ${url}`);
+    }
+    const blob = await resp.blob();
+    return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+function _nombreMes(n) {
+    return ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][n];
 }
 
 // ═══════════════════════════════════════════════════════════════
