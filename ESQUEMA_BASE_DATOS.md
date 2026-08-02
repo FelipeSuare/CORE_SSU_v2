@@ -11,7 +11,6 @@ con migraciones propias es `intentos_acceso`.
 - [App `accounts`](#app-accounts)
 - [App `vacations`](#app-vacations)
 - [Tablas estándar de Django / DRF](#tablas-estándar-de-django--drf)
-- [Tablas sin modelo Django (huérfanas)](#tablas-sin-modelo-django-huérfanas)
 - [Diferencias entre v1 y v2](#diferencias-entre-v1-y-v2)
 
 ---
@@ -104,7 +103,7 @@ Modelo: `employees.HistorialCargo`. Historial de cargos/contratos de un funciona
 ## App `accounts`
 
 ### `roles`
-Modelo: `accounts.Roles` (⚠️ el nombre de la clase es `Roles` pero apunta a la tabla `roles` — no confundir con las tablas huérfanas `accounts_role` / `accounts_userrole`, ver más abajo). Catálogo de roles funcionales (RRHH, Administrador, Auditoría, Jefe de Área, etc.).
+Modelo: `accounts.Roles` (⚠️ el nombre de la clase es `Roles` pero apunta a la tabla `roles`). Catálogo de roles funcionales (RRHH, Administrador, Auditoría, Jefe de Área, etc.).
 
 | Columna | Tipo | Null | Default | Descripción |
 |---|---|---|---|---|
@@ -206,18 +205,6 @@ No son específicas del dominio, las gestiona 100% el framework: `auth_user`, `a
 `auth_user.username` se hace coincidir con el CI del funcionario para poder iniciar sesión (ver patrón
 de autenticación del proyecto); el resto de estas tablas se usa de forma estándar y no tiene lógica de
 negocio propia.
-
-## Tablas sin modelo Django (huérfanas)
-`accounts_role` y `accounts_userrole` existen físicamente en la base de datos:
-
-- `accounts_role`: `id`, `nombre`, `descripcion`, `activo`, `fecha_creacion`, `fecha_actualizacion`.
-- `accounts_userrole`: `id`, `fecha_asignacion`, `rol_id` (FK → `accounts_role`), `usuario_id` (FK → `auth_user`, único).
-
-**Ningún modelo, vista, migración ni código actual las referencia** (verificado con búsqueda en todo el
-repositorio). Todo indica que son un remanente de una implementación de roles anterior, basada en
-`auth_user` en vez de en `Funcionario`/`cod_funcionario` (el patrón que terminó usando el sistema, con
-las tablas `roles` y `funcionario_rol` de arriba). No asumir que están en uso — confirmar con quien las
-haya creado antes de modificarlas, migrarles datos o borrarlas.
 
 ## Diferencias entre v1 y v2
 `CORE_SSU` (v1) y `CORE_SSU_v2` comparten la misma base de datos física (`db_core_ssu` en

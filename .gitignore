@@ -10,6 +10,9 @@ graphify-out/
 .env
 .env.docker
 
+# Backups de base de datos (contienen datos sensibles)
+backups/
+
 # Python
 __pycache__/
 *.py[cod]
