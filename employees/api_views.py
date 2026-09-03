@@ -395,11 +395,23 @@ class EditarFuncionarioView(APIView):
                 from employees.utils import generar_matricula_seguro
                 matricula_seguro = generar_matricula_seguro(p, excluir_cod=funcionario.cod_funcionario)
 
+                fecha_ing_anterior = funcionario.fecha_ingreso
+
                 funcionario.id_unidad        = unidad
                 funcionario.fecha_ingreso    = fecha_ing
                 funcionario.tipo_funcionario = tipo_func
                 funcionario.matricula_seguro = matricula_seguro
                 funcionario.save(update_fields=['id_unidad', 'fecha_ingreso', 'tipo_funcionario', 'matricula_seguro'])
+
+                if fecha_ing != fecha_ing_anterior:
+                    # El primer cargo arranca en la fecha de ingreso: si esta se
+                    # corrige, ese cargo debe seguirla.
+                    HistorialCargo.objects.filter(
+                        cod_funcionario=funcionario, fecha_inicio=fecha_ing_anterior,
+                    ).update(fecha_inicio=fecha_ing)
+
+                    from vacations.utils import resincronizar_gestiones
+                    resincronizar_gestiones(funcionario, fecha_ing_anterior)
 
                 cargo_act = HistorialCargo.objects.filter(cod_funcionario=funcionario, es_actual=True).first()
                 if cargo_act and (cargo_act.cargo != cargo or cargo_act.tipo_contrato != tipo_contrato):

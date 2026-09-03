@@ -280,7 +280,7 @@ function generarPlanillaPDF() {
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
     @page { size: A4 portrait; margin: 22mm 20mm 18mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Montserrat', Arial, sans-serif; font-size: 10px; color: ${T.textNavyMuted}; background: #fff; }
+    body { font-family: 'Montserrat', Arial, sans-serif; font-size: 10px; color: ${T.textNavyMuted}; background: #fff; padding: 36px 44px; }
 
     /* ── Encabezado institucional ── */
     .inst-header {
@@ -445,10 +445,7 @@ ${bloquesPDF}
 </body>
 </html>`;
 
-    const w = window.open('', '_blank');
-    w.document.write(html);
-    w.document.close();
-    setTimeout(() => w.print(), 500);
+    descargarPDFDesdeHTML(html, `HC-${nombreArchivoSeguro(f.nombre_completo)}.pdf`, 'portrait');
 }
 
 // ══════════════════════════════════════════════════════════════

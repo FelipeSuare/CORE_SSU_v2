@@ -178,3 +178,48 @@ def poblar_gestion_vacacion(funcionario):
         'sin_elegibilidad': False,
         'evictadas': evictadas,
     }
+
+
+def resincronizar_gestiones(funcionario, fecha_ingreso_anterior):
+    """
+    Reajusta las gestiones cuando se corrige la fecha de ingreso del funcionario.
+
+    Los años de gestión y los días por antigüedad se recalculan con la fecha
+    nueva; los días ya consumidos en cada año se conservan (se descuentan del
+    saldo nuevo) para que corregir la fecha no devuelva vacaciones ya tomadas.
+
+    Retorna True si hubo cambio de fecha y se resincronizó.
+    """
+    from vacations.models import GestionVacacion
+
+    if not fecha_ingreso_anterior or fecha_ingreso_anterior == funcionario.fecha_ingreso:
+        return False
+
+    gv = GestionVacacion.objects.filter(cod_funcionario=funcionario).first()
+    if gv is None:
+        poblar_gestion_vacacion(funcionario)
+        return True
+
+    # Días ya consumidos por año, medidos contra la asignación anterior.
+    consumidos = {}
+    for i in range(1, 5):
+        anio = getattr(gv, f'anio_gestion{i}')
+        if anio is None:
+            continue
+        anios_ant = calcular_anios_antiguedad(fecha_ingreso_anterior, date(anio, 12, 31))
+        esperado  = dias_por_antiguedad(anios_ant) if anios_ant >= 1 else Decimal('0')
+        consumidos[anio] = max(Decimal('0'), esperado - getattr(gv, f'dias_gestion{i}'))
+
+    for i in range(1, 5):
+        setattr(gv, f'anio_gestion{i}', None)
+        setattr(gv, f'dias_gestion{i}', Decimal('0'))
+
+    for slot, anio, dias in calcular_gestioneS_pendientes(funcionario.fecha_ingreso):
+        setattr(gv, f'anio_gestion{slot}', anio)
+        setattr(gv, f'dias_gestion{slot}', max(Decimal('0'), dias - consumidos.get(anio, Decimal('0'))))
+
+    # Los períodos cambiaron: la pérdida por exceso de gestiones se recalcula.
+    gv.dias_perdidos = Decimal('0')
+    aplicar_limite_gestiones_activas(gv)
+    gv.save()
+    return True

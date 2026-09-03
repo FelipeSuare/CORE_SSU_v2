@@ -830,3 +830,50 @@ class TestAlertaPoblarHoyAPI(APITestCase):
         fila = next((row for row in r.json()['funcionarios'] if row['ci'] == '11111207'), None)
         self.assertIsNotNone(fila)
         self.assertEqual(fila['aniversario'], ayer.strftime('%d/%m/%Y'))
+
+
+class ResincronizarGestionesTests(TestCase):
+    """Corregir la fecha de ingreso debe reajustar años y saldos sin devolver
+    los días ya consumidos."""
+
+    def test_reajusta_anios_y_conserva_dias_consumidos(self):
+        from vacations.models import GestionVacacion
+        from vacations.utils import poblar_gestion_vacacion, resincronizar_gestiones
+
+        vieja = date(2015, 1, 10)
+        f = hacer_funcionario(ci='12341234', nombre='Yaskara', fecha_ingreso=vieja)
+        poblar_gestion_vacacion(f)
+
+        gv = GestionVacacion.objects.get(cod_funcionario=f)
+        slot_reciente = next(i for i in range(1, 5) if getattr(gv, f'anio_gestion{i}') is not None)
+        anio_reciente = getattr(gv, f'anio_gestion{slot_reciente}')
+        asignados     = getattr(gv, f'dias_gestion{slot_reciente}')
+
+        # El funcionario ya tomó 5 días de esa gestión.
+        setattr(gv, f'dias_gestion{slot_reciente}', asignados - Decimal('5'))
+        gv.save()
+
+        # Se corrige la fecha de ingreso a un año después.
+        f.fecha_ingreso = date(2016, 1, 10)
+        f.save(update_fields=['fecha_ingreso'])
+        self.assertTrue(resincronizar_gestiones(f, vieja))
+
+        gv.refresh_from_db()
+        anios_bd = {getattr(gv, f'anio_gestion{i}') for i in range(1, 5)} - {None}
+        # Solo sobreviven las 2 gestiones activas más recientes (LIMITE_GESTIONES_ACTIVAS).
+        esperados = set(sorted(a for _, a, _ in calcular_gestioneS_pendientes(f.fecha_ingreso))[-2:])
+        self.assertEqual(anios_bd, esperados)
+
+        # El año que sobrevive conserva el descuento de los 5 días tomados.
+        if anio_reciente in anios_bd:
+            slot = next(i for i in range(1, 5) if getattr(gv, f'anio_gestion{i}') == anio_reciente)
+            nuevo_total = dias_por_antiguedad(
+                calcular_anios_antiguedad(f.fecha_ingreso, date(anio_reciente, 12, 31))
+            )
+            self.assertEqual(getattr(gv, f'dias_gestion{slot}'), nuevo_total - Decimal('5'))
+
+    def test_sin_cambio_de_fecha_no_hace_nada(self):
+        from vacations.utils import resincronizar_gestiones
+
+        f = hacer_funcionario(ci='43214321', nombre='Luis', fecha_ingreso=date(2018, 5, 1))
+        self.assertFalse(resincronizar_gestiones(f, date(2018, 5, 1)))
