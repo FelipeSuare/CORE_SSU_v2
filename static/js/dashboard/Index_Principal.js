@@ -203,10 +203,7 @@ function mostrarAlertaRiesgo(funcionarios) {
             <td>${_esc(f.unidad)}</td>
             <td>${_esc(String(f.anio_en_riesgo))}</td>
             <td><span class="alerta-dias">${f.dias} días</span></td>
-            <td>
-                <span class="alerta-fecha-limite${f.vencido ? ' alerta-fecha-vencida' : ''}">${_esc(f.fecha_limite)}</span>
-                ${f.vencido ? '<span class="alerta-badge-vencido">VENCIDO</span>' : ''}
-            </td>
+            <td><span class="alerta-fecha-limite">${_esc(f.fecha_limite)}</span></td>
         </tr>`);
 
     crearWidgetAlerta({
@@ -232,7 +229,6 @@ function mostrarAlertaPoblarHoy(funcionarios) {
 
     crearWidgetAlerta({
         id:            'alertaPoblarHoy',
-        offsetTop:     '80px',
         titulo:        'Hoy toca poblar vacaciones',
         subtitulo:     'Ya cumplieron (o correspondía el día hábil anterior, si cayó en fin de semana/feriado) su aniversario de ingreso y todavía no se les acreditó la gestión.',
         headers:       ['Funcionario', 'C.I.', 'Unidad', 'Gestión', 'Correspondía', ''],
@@ -242,14 +238,26 @@ function mostrarAlertaPoblarHoy(funcionarios) {
 }
 
 // ── Widget genérico (usado por ambas alertas) ──
-function crearWidgetAlerta({ id, offsetTop, titulo, subtitulo, headers, filas, contadorLabel }) {
+// Todos los widgets viven en una única pila fija; el espaciado lo da el
+// `gap` del contenedor, no un `top` calculado a mano por widget.
+function _stackAlertas() {
+    let stack = document.getElementById('alertaStack');
+    if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'alertaStack';
+        stack.className = 'alerta-stack';
+        document.body.appendChild(stack);
+    }
+    return stack;
+}
+
+function crearWidgetAlerta({ id, titulo, subtitulo, headers, filas, contadorLabel }) {
     const existing = document.getElementById(id);
     if (existing) existing.remove();
 
     const flotante = document.createElement('div');
     flotante.id        = id;
     flotante.className = 'alerta-flotante';
-    if (offsetTop) flotante.style.top = offsetTop;
 
     flotante.innerHTML = `
         <div class="alerta-trigger" id="${id}Trigger">
@@ -273,7 +281,7 @@ function crearWidgetAlerta({ id, offsetTop, titulo, subtitulo, headers, filas, c
             </div>
         </div>`;
 
-    document.body.appendChild(flotante);
+    _stackAlertas().appendChild(flotante);
 
     document.getElementById(`${id}Trigger`).addEventListener('click', e => {
         if (e.target.closest(`#${id}Close`)) return;
@@ -377,7 +385,6 @@ function mostrarAlertaSolicitudesPendientes(solicitudes) {
 
     crearWidgetAlerta({
         id:            'alertaSolicitudesPendientes',
-        offsetTop:     '80px',
         titulo:        'Solicitudes de vacación pendientes de tu aprobación',
         subtitulo:     'Funcionarios a tu cargo con una solicitud de vacación esperando tu decisión.',
         headers:       ['Funcionario', 'Cargo', 'Fecha Solicitud', 'Días'],
@@ -393,15 +400,11 @@ function mostrarAlertaGestionesEquipo(funcionarios) {
             <td>${_esc(String(f.ci))}</td>
             <td>${_esc(String(f.anio_en_riesgo))}</td>
             <td><span class="alerta-dias">${f.dias} días</span></td>
-            <td>
-                <span class="alerta-fecha-limite${f.vencido ? ' alerta-fecha-vencida' : ''}">${_esc(f.fecha_limite)}</span>
-                ${f.vencido ? '<span class="alerta-badge-vencido">VENCIDO</span>' : ''}
-            </td>
+            <td><span class="alerta-fecha-limite">${_esc(f.fecha_limite)}</span></td>
         </tr>`);
 
     crearWidgetAlerta({
         id:            'alertaGestionesEquipo',
-        offsetTop:     '160px',
         titulo:        'Tu equipo: a punto de perder días de vacación',
         subtitulo:     'Funcionarios a tu cargo que ya tienen sus 2 gestiones acumuladas y una nueva por acreditar: al acreditarla, la gestión más antigua se pierde en la fecha límite indicada.',
         headers:       ['Funcionario', 'C.I.', 'Gestión en Riesgo', 'Días en Riesgo', 'Fecha Límite'],

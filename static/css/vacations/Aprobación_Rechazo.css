@@ -189,9 +189,53 @@ table { min-width: 900px; }
     padding: 25px;
     border-radius: 10px;
 }
-.confirmation-text { font-size: 1.1em; color: var(--color-purple-dark); margin-bottom: 20px; text-align: center; }
-.confirmation-details { background: var(--color-pink-light); padding: 15px; border-radius: 8px; margin-top: 15px; }
-.confirmation-details p { margin-bottom: 8px; color: var(--color-purple-dark); }
+/* ── Modal de confirmación (resumen compacto en vertical) ── */
+#modalConfirmacion .modal-content { max-width: 380px; }
+#modalConfirmacion .modal-header  { padding: 18px 22px 0; }
+#modalConfirmacion .modal-header h2 { font-size: 1.12em; gap: 8px; }
+#modalConfirmacion .modal-body    { padding: 12px 22px 4px; }
+#modalConfirmacion .modal-footer  { padding: 14px 22px 18px; gap: 10px; }
+#modalConfirmacion .modal-footer .btn { flex: 1; justify-content: center; }
+
+.confirmation-text {
+    font-size: 0.95em;
+    color: var(--color-purple-dark);
+    margin-bottom: 14px;
+    text-align: center;
+    line-height: 1.4;
+}
+.confirmation-details {
+    background: var(--color-pink-light);
+    padding: 12px 14px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.confirm-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.85em;
+}
+.confirm-label {
+    color: var(--color-pink-dark);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.82em;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+}
+.confirm-value {
+    color: var(--color-purple-dark);
+    font-weight: 600;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+/* Los comentarios son texto largo: etiqueta arriba, texto debajo. */
+.confirm-row-block { flex-direction: column; align-items: stretch; gap: 3px; }
+.confirm-row-block .confirm-value { text-align: left; font-weight: 500; line-height: 1.45; }
 .highlight { color: var(--color-warning); font-weight: 700; font-size: 1.2em; }
 .optional  { font-weight: 400; color: #999; font-size: 0.85em; font-style: italic; }
 

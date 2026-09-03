@@ -231,7 +231,8 @@ function limpiarFiltros() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  EXPORTAR PDF  —  diseño limpio de documento institucional
+//  EXPORTAR PDF  —  misma paleta y encabezado que el resto de los
+//  reportes del sistema (PDF_THEME, cargado por pdf-theme.js)
 // ══════════════════════════════════════════════════════════════
 function generarPlanillaPDF() {
     if (!funcionarioSeleccionado) return;
@@ -239,6 +240,7 @@ function generarPlanillaPDF() {
     const hoy      = new Date();
     const fechaHoy = `${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
     const f        = funcionarioSeleccionado;
+    const T        = PDF_THEME.html;
 
     // ── Bloques por cargo ──────────────────────────────────────
     const bloquesPDF = cargosDelFuncionario.map((c, idx) => {
@@ -257,19 +259,10 @@ function generarPlanillaPDF() {
         ).join('');
 
         return `
-        <div class="cargo-bloque">
-            <div class="cargo-header">
-                <div class="cargo-header-left">
-                    <span class="cargo-num">${idx + 1}.</span>
-                    <div>
-                        <div class="cargo-titulo">${_escHtml(c.cargo)}${etiqueta}</div>
-                        <div class="cargo-periodo">${formatearFecha(c.fecha_inicio)} — ${fechaFinStr}</div>
-                    </div>
-                </div>
-                <div class="cargo-total-col">
-                    <span class="total-etiq">Total días</span>
-                    <span class="total-num">${c.saldo_total}</span>
-                </div>
+        <div class="bloque">
+            <div class="bloque-header">
+                <span>${idx + 1}. ${_escHtml(c.cargo)}${etiqueta}</span>
+                <span>${formatearFecha(c.fecha_inicio)} — ${fechaFinStr}&nbsp;&nbsp;·&nbsp;&nbsp;Total ${c.saldo_total} días</span>
             </div>
             <table>
                 <thead><tr>${thSaldoAnt}${thsG}</tr></thead>
@@ -284,172 +277,106 @@ function generarPlanillaPDF() {
 <head>
 <meta charset="UTF-8">
 <style>
-    @page  { size: A4 portrait; margin: 22mm 20mm 18mm; }
-    *      { box-sizing: border-box; margin: 0; padding: 0; }
-    body   { font-family: 'Montserrat', Arial, sans-serif; font-size: 10.5px; color: #111; }
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
+    @page { size: A4 portrait; margin: 22mm 20mm 18mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Montserrat', Arial, sans-serif; font-size: 10px; color: ${T.textNavyMuted}; background: #fff; }
 
-    /* ── Encabezado ── */
-    .cabecera {
+    /* ── Encabezado institucional ── */
+    .inst-header {
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        padding-bottom: 10px;
-        border-bottom: 2px solid rgb(39,20,71);
-        margin-bottom: 14px;
+        align-items: flex-start;
+        margin-bottom: 22px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid ${T.navy};
     }
-    .cab-left {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-    }
-    .cab-logo { height: 52px; width: auto; }
-    .cab-institucion {
-        font-size: 12px;
+    .inst-nombre {
+        font-size: 13px;
         font-weight: 700;
+        color: ${T.navy};
         text-transform: uppercase;
-        letter-spacing: 0.6px;
-        color: rgb(39,20,71);
+        line-height: 1.6;
     }
-    .cab-area {
-        font-size: 9px;
-        color: rgb(114,0,53);
-        margin-top: 2px;
+    .inst-fecha { font-size: 10px; color: ${T.grayDate}; text-align: right; line-height: 1.6; }
+
+    .titulo { text-align: center; margin-bottom: 20px; }
+    .titulo h2 {
+        color: ${T.pink};
+        font-size: 17px;
+        font-weight: 800;
+        letter-spacing: 1px;
         text-transform: uppercase;
-        letter-spacing: 0.4px;
-        font-weight: 600;
-    }
-    .cab-titulo {
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 1.2px;
-        margin-top: 6px;
-        color: rgb(39,20,71);
-        border-bottom: 1px solid rgb(39,20,71);
-        display: inline-block;
-        padding-bottom: 1px;
-    }
-    .cab-right { text-align: right; }
-    .cab-fecha {
-        font-size: 9px;
-        color: #555;
     }
 
     /* ── Ficha del funcionario ── */
-    .ficha {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 16px;
-        border: 1px solid #e0c8d4;
-        background: #fdf5f8;
+    .datos {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 30px;
+        background: #f4f5fb;
+        border: 1px solid #e3e5ef;
+        border-radius: 6px;
+        padding: 12px 18px;
+        margin-bottom: 20px;
     }
-    .ficha td {
-        padding: 6px 10px;
-        border-right: 1px solid #e0c8d4;
-        vertical-align: top;
-    }
-    .ficha td:last-child { border-right: none; }
-    .ficha-etiq {
-        font-size: 8px;
+    .dato { display: flex; gap: 6px; align-items: baseline; }
+    .dato-label {
         font-weight: 700;
+        color: ${T.pink};
+        font-size: 9px;
         text-transform: uppercase;
-        color: rgb(114,0,53);
-        letter-spacing: 0.4px;
-        display: block;
-        margin-bottom: 2px;
+        min-width: 85px;
     }
-    .ficha-val {
-        font-size: 10.5px;
-        font-weight: 600;
-        color: rgb(39,20,71);
-    }
+    .dato-valor { font-weight: 600; color: ${T.navy}; font-size: 10px; }
 
     /* ── Bloque por cargo ── */
-    .cargo-bloque {
-        border: 1px solid #e0c8d4;
-        margin-bottom: 10px;
-    }
-    .cargo-header {
-        background: linear-gradient(90deg, rgb(39,20,71), rgb(114,0,53));
-        padding: 6px 10px;
+    .bloque { margin-bottom: 16px; }
+    .bloque-header {
+        background: ${T.headerFillLight};
+        color: ${T.navy};
+        padding: 7px 14px;
+        border-radius: 6px 6px 0 0;
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        gap: 8px;
-    }
-    .cargo-header-left {
-        display: flex;
-        align-items: baseline;
-        gap: 5px;
-    }
-    .cargo-num   { font-weight: 700; font-size: 11px; white-space: nowrap; color: #fff; }
-    .cargo-titulo {
+        gap: 12px;
         font-weight: 700;
-        font-size: 10.5px;
-        white-space: nowrap;
-        color: #fff;
+        font-size: 9.5px;
     }
-    .cargo-periodo {
-        font-size: 9px;
-        color: rgba(255,255,255,.75);
-        margin-top: 2px;
-    }
-    .cargo-total-col { text-align: right; white-space: nowrap; }
-    .total-etiq {
-        font-size: 8px;
-        text-transform: uppercase;
-        color: rgba(255,255,255,.75);
-        letter-spacing: 0.3px;
-        display: block;
-    }
-    .total-num { font-size: 14px; font-weight: 700; color: #fff; }
+    .bloque-header span:last-child { font-weight: 400; opacity: 0.7; white-space: nowrap; }
 
-    /* ── Tabla gestiones ── */
-    table { width: 100%; border-collapse: collapse; }
-    thead { background: linear-gradient(90deg, rgb(39,20,71), rgb(114,0,53)); }
-    th {
-        padding: 5px 10px;
-        font-size: 9px;
-        font-weight: 700;
-        text-align: center;
-        text-transform: uppercase;
-        letter-spacing: 0.3px;
-        border-right: 1px solid rgba(255,255,255,.15);
-        color: #fff;
-    }
-    th:last-child { border-right: none; }
-    td {
+    table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+    thead th {
+        background: ${T.headerFillLight};
+        color: ${T.navy};
         padding: 7px 10px;
-        font-size: 10px;
         text-align: center;
-        border-bottom: 1px solid #f0e6ec;
+        font-weight: 700;
+        text-transform: uppercase;
+        border: 1px solid ${T.borderLight};
     }
-    tbody tr:nth-child(even) td { background: #fdf6fa; }
+    td { padding: 8px 10px; border: 1px solid ${T.borderLight}; text-align: center; }
+    tbody tr:nth-child(even) td { background: ${T.rowFillEven}; }
 
-    .th-ant { background: rgba(0,0,0,.08); }
-    .td-ant { background: rgba(114,0,53,.04); }
-    .cero   { color: #ccc; }
+    .th-ant { background: #cfd5ec; }
+    .td-ant { background: ${T.rowFillEven}; }
+    .cero   { color: ${T.grayLabel}; }
 
     /* ── Nota al pie ── */
     .nota {
         font-size: 8.5px;
-        color: #888;
+        color: ${T.grayLabel};
         font-style: italic;
         margin-top: 10px;
         padding-top: 8px;
-        border-top: 1px solid #e0c8d4;
+        border-top: 1px solid ${T.borderLight};
         line-height: 1.5;
     }
 
     /* ── Firma — fija al fondo de la página ── */
-    .firma-seccion {
-        position: fixed;
-        bottom: 24mm;
-        right: 20mm;
-    }
-    .firma-bloque { text-align: center; }
-    .firma-linea  {
-        border-top: 1.5px solid rgb(39,20,71);
+    .firma-seccion { position: fixed; bottom: 24mm; right: 20mm; text-align: center; }
+    .firma-linea {
+        border-top: 1.5px solid ${T.navy};
         width: 220px;
         margin: 40px auto 5px;
     }
@@ -458,7 +385,7 @@ function generarPlanillaPDF() {
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.4px;
-        color: rgb(39,20,71);
+        color: ${T.navy};
     }
 
     /* ── Pie del documento — fijo al fondo ── */
@@ -468,47 +395,35 @@ function generarPlanillaPDF() {
         left: 20mm;
         right: 20mm;
         padding-top: 5px;
-        border-top: 1px solid #e0c8d4;
+        border-top: 1px solid ${T.borderLight};
         display: flex;
         justify-content: space-between;
         font-size: 8px;
-        color: rgb(114,0,53);
+        color: ${T.pink};
         opacity: .7;
     }
 </style>
 </head>
 <body>
 
-<div class="cabecera">
-    <div class="cab-left">
-        <img class="cab-logo" src="/static/img/login/LOGOSSU.png">
-        <div>
-            <div class="cab-institucion">Seguro Social Universitario</div>
-            <div class="cab-area">${rolLabel}</div>
-            <div class="cab-titulo">Historial de Cargos</div>
+<div class="inst-header">
+    <div style="display:flex;align-items:center;gap:14px;">
+        <img src="/static/img/login/LOGOSSU.png" style="height:54px;width:auto;">
+        <div class="inst-nombre">SEGURO SOCIAL UNIVERSITARIO<br>
+            <span style="font-weight:400;font-size:10px;color:${T.grayLabel};letter-spacing:.5px">${_escHtml(rolLabel)}</span>
         </div>
     </div>
-    <div class="cab-right">
-        <div class="cab-fecha">Trinidad, ${fechaHoy}</div>
-    </div>
+    <div class="inst-fecha">Trinidad, ${fechaHoy}</div>
 </div>
 
-<table class="ficha">
-    <tr>
-        <td style="width:45%">
-            <span class="ficha-etiq">Funcionario</span>
-            <span class="ficha-val">${_escHtml(f.nombre_completo)}</span>
-        </td>
-        <td style="width:35%">
-            <span class="ficha-etiq">Cargo Actual</span>
-            <span class="ficha-val">${_escHtml(f.cargo_actual)}</span>
-        </td>
-        <td style="width:20%">
-            <span class="ficha-etiq">Fecha de Ingreso</span>
-            <span class="ficha-val">${formatearFecha(f.fecha_ingreso)}</span>
-        </td>
-    </tr>
-</table>
+<div class="titulo"><h2>Historial de Cargos</h2></div>
+
+<div class="datos">
+    <div class="dato"><span class="dato-label">Funcionario:</span><span class="dato-valor">${_escHtml(f.nombre_completo)}</span></div>
+    <div class="dato"><span class="dato-label">Cargo Actual:</span><span class="dato-valor">${_escHtml(f.cargo_actual)}</span></div>
+    <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${formatearFecha(f.fecha_ingreso)}</span></div>
+    <div class="dato"><span class="dato-label">Cargos:</span><span class="dato-valor">${cargosDelFuncionario.length}</span></div>
+</div>
 
 ${bloquesPDF}
 
@@ -518,10 +433,8 @@ ${bloquesPDF}
 </p>
 
 <div class="firma-seccion">
-    <div class="firma-bloque">
-        <div class="firma-linea"></div>
-        <div class="firma-cargo">${rolLabel}</div>
-    </div>
+    <div class="firma-linea"></div>
+    <div class="firma-cargo">${_escHtml(rolLabel)}</div>
 </div>
 
 <div class="pie-doc">

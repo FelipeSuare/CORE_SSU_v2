@@ -10,7 +10,7 @@ const URL_MIS_SOLICITUDES = '/api/vacaciones/mis-solicitudes/';
 let todasLasSolicitudes = [];
 let tabActual           = 'todas';
 let textoBusqueda       = '';
-let nivelCols           = [];   // [{db_nivel, header, subtitle}] — dinámico por tipo_funcionario
+let nivelCols           = [];   // [{nivel, header, subtitle}] — dinámico por tipo_funcionario
 let USUARIO_ACTUAL      = { nombre: '', ci: '' };
 let resumenGlobal       = { total: 0, dias_usados: 0, dias_pendientes: 0, dias_adeudados: 0 };
 
@@ -153,7 +153,7 @@ function renderizarTabla() {
 
     tbody.innerHTML = filtradas.map(s => {
         const nivelesHtml = nivelCols.map(c =>
-            `<td>${_celdaNivel(s[`nivel${c.db_nivel}`])}</td>`
+            `<td>${_celdaNivel(s[`nivel${c.nivel}`])}</td>`
         ).join('');
 
         const motivo = s.motivo.length > 45
@@ -223,7 +223,7 @@ function generarPlanillaPDF() {
 
     const filas = todasLasSolicitudes.map((s, i) => {
         const nivelesHtml = nivelCols.map(c => {
-            const n = s[`nivel${c.db_nivel}`];
+            const n = s[`nivel${c.nivel}`];
             return n
                 ? `<td style="text-align:center;font-size:0.82em">${_escHtml(n.nombre)}<br><small>${formatearFecha(n.fecha)}</small></td>`
                 : `<td style="text-align:center"><span style="color:#bbb">—</span></td>`;

@@ -1,19 +1,29 @@
 /* base.css carga primero — aquí solo overrides del dashboard */
 
-/* ── Notificación flotante de gestiones en riesgo (RRHH / Admin) ── */
-.alerta-flotante {
+/* ── Notificaciones flotantes (RRHH / Admin / aprobadores) ──
+   Todas se apilan en un único contenedor; el `gap` define la separación,
+   así no hay que calcular un `top` por widget. */
+.alerta-stack {
     position: fixed;
     top: 24px;
     right: 24px;
     z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.alerta-flotante {
+    position: relative;
     font-family: 'Montserrat', sans-serif;
     user-select: none;
 }
 
-/* El widget de "a punto de perder días" debe quedar por encima del de
-   "hoy toca poblar" cuando ambos paneles están abiertos y se superponen. */
+/* El widget de "a punto de perder días" debe quedar por encima de los
+   demás cuando varios paneles están abiertos y se superponen. */
 #alertaGestionesRiesgo {
-    z-index: 1101;
+    z-index: 1;
 }
 #alertaGestionesRiesgo .alerta-panel {
     z-index: 3;
@@ -158,19 +168,6 @@
 .alerta-table tbody tr:hover td { background: rgba(114,0,53,0.04); }
 .alerta-dias { font-weight: 700; color: #720035; }
 .alerta-fecha-limite { font-weight: 700; color: #271447; }
-.alerta-fecha-vencida { color: #a10000; }
-.alerta-badge-vencido {
-    display: inline-block;
-    margin-left: 6px;
-    background: #a10000;
-    color: #fff;
-    font-size: 0.68em;
-    font-weight: 800;
-    letter-spacing: .4px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    vertical-align: middle;
-}
 
 * { scrollbar-width: none; }
 

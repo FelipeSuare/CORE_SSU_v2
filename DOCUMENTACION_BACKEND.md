@@ -230,7 +230,7 @@ Módulo DRF con toda la lógica de negocio de gestión de funcionarios: CRUD, b�
 
 2. **`AprobadoresView`** — `GET /funcionarios/aprobadores/` (name `funcionarios_aprobadores`). Permisos: `[NoCambioPendiente, EsRRHH]`. Query param opcional `excluir` (código de funcionario a excluir, típicamente el propio funcionario que se está editando). Devuelve `jefes_area`, `gerentes` (unión de Gerente Administrativo + Gerente de Salud), `gerente_general`, y `descripciones`. Alimenta el selector de aprobadores al crear/editar un funcionario.
 
-3. **`NuevoFuncionarioView`** — `POST /funcionarios/nuevo/` (name `funcionarios_nuevo`). Permisos: `[NoCambioPendiente, EsRRHH]`. Body JSON: `ci, nombres, ap_paterno, ap_materno, fecha_nacimiento, sexo, matricula_seguro (opcional), cargo, tipo_contrato, unidad, fecha_ingreso, tipo_funcionario, roles (lista, default ['Funcionario']), jerarquia (lista de {aprobador_cod, nivel})`. Validaciones exhaustivas: campos obligatorios, `sexo`/`tipo_funcionario` válidos, longitudes máximas, unicidad de `ci`, parseo de fechas ISO, existencia de la `UnidadOrganizacional`. Dentro de `transaction.atomic()`: crea `Persona`, genera `cod_funcionario` y `matricula_seguro`, crea `Funcionario` (`contrasena_hash='1234567'` por defecto), crea el primer `HistorialCargo` (`es_actual=True`), crea `FuncionarioRol` por cada rol, crea `JerarquiaAprobacion` por cada entrada de jerarquía, crea un `User` de Django vinculado, llama a `vacations.utils.poblar_gestion_vacacion(funcionario)`, y si es tipo gerente, reasigna jerarquías previas apuntadas al gerente anterior del mismo tipo hacia el nuevo. Responde `201` con `{'ok': True, 'cod': cod, 'matricula_seguro': matricula}`.
+3. **`NuevoFuncionarioView`** — `POST /funcionarios/nuevo/` (name `funcionarios_nuevo`). Permisos: `[NoCambioPendiente, EsRRHH]`. Body JSON: `ci, nombres, ap_paterno, ap_materno, fecha_nacimiento, sexo, cargo, tipo_contrato, unidad, fecha_ingreso, tipo_funcionario, roles (lista, default ['Funcionario']), jerarquia (lista de {aprobador_cod, nivel})`. Validaciones exhaustivas: campos obligatorios, `sexo`/`tipo_funcionario` válidos, longitudes máximas, unicidad de `ci`, parseo de fechas ISO, existencia de la `UnidadOrganizacional`. Dentro de `transaction.atomic()`: crea `Persona`, genera `cod_funcionario` y `matricula_seguro`, crea `Funcionario` (`contrasena_hash='1234567'` por defecto), crea el primer `HistorialCargo` (`es_actual=True`), crea `FuncionarioRol` por cada rol, crea `JerarquiaAprobacion` por cada entrada de jerarquía, crea un `User` de Django vinculado, llama a `vacations.utils.poblar_gestion_vacacion(funcionario)`, y si es tipo gerente, reasigna jerarquías previas apuntadas al gerente anterior del mismo tipo hacia el nuevo. Responde `201` con `{'ok': True, 'cod': cod, 'matricula_seguro': matricula}`.
 
 4. **`EditarFuncionarioView`** — `POST /funcionarios/<cod>/editar/` (name `funcionarios_editar`). Permisos: `[NoCambioPendiente, EsRRHH]`. Actualiza `Persona` y `Funcionario`. Si el cargo actual cambió, congela el saldo de vacaciones vigente en el `HistorialCargo` saliente (`*_al_salir`), lo marca `es_actual=False`, y crea uno nuevo `es_actual=True`. Sincroniza roles (crea/desactiva `FuncionarioRol`, nunca desactiva `'Funcionario'`). Sincroniza jerarquía nivel por nivel (crea, reemplaza o mantiene según corresponda). Poda jerarquías con nivel mayor al permitido por el nuevo tipo. Si cambió a tipo gerente, reasigna jerarquías del gerente anterior. Responde `200 OK`.
 
@@ -274,7 +274,7 @@ Módulo de funciones helper de dominio:
 
 - **`_inicial(texto)`** (privada): devuelve la primera letra de un texto en mayúscula, normalizando y eliminando diacríticos vía `unicodedata.normalize('NFD', ...)`.
 
-- **`generar_matricula_seguro(persona)`**: genera la matrícula de seguro social con formato codificado: 2 últimos dígitos del año de nacimiento + 2 dígitos de mes (offset `_OFFSET_MES_FEMENINO = 49` para mujeres, diferenciando sexo) + 2 dígitos de día + iniciales de apellido paterno, materno, primer y segundo nombre. Si la matrícula ya existe, añade un sufijo numérico incremental hasta encontrar una libre.
+- **`generar_matricula_seguro(persona, excluir_cod=None)`**: genera la matrícula de seguro social (9 caracteres, 10 si la persona tiene dos nombres): 2 últimos dígitos del año de nacimiento + 2 dígitos de mes con sexo (varones `01`-`12`, mujeres `51`-`62` vía `_OFFSET_MES_FEMENINO = 50`) + 2 dígitos de día + inicial de apellido paterno + inicial de apellido materno + inicial(es) del nombre (una si tiene un solo nombre, dos si tiene dos). Si la matrícula ya existe, añade un sufijo numérico incremental hasta encontrar una libre; `excluir_cod` deja fuera al propio funcionario para que regenerar su matrícula no cuente como colisión.
 
 - **`reasignar_aprobador(old_aprobador, new_aprobador, hoy=None)`**: migra todos los registros activos de `JerarquiaAprobacion` (app `vacations`) del aprobador saliente al entrante: desactiva cada registro existente y crea uno nuevo idéntico salvo el aprobador. Se usa al cambiar el titular de un puesto gerencial.
 
@@ -393,7 +393,7 @@ Archivo de 1775 líneas que concentra **todos los endpoints DRF (`APIView`)** de
 #### Constantes de dominio
 
 - `_NIVEL_LABELS`: diccionario que mapea `tipo_funcionario` a las etiquetas de cada nivel de aprobación (Jefe de Área, Gerente Adm./Salud, Gerente General). Define cuántos niveles de aprobación jerárquica le corresponden a cada tipo de funcionario: un `PERSONAL DE AREA` normal pasa por 3 niveles; un `JEFE AREA` por 2; cargos de dependencia directa o los propios gerentes van directo a Gerente General o no requieren aprobación (`GERENTE GENERAL` no tiene niveles, `{}`).
-- `_NIVEL_COLS`: variante pensada para renderizar columnas en el frontend (con `db_nivel`, `header`, `subtitle`).
+- `_NIVELES_SEMANTICOS` / `_NIVEL_SUBTITULO`: niveles **semánticos** de la cadena de aprobación (`1` = Jefe de Área, `2` = Gerente Adm./Salud, `3` = Gerente General) por los que pasa cada `tipo_funcionario`, y su subtítulo. Son independientes de la numeración de `jerarquia_aprobacion`, que siempre arranca en 1 para todos: un `JEFE AREA` con niveles 1 y 2 en BD corresponde a los niveles semánticos 2 y 3.
 - `_ESTADOS_PENDIENTE = ('PENDIENTE_JEFE', 'PENDIENTE_GERENTE_AREA', 'PENDIENTE_GERENTE_GENERAL')`: los tres estados intermedios de una solicitud.
 - `_ROLES_APROBADOR` y `_ROLES_RRHH`: sets de nombres de rol usados para checks manuales de autorización adicionales a las permission classes de DRF.
 - `_ESTADOS_SIGUIENTE = {1: 'PENDIENTE_GERENTE_AREA', 2: 'PENDIENTE_GERENTE_GENERAL'}`: tabla de transición de estado tras aprobar el nivel 1 o 2.
@@ -414,7 +414,8 @@ Archivo de 1775 líneas que concentra **todos los endpoints DRF (`APIView`)** de
 - **`_sumar_meses(fecha, meses)`**: suma meses calendario recortando al último día del mes destino si el día original no existe.
 - **`_get_usuario_rrhh(request)`** / **`_check_acceso_historial(request)`**: obtienen el `Funcionario` del request junto con su set de roles activos.
 - **`_sin_jefe_area(funcionario)`**: `True` si el funcionario es `PERSONAL DE AREA` y no tiene ningún Jefe de Área activo en su `JerarquiaAprobacion`.
-- **`_nivel_cols_dinamico(funcionario)`** / **`_nivel_labels_dinamico(funcionario)`**: versiones "conscientes" de `_NIVEL_COLS`/`_NIVEL_LABELS` que, cuando `_sin_jefe_area()` es `True`, insertan una columna sintética "Jefe de Área — No asignado" y re-etiquetan los niveles siguientes.
+- **`_niveles_semanticos(tipo_funcionario)`** / **`_nivel_cols(tipo_funcionario)`**: lista de niveles semánticos del tipo de funcionario y su versión para renderizar columnas en el frontend (`nivel`, `header`, `subtitle`).
+- **`_nivel_labels_dinamico(funcionario)`**: versión "consciente" de `_NIVEL_LABELS` que, cuando `_sin_jefe_area()` es `True`, re-etiqueta los niveles de BD (1 → Gerente Adm./Salud, 2 → Gerente General).
 
 #### MÓDULO: SOLICITUD DE VACACIONES
 
@@ -460,7 +461,7 @@ Archivo de 1775 líneas que concentra **todos los endpoints DRF (`APIView`)** de
 
 #### Alertas proactivas para RRHH
 
-**`AlertaGestionesPorPerderView`** — `GET /api/vacaciones/alerta-gestiones-riesgo/` (`vac_alerta_gestiones_riesgo`). Permisos: `NoCambioPendiente`, `EsRRHH`. Constante `_ANTICIPO_RIESGO_MESES = 1`. Detecta funcionarios con las 2 gestiones activas al tope que, dentro del próximo mes, se volverán elegibles para una gestión adicional aún no acreditada (riesgo de evicción a `dias_perdidos`).
+**`AlertaGestionesPorPerderView`** — `GET /api/vacaciones/alerta-gestiones-riesgo/` (`vac_alerta_gestiones_riesgo`). Permisos: `NoCambioPendiente`, `EsRRHH`. Constante `_ANTICIPO_RIESGO_MESES = 1`. Detecta funcionarios con las 2 gestiones activas al tope que, dentro del próximo mes, se volverán elegibles para una gestión adicional aún no acreditada (riesgo de evicción a `dias_perdidos`). Se excluyen los que ya pasaron su fecha límite: esos días ya se perdieron y la alerta deja de mostrarlos.
 
 **`AlertaPoblarHoyView`** — `GET /api/vacaciones/alerta-poblar-hoy/` (`vac_alerta_poblar_hoy`). Permisos: `NoCambioPendiente`, `EsRRHH`. Lista funcionarios cuyo aniversario de ingreso (ajustado al siguiente día hábil) ya se cumplió y cuya gestión aún no fue acreditada.
 
@@ -665,7 +666,7 @@ Alimenta la pantalla **Dashboard/Página Principal** (home tras login: sidebar, 
 **Carrusel**: autoplay cada 5000ms (pausado en hover), navegación con flechas e indicadores.
 
 **Alertas proactivas de vacaciones** (visibles solo para RRHH/Administrador, backend responde 403 para otros roles):
-- `verificarAlertasVacaciones()`: en paralelo `GET /api/vacaciones/alerta-gestiones-riesgo/` y `GET /api/vacaciones/alerta-poblar-hoy/`. Muestra widgets flotantes con `crearWidgetAlerta` (trigger colapsado con contador + panel expandible con tabla).
+- `verificarAlertasVacaciones()`: en paralelo `GET /api/vacaciones/alerta-gestiones-riesgo/` y `GET /api/vacaciones/alerta-poblar-hoy/`. Muestra widgets flotantes con `crearWidgetAlerta`, que los apila todos dentro de un único contenedor `.alerta-stack` (la separación la da su `gap`, no un `top` por widget); trigger colapsado con contador + panel expandible con tabla.
 - **Flujo "Poblar ahora"**: click en botón de fila del widget → `POST /api/vacaciones/inicializar/` con `{cod_funcionario}`; éxito elimina las filas de ese funcionario en todos los widgets donde aparezca y actualiza contadores (cierra el widget si queda vacío).
 
 No usa librerías externas para carrusel/alertas; usa `AppDialog` para el logout y `fetch` nativo para el resto.
@@ -763,7 +764,7 @@ Alimenta la pantalla de **Historial de Cargos** (RRHH/Auditoría): búsqueda de 
 
 **Renderizado**: banner con avatar/cargo actual/fecha de ingreso; por cada cargo del historial, un bloque con rango de fechas, badge "Actual", saldo total, y tabla de gestiones (más columna "Saldo Anterior" de referencia si no es el primer cargo, no sumada al total).
 
-**PDF**: `generarPlanillaPDF()` construye HTML con estilos embebidos (cabecera institucional, ficha del funcionario, bloques por cargo, firma), abierto en ventana nueva con `window.print()` tras 500ms. Sin librería de PDF.
+**PDF**: `generarPlanillaPDF()` construye HTML con estilos embebidos usando la paleta compartida `PDF_THEME.html` de `js/reports/pdf-theme.js` (misma cabecera institucional, título y tablas que los reportes General y Personal), abierto en ventana nueva con `window.print()` tras 500ms. Sin librería de PDF.
 
 Vista de solo lectura/consulta, sin formularios de edición de cargos.
 
@@ -800,7 +801,7 @@ Un único endpoint de decisión maneja tanto aprobación como rechazo, diferenci
 ### static/js/vacations/Historial_Solicitudes.js
 Alimenta la pantalla "Mis Solicitudes" del **Funcionario**: historial completo de sus propias solicitudes, con pestañas de estado, buscador y exportación a PDF.
 
-**Carga — `cargarSolicitudes()`**: `GET /api/vacaciones/mis-solicitudes/`; guarda `resumenGlobal` (días usados/pendientes/adeudados) y `nivelCols` (columnas dinámicas según el tipo de jerarquía del funcionario — 3 niveles para Personal de Área, menos para gerentes).
+**Carga — `cargarSolicitudes()`**: `GET /api/vacaciones/mis-solicitudes/`; guarda `resumenGlobal` (días usados/pendientes/adeudados) y `nivelCols` (una columna por nivel semántico aplicable al funcionario: 3 para Personal de Área, 2 para Jefe de Área —salta el Nivel 1—, 1 para dependencia directa/gerentes y ninguna para Gerente General). Cada columna trae `nivel`, que apunta a `nivel1`/`nivel2`/`nivel3` de la solicitud.
 
 **Cabecera dinámica**: la tabla construye columnas por cada nivel de aprobación aplicable al funcionario.
 

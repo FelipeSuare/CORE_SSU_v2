@@ -12,6 +12,9 @@
     font-size: 2em;
     gap: 14px;
 }
+/* El icono hereda el tamaño del título (mismo patrón que Vacaciones y
+   Aprobación); sin esto queda en los 24px por defecto de Material Symbols. */
+.module-title i { font-size: 1.2em; }
 
 /* ── BOTONES (estilo compacto) ── */
 .btn {

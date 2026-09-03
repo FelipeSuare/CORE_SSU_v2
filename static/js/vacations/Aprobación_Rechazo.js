@@ -297,10 +297,23 @@ async function abrirModalConfirmacion() {
         : '¿Está seguro de RECHAZAR esta solicitud de vacación?';
 
     document.getElementById('confirmDetalles').innerHTML = `
-        <p><strong>Funcionario:</strong> ${esc(s.funcionario)}</p>
-        <p><strong>Días:</strong> ${s.dias}</p>
-        <p><strong>Período:</strong> ${formatearFecha(s.fecha_salida)} – ${formatearFecha(s.fecha_retorno)}</p>
-        ${comentarios ? `<p><strong>Comentarios:</strong> ${esc(comentarios)}</p>` : ''}
+        <div class="confirm-row">
+            <span class="confirm-label">Funcionario</span>
+            <span class="confirm-value">${esc(s.funcionario)}</span>
+        </div>
+        <div class="confirm-row">
+            <span class="confirm-label">Período</span>
+            <span class="confirm-value">${formatearFecha(s.fecha_salida)} – ${formatearFecha(s.fecha_retorno)}</span>
+        </div>
+        <div class="confirm-row">
+            <span class="confirm-label">Días</span>
+            <span class="confirm-value">${s.dias}</span>
+        </div>
+        ${comentarios ? `
+        <div class="confirm-row confirm-row-block">
+            <span class="confirm-label">Comentarios</span>
+            <span class="confirm-value">${esc(comentarios)}</span>
+        </div>` : ''}
     `;
 
     modalConfirmacion.classList.add('show');

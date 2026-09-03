@@ -43,21 +43,21 @@ _NIVEL_LABELS = {
 
 _ESTADOS_PENDIENTE = ('PENDIENTE_JEFE', 'PENDIENTE_GERENTE_AREA', 'PENDIENTE_GERENTE_GENERAL')
 
-_NIVEL_COLS = {
-    'PERSONAL DE AREA': [
-        {'db_nivel': 1, 'header': 'Nivel 1', 'subtitle': 'Jefe de Área'},
-        {'db_nivel': 2, 'header': 'Nivel 2', 'subtitle': 'Gte. Adm./Salud'},
-        {'db_nivel': 3, 'header': 'Nivel 3', 'subtitle': 'Gerente General'},
-    ],
-    'JEFE AREA': [
-        {'db_nivel': 1, 'header': 'Nivel 2', 'subtitle': 'Gte. Adm./Salud'},
-        {'db_nivel': 2, 'header': 'Nivel 3', 'subtitle': 'Gerente General'},
-    ],
-    'DEPENDENCIA DIRECTA':   [{'db_nivel': 1, 'header': 'Nivel 3', 'subtitle': 'Gerente General'}],
-    'GERENTE ADMINISTRATIVO':[{'db_nivel': 1, 'header': 'Nivel 3', 'subtitle': 'Gerente General'}],
-    'GERENTE SALUD':         [{'db_nivel': 1, 'header': 'Nivel 3', 'subtitle': 'Gerente General'}],
-    'GERENTE GENERAL':       [],
+# Niveles SEMÁNTICOS de la cadena de aprobación (independientes de la
+# numeración que use `jerarquia_aprobacion`, que siempre arranca en 1):
+#   1 = Jefe de Área   2 = Gerente Adm./Salud   3 = Gerente General
+# Cada tipo de funcionario entra a la cadena en un punto distinto: un Jefe de
+# Área salta el nivel 1, y gerentes/dependencia directa solo pasan por el 3.
+_NIVELES_SEMANTICOS = {
+    'PERSONAL DE AREA':       [1, 2, 3],
+    'JEFE AREA':              [2, 3],
+    'DEPENDENCIA DIRECTA':    [3],
+    'GERENTE ADMINISTRATIVO': [3],
+    'GERENTE SALUD':          [3],
+    'GERENTE GENERAL':        [],
 }
+
+_NIVEL_SUBTITULO = {1: 'Jefe de Área', 2: 'Gte. Adm./Salud', 3: 'Gerente General'}
 
 _ROLES_APROBADOR   = {'Jefe de Area', 'Gerente Administrativo', 'Gerente de Salud', 'Gerente General'}
 _ESTADOS_SIGUIENTE = {1: 'PENDIENTE_GERENTE_AREA', 2: 'PENDIENTE_GERENTE_GENERAL'}
@@ -200,19 +200,17 @@ def _sin_jefe_area(funcionario):
     ).exists()
 
 
-def _nivel_cols_dinamico(funcionario):
-    """Devuelve nivel_cols con los 3 niveles canónicos.
-    Cuando falta Jefe de Área, el nivel 1 se marca sin_asignacion=True y db_nivel=None
-    (no apunta a ningún campo de la respuesta). Los DB niveles 1 y 2 se reasignan
-    a las posiciones 2 y 3 del display para reflejar la jerarquía real.
-    """
-    if _sin_jefe_area(funcionario):
-        return [
-            {'db_nivel': None, 'header': 'Jefe de Área',       'subtitle': '',  'sin_asignacion': True},
-            {'db_nivel': 1,    'header': 'Gerente Adm./Salud', 'subtitle': ''},
-            {'db_nivel': 2,    'header': 'Gerente General',    'subtitle': ''},
-        ]
-    return _NIVEL_COLS.get(funcionario.tipo_funcionario, _NIVEL_COLS['PERSONAL DE AREA'])
+def _niveles_semanticos(tipo_funcionario):
+    """Niveles semánticos por los que pasa una solicitud de ese tipo de funcionario."""
+    return _NIVELES_SEMANTICOS.get(tipo_funcionario, _NIVELES_SEMANTICOS['PERSONAL DE AREA'])
+
+
+def _nivel_cols(tipo_funcionario):
+    """Columnas de nivel para 'Mis Solicitudes', una por nivel semántico."""
+    return [
+        {'nivel': n, 'header': f'Nivel {n}', 'subtitle': _NIVEL_SUBTITULO[n]}
+        for n in _niveles_semanticos(tipo_funcionario)
+    ]
 
 
 def _nivel_labels_dinamico(funcionario):
@@ -511,6 +509,7 @@ class MisSolicitudesView(APIView):
 
         # Estado actual de jerarquía (para solicitudes pendientes sin AprobacionSolicitud)
         sin_jefe_ahora = _sin_jefe_area(f)
+        niveles_sem    = _niveles_semanticos(f.tipo_funcionario)
 
         def dato_nivel(aprs, nivel):
             ap = aprs.get(nivel)
@@ -529,26 +528,23 @@ class MisSolicitudesView(APIView):
             todas_obs  = [ap.observacion for ap in aprs.values() if ap.observacion]
             dias_ajust = ajustes_parciales.get(s.id_formulario, 0.0)
 
-            # Determinar si ESTA solicitud fue procesada sin Jefe de Área.
-            # Si hay AprobacionSolicitud en nivel 1 y el aprobador NO es Jefe de Área,
-            # significa que la BD fue renumerada: nivel 1 → Gerente Adm, nivel 2 → Gerente General.
-            # Si nivel 1 aún está pendiente (sin registro), usamos el estado actual de jerarquía.
-            ap1 = aprs.get(1)
-            if ap1 is not None:
-                sol_sin_jefe = ap1.cod_aprobador.tipo_funcionario != 'JEFE AREA'
-            else:
-                sol_sin_jefe = sin_jefe_ahora
+            # La BD numera los niveles desde 1 para todos; el mapeo a nivel
+            # semántico depende del tipo de funcionario (un Jefe de Área no
+            # tiene nivel 1, un gerente solo tiene el 3).
+            sem = niveles_sem
+            if f.tipo_funcionario == 'PERSONAL DE AREA':
+                # Sin Jefe de Área la BD queda renumerada (nivel 1 = Gte. Adm./Salud).
+                # Si ya hay decisión en nivel 1, su aprobador dice cómo se procesó
+                # ESTA solicitud; si sigue pendiente, vale el estado actual.
+                ap1 = aprs.get(1)
+                sol_sin_jefe = (
+                    ap1.cod_aprobador.tipo_funcionario != 'JEFE AREA'
+                    if ap1 is not None else sin_jefe_ahora
+                )
+                if sol_sin_jefe:
+                    sem = sem[1:]
 
-            if sol_sin_jefe:
-                # Nivel semántico 1 (Jefe de Área) estaba vacío.
-                # DB nivel 1 = Gerente Adm/Salud → posición 2; DB nivel 2 = Ger. General → posición 3.
-                n1 = None
-                n2 = dato_nivel(aprs, 1)
-                n3 = dato_nivel(aprs, 2)
-            else:
-                n1 = dato_nivel(aprs, 1)
-                n2 = dato_nivel(aprs, 2)
-                n3 = dato_nivel(aprs, 3)
+            niveles = {s: dato_nivel(aprs, db) for db, s in enumerate(sem, start=1)}
 
             resultado.append({
                 'id':              s.id_formulario,
@@ -559,9 +555,9 @@ class MisSolicitudesView(APIView):
                 'dias':            float(s.dias_solicitados) - dias_ajust,
                 'motivo':          s.motivo_vacacion or '',
                 'estado':          _estado_display(s.estado),
-                'nivel1':          n1,
-                'nivel2':          n2,
-                'nivel3':          n3,
+                'nivel1':          niveles.get(1),
+                'nivel2':          niveles.get(2),
+                'nivel3':          niveles.get(3),
                 'observaciones':   todas_obs[-1] if todas_obs else None,
             })
 
@@ -587,7 +583,7 @@ class MisSolicitudesView(APIView):
                 'ci':     f.ci.ci,
             },
             'tipo_funcionario': f.tipo_funcionario,
-            'nivel_cols':       _NIVEL_COLS.get(f.tipo_funcionario, _NIVEL_COLS['PERSONAL DE AREA']),
+            'nivel_cols':       _nivel_cols(f.tipo_funcionario),
         })
 
 
@@ -1661,6 +1657,9 @@ def _calcular_alertas_gestiones_vencidas(funcionarios, hoy=None):
     Compartida por AlertaGestionesPorPerderView (alcance RRHH: todos los
     funcionarios) y AlertaGestionesJefeAreaView (alcance acotado a los
     subordinados de un Jefe de Area vía JerarquiaAprobacion).
+
+    Se excluyen los que ya pasaron su fecha límite: esos días ya se perdieron
+    y avisar no sirve de nada.
     """
     hoy       = hoy or date.today()
     horizonte = _sumar_meses(hoy, _ANTICIPO_RIESGO_MESES)
@@ -1702,6 +1701,9 @@ def _calcular_alertas_gestiones_vencidas(funcionarios, hoy=None):
         except ValueError:
             fecha_limite = date(anio_mas_reciente_esperado, 3, 1)
 
+        if fecha_limite < hoy:
+            continue  # ya venció: los días se perdieron, no hay nada que avisar
+
         ocupados.sort(key=lambda t: t[1])  # año ascendente = más antigua primero
         _, anio_riesgo, dias_riesgo = ocupados[0]
 
@@ -1714,7 +1716,6 @@ def _calcular_alertas_gestiones_vencidas(funcionarios, hoy=None):
             'anio_en_riesgo':  anio_riesgo,
             'dias':            float(dias_riesgo or 0),
             'fecha_limite':    fecha_limite.strftime('%d/%m/%Y'),
-            'vencido':         fecha_limite < hoy,
             '_fecha_limite_dt': fecha_limite,
         })
 

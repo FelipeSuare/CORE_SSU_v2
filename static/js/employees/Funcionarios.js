@@ -906,7 +906,6 @@ document.getElementById('funcionarioForm').addEventListener('submit', async e =>
         ap_materno:       document.getElementById('apellidoMaterno').value.trim(),
         fecha_nacimiento: document.getElementById('fechaNacimiento').value,
         sexo:             document.getElementById('sexo').value,
-        matricula_seguro: document.getElementById('matriculaSeguro').value.trim(),
         cargo:            document.getElementById('cargo').value.trim(),
         tipo_contrato:    document.getElementById('tipoContrato').value,
         unidad:           document.getElementById('unidad').value,
@@ -935,7 +934,7 @@ document.getElementById('funcionarioForm').addEventListener('submit', async e =>
         cargarTabla();
         AppDialog.alert(
             editandoCod
-                ? 'Funcionario actualizado correctamente.'
+                ? `Funcionario actualizado correctamente.\nMatrícula del seguro: ${data.matricula_seguro}`
                 : `Funcionario registrado correctamente.\nMatrícula asignada: ${data.matricula_seguro}`,
             { title: 'Guardado', icon: 'check_circle', variant: 'success' }
         );

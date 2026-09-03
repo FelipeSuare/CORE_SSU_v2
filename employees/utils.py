@@ -3,9 +3,8 @@ from datetime import date
 
 from django.db import transaction
 
-# Femenino: mes + 49  →  enero=50, febrero=51, ..., abril=53, ..., diciembre=61
-# (Ejemplo del spec: Fátima Carmela, nacida 20/04/1980 → código 53 para abril femenino)
-_OFFSET_MES_FEMENINO = 49
+# Masculino: mes tal cual (01-12). Femenino: mes + 50 → enero=51 ... diciembre=62.
+_OFFSET_MES_FEMENINO = 50
 
 
 def _inicial(texto: str) -> str:
@@ -20,14 +19,18 @@ def _inicial(texto: str) -> str:
     return base.upper()
 
 
-def generar_matricula_seguro(persona) -> str:
+def generar_matricula_seguro(persona, excluir_cod: str = None) -> str:
     """
-    Genera la matrícula del seguro social a partir de los datos de la Persona:
+    Genera la matrícula del seguro social a partir de los datos de la Persona
+    (9 caracteres, 10 si la persona tiene dos nombres):
 
       [2 últimos dígitos año nacimiento]
-      [2 dígitos mes  — masculino 01-12, femenino 50-61]
+      [2 dígitos mes + sexo — varones 01-12, mujeres 51-62]
       [2 dígitos día]
-      [inicial ap_paterno][inicial ap_materno][inicial 1er nombre][inicial 2do nombre?]
+      [inicial ap_paterno][inicial ap_materno]
+      [inicial del nombre; si tiene dos nombres, las iniciales de ambos]
+
+    Ej.: Fedra Montero Suárez → ...MSF   |   Fátima Carmela Vaca Hurtado → ...VHFC
 
     Si la matrícula ya existe agrega sufijo numérico (2, 3, ...) hasta encontrar una libre.
     """
@@ -51,11 +54,17 @@ def generar_matricula_seguro(persona) -> str:
 
     base = f"{anio}{mes}{dia}{ini_pat}{ini_mat}{ini_nom1}{ini_nom2}"
 
-    if not Funcionario.objects.filter(matricula_seguro=base).exists():
+    # Al regenerar la matrícula de un funcionario existente no debe contar
+    # como colisión la suya propia, o se le agregaría un sufijo en cada edición.
+    ocupadas = Funcionario.objects.all()
+    if excluir_cod:
+        ocupadas = ocupadas.exclude(cod_funcionario=excluir_cod)
+
+    if not ocupadas.filter(matricula_seguro=base).exists():
         return base
 
     sufijo = 2
-    while Funcionario.objects.filter(matricula_seguro=f"{base}{sufijo}").exists():
+    while ocupadas.filter(matricula_seguro=f"{base}{sufijo}").exists():
         sufijo += 1
     return f"{base}{sufijo}"
 

@@ -659,10 +659,17 @@ class TestAlertaGestionesRiesgoAPI(APITestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_funcionario_al_tope_y_desactualizado_aparece_en_riesgo(self):
-        f = hacer_funcionario(ci='11111103', nombre='Carla', fecha_ingreso=date(2015, 1, 1))
-        gv = hacer_gestion(f, anio1=2024, dias1=Decimal('15'))
-        gv.anio_gestion2 = 2025
+    def test_fecha_limite_ya_pasada_no_aparece(self):
+        # Los días ya se perdieron: avisar no sirve de nada, así que la
+        # alerta deja de mostrarlos.
+        hoy = date.today()
+        aniversario_pasado = max(hoy - timedelta(days=15), date(hoy.year, 1, 1))
+        f = hacer_funcionario(
+            ci='11111103', nombre='Carla',
+            fecha_ingreso=date(2015, aniversario_pasado.month, aniversario_pasado.day),
+        )
+        gv = hacer_gestion(f, anio1=hoy.year - 2, dias1=Decimal('15'))
+        gv.anio_gestion2 = hoy.year - 1
         gv.dias_gestion2 = Decimal('15')
         gv.save(update_fields=['anio_gestion2', 'dias_gestion2'])
 
@@ -670,13 +677,8 @@ class TestAlertaGestionesRiesgoAPI(APITestCase):
         r = self.client.get(self.url)
 
         self.assertEqual(r.status_code, status.HTTP_200_OK)
-        data = r.json()
-        cis = [row['ci'] for row in data['funcionarios']]
-        self.assertIn('11111103', cis)
-        fila = next(row for row in data['funcionarios'] if row['ci'] == '11111103')
-        self.assertEqual(fila['anio_en_riesgo'], 2024)
-        self.assertEqual(fila['dias'], 15.0)
-        self.assertEqual(fila['fecha_limite'], '01/01/2026')
+        cis = [row['ci'] for row in r.json()['funcionarios']]
+        self.assertNotIn('11111103', cis)
 
     def test_funcionario_al_dia_no_aparece(self):
         f = hacer_funcionario(ci='11111104', nombre='Diego', fecha_ingreso=date(2015, 1, 1))
@@ -722,6 +724,8 @@ class TestAlertaGestionesRiesgoAPI(APITestCase):
         self.assertIn('11111106', cis)
         fila = next(row for row in r.json()['funcionarios'] if row['ci'] == '11111106')
         self.assertEqual(fila['fecha_limite'], aniversario_futuro.strftime('%d/%m/%Y'))
+        self.assertEqual(fila['anio_en_riesgo'], hoy.year - 2)  # la gestión más antigua
+        self.assertEqual(fila['dias'], 15.0)
 
     def test_aniversario_fuera_de_la_ventana_de_un_mes_no_aparece(self):
         # Aniversario a 60 días: fuera de la ventana de anticipo de 1 mes.

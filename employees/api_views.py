@@ -192,7 +192,6 @@ class NuevoFuncionarioView(APIView):
         ap_materno       = data.get('ap_materno', '').strip()
         fecha_nac_str    = data.get('fecha_nacimiento', '').strip()
         sexo             = data.get('sexo', '').strip()
-        matricula_seguro = data.get('matricula_seguro', '').strip() or None
         cargo            = data.get('cargo', '').strip()
         tipo_contrato    = data.get('tipo_contrato', '').strip()
         unidad_nombre    = data.get('unidad', '').strip()
@@ -200,6 +199,8 @@ class NuevoFuncionarioView(APIView):
         tipo_func        = data.get('tipo_funcionario', '').strip()
         roles_nombres    = list(data.get('roles', ['Funcionario']))
         jerarquia        = data.get('jerarquia', [])
+        # `matricula_seguro` es derivado de la Persona: se genera aquí y se
+        # ignora deliberadamente lo que mande el cliente.
 
         if not all([ci, nombres, ap_paterno, fecha_nac_str, sexo, cargo,
                     tipo_contrato, unidad_nombre, fecha_ing_str, tipo_func]):
@@ -330,7 +331,6 @@ class EditarFuncionarioView(APIView):
         ap_materno       = data.get('ap_materno', '').strip()
         fecha_nac_str    = data.get('fecha_nacimiento', '').strip()
         sexo             = data.get('sexo', '').strip()
-        matricula_seguro = data.get('matricula_seguro', '').strip() or None
         cargo            = data.get('cargo', '').strip()
         tipo_contrato    = data.get('tipo_contrato', '').strip()
         unidad_nombre    = data.get('unidad', '').strip()
@@ -338,6 +338,8 @@ class EditarFuncionarioView(APIView):
         tipo_func        = data.get('tipo_funcionario', '').strip()
         roles_nombres    = list(data.get('roles', ['Funcionario']))
         jerarquia        = data.get('jerarquia', [])
+        # `matricula_seguro` se recalcula desde la Persona (ver más abajo);
+        # lo que mande el cliente se ignora, el campo es de solo lectura.
 
         if not all([nombres, ap_paterno, fecha_nac_str, sexo, cargo,
                     tipo_contrato, unidad_nombre, fecha_ing_str, tipo_func]):
@@ -387,6 +389,11 @@ class EditarFuncionarioView(APIView):
                 p.fecha_nacimiento = fecha_nac
                 p.sexo             = sexo
                 p.save(update_fields=['nombre', 'ap_paterno', 'ap_materno', 'fecha_nacimiento', 'sexo'])
+
+                # La matrícula deriva de nombre/apellidos/nacimiento/sexo: si
+                # alguno de esos cambió, debe seguirlo.
+                from employees.utils import generar_matricula_seguro
+                matricula_seguro = generar_matricula_seguro(p, excluir_cod=funcionario.cod_funcionario)
 
                 funcionario.id_unidad        = unidad
                 funcionario.fecha_ingreso    = fecha_ing
@@ -496,7 +503,7 @@ class EditarFuncionarioView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        return Response({'ok': True})
+        return Response({'ok': True, 'matricula_seguro': funcionario.matricula_seguro})
 
 
 class ToggleEstadoView(APIView):

@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from core.test_utils import hacer_usuario_y_funcionario, hacer_cargo, hacer_unidad
 from employees.models import Funcionario, Persona
+from employees.utils import generar_matricula_seguro
 
 
 class TestListarFuncionariosAPI(APITestCase):
@@ -170,3 +171,44 @@ class TestBuscarFuncionariosAPI(APITestCase):
         r = self.client.get(self.url, {'q': 'XZXZnoexiste'})
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.assertEqual(r.json()['funcionarios'], [])
+
+
+class TestGenerarMatriculaSeguro(APITestCase):
+    """employees.utils.generar_matricula_seguro — formato de 9 dígitos."""
+
+    def _persona(self, **kw):
+        base = dict(
+            ci='77700001', nombre='Fedra', ap_paterno='Montero',
+            ap_materno='Suarez', fecha_nacimiento=date(1990, 3, 7),
+            sexo='Femenino',
+        )
+        base.update(kw)
+        return Persona(**base)
+
+    def test_varon_usa_el_mes_tal_cual(self):
+        p = self._persona(nombre='Juan', ap_paterno='Perez', ap_materno='Lopez',
+                          fecha_nacimiento=date(1986, 5, 5), sexo='Masculino')
+        self.assertEqual(generar_matricula_seguro(p), '860505PLJ')
+
+    def test_mujer_suma_50_al_mes(self):
+        # marzo (3) + 50 = 53 → rango femenino 51-62
+        p = self._persona()
+        self.assertEqual(generar_matricula_seguro(p), '905307MSF')
+
+    def test_mujer_enero_y_diciembre_en_los_bordes(self):
+        enero = self._persona(fecha_nacimiento=date(1990, 1, 7))
+        dic   = self._persona(fecha_nacimiento=date(1990, 12, 7))
+        self.assertTrue(generar_matricula_seguro(enero).startswith('9051'))
+        self.assertTrue(generar_matricula_seguro(dic).startswith('9062'))
+
+    def test_un_solo_nombre_una_inicial_dos_nombres_dos_iniciales(self):
+        uno = self._persona(nombre='Fedra')
+        dos = self._persona(nombre='Fatima Carmela', ap_paterno='Vaca',
+                            ap_materno='Hurtado', fecha_nacimiento=date(1980, 4, 20))
+        self.assertEqual(generar_matricula_seguro(uno), '905307MSF')
+        self.assertEqual(generar_matricula_seguro(dos), '805420VHFC')
+
+    def test_acentos_y_dia_con_cero_a_la_izquierda(self):
+        p = self._persona(nombre='Angela', ap_paterno='Nunez', ap_materno='Ibanez',
+                          fecha_nacimiento=date(2001, 8, 3))
+        self.assertEqual(generar_matricula_seguro(p), '015803NIA')
