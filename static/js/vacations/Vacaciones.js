@@ -152,8 +152,10 @@ async function cargarDatosFormulario() {
             vacationRequestForm.querySelector('button[type="submit"]').disabled = true;
         }
 
-        // Cargar seguimiento al inicializar
+        // Cargar seguimiento al inicializar; #seguimiento (desde la notificación
+        // del dashboard) abre el panel directamente.
         await cargarSeguimiento();
+        if (location.hash === '#seguimiento') trackingPanel.classList.add('show');
 
     } catch (err) {
         console.error('Error al cargar datos del formulario:', err);

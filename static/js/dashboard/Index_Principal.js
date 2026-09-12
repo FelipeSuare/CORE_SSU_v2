@@ -251,7 +251,7 @@ function _stackAlertas() {
     return stack;
 }
 
-function crearWidgetAlerta({ id, titulo, subtitulo, headers, filas, contadorLabel }) {
+function crearWidgetAlerta({ id, titulo, subtitulo, headers, filas, contadorLabel, contador = filas.length }) {
     const existing = document.getElementById(id);
     if (existing) existing.remove();
 
@@ -262,7 +262,7 @@ function crearWidgetAlerta({ id, titulo, subtitulo, headers, filas, contadorLabe
     flotante.innerHTML = `
         <div class="alerta-trigger" id="${id}Trigger">
             <i class="material-symbols-outlined alerta-trigger-icon">notification_important</i>
-            <span class="alerta-count">${filas.length}</span>
+            <span class="alerta-count">${contador}</span>
             <span class="alerta-trigger-text">${contadorLabel}</span>
             <button class="alerta-close-btn" id="${id}Close" title="Cerrar notificación">
                 <i class="material-symbols-outlined">close</i>
@@ -414,3 +414,67 @@ function mostrarAlertaGestionesEquipo(funcionarios) {
 }
 
 document.addEventListener('DOMContentLoaded', verificarAlertasJefeArea);
+
+// ── Notificación al funcionario: estado final de su última solicitud ──
+// Reusa /seguimiento/ (misma fuente que el panel "Seguimiento" de Vacaciones.html):
+// el panel muestra el motivo del rechazo/aprobación y enlaza al módulo.
+// Solo estados finales (Aprobada / Rechazada). Al cerrarla queda marcada como
+// vista en localStorage para esa solicitud+estado y no vuelve a aparecer.
+const _ESTADOS_NOTIF_SOLICITUD = { Aprobada: 'approved', Rechazada: 'rejected' };
+
+function _keyNotifSolicitud(data) {
+    return `vacNotifVista:${data.id}:${data.estado}`;
+}
+
+async function verificarEstadoMiSolicitud() {
+    try {
+        const res = await fetch('/api/vacaciones/seguimiento/');
+        if (!res.ok) return; // 403/404 = sin rol funcionario o sin ficha, ignorar
+        const data = await res.json();
+        if (!data.tiene_solicitud || !(data.estado in _ESTADOS_NOTIF_SOLICITUD)) return;
+        if (localStorage.getItem(_keyNotifSolicitud(data))) return;
+        mostrarAlertaEstadoSolicitud(data);
+    } catch (_) {}
+}
+
+function mostrarAlertaEstadoSolicitud(data) {
+    const rechazada  = data.estado === 'Rechazada';
+    const pasoFinal  = data.timeline.filter(p => p.estado === _ESTADOS_NOTIF_SOLICITUD[data.estado]).pop();
+    const statusText = { approved: 'APROBADO', rejected: 'RECHAZADO', pending: 'PENDIENTE', sent: 'ENVIADO', inactive: 'Esperando', na: 'NO ASIGNADO' };
+    const fmtFecha   = f => (f ? f.split('-').reverse().join('/') : '--/--/----');
+
+    const filas = data.timeline.map(p => `
+        <tr>
+            <td>${_esc(p.nivel)}</td>
+            <td>${_esc(p.responsable)}</td>
+            <td><span class="alerta-decision ${_esc(p.estado)}">${statusText[p.estado] || _esc(p.estado)}</span></td>
+            <td>${fmtFecha(p.fecha)}</td>
+            <td>${_esc(p.comentarios) || '—'}</td>
+        </tr>`);
+
+    const subtitulo = rechazada
+        ? `Motivo del rechazo (${_esc(pasoFinal?.nivel)} — ${_esc(pasoFinal?.responsable)}): ${_esc(pasoFinal?.comentarios) || 'Sin observación registrada.'}`
+        : 'Su solicitud fue aprobada en todos los niveles.';
+
+    const flotante = crearWidgetAlerta({
+        id:            'alertaEstadoSolicitud',
+        titulo:        `Solicitud ${_esc(data.codigo)} — ${_esc(data.estado)}`,
+        subtitulo,
+        headers:       ['Nivel', 'Responsable', 'Decisión', 'Fecha', 'Observación'],
+        filas,
+        contador:      1,
+        contadorLabel: ` solicitud ${_esc(data.codigo)}: ${_esc(data.estado.toUpperCase())}`,
+    });
+
+    flotante.classList.add(rechazada ? 'rechazada' : 'aprobada');
+    flotante.querySelector('.alerta-panel').insertAdjacentHTML('beforeend', `
+        <div class="alerta-panel-footer">
+            <a class="alerta-accion-btn" href="Vacaciones.html#seguimiento">Ver seguimiento completo</a>
+        </div>`);
+
+    document.getElementById('alertaEstadoSolicitudClose').addEventListener('click', () => {
+        try { localStorage.setItem(_keyNotifSolicitud(data), '1'); } catch (_) {}
+    });
+}
+
+document.addEventListener('DOMContentLoaded', verificarEstadoMiSolicitud);

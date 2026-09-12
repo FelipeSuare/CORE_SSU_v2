@@ -169,6 +169,19 @@
 .alerta-dias { font-weight: 700; color: #720035; }
 .alerta-fecha-limite { font-weight: 700; color: #271447; }
 
+/* Notificación "estado de mi solicitud" (funcionario): verde si fue aprobada */
+.alerta-flotante.aprobada .alerta-trigger { background: #1e7d4f; box-shadow: 0 4px 18px rgba(30,125,79,0.4); }
+.alerta-flotante.aprobada .alerta-trigger:hover { background: #166039; }
+.alerta-flotante.aprobada .alerta-count { color: #1e7d4f; }
+.alerta-decision { font-weight: 700; font-size: 0.9em; }
+.alerta-decision.approved, .alerta-decision.sent { color: #1e7d4f; }
+.alerta-decision.rejected { color: #c0392b; }
+.alerta-decision.pending, .alerta-decision.inactive, .alerta-decision.na { color: #999; }
+#alertaEstadoSolicitud .alerta-panel-sub { color: #271447; font-size: 0.8em; font-weight: 600; }
+#alertaEstadoSolicitud .alerta-table td { white-space: normal; }
+.alerta-panel-footer { padding: 0 18px 14px; text-align: right; }
+.alerta-panel-footer .alerta-accion-btn { display: inline-block; text-decoration: none; }
+
 * { scrollbar-width: none; }
 
 body {
