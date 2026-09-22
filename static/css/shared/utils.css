@@ -264,6 +264,19 @@
 .col-span-2 { grid-column: span 2 !important; }
 .col-full   { grid-column: 1 / -1 !important; }
 
+/* Botón PDF (compartido: Frm_Solicitud, Solicitudes_Rechazadas, Funcionarios) */
+.btn-pdf {
+    background: var(--color-pink-dark);
+    color: var(--color-white-solid);
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.3s;
+    font-family: 'Montserrat', sans-serif;
+}
+.btn-pdf:hover { background: var(--color-purple-dark); }
+
 /* ═══════════════════════════════════════════════════════════
    RESPONSIVE HELPERS
 ═══════════════════════════════════════════════════════════ */

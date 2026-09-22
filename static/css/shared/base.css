@@ -333,6 +333,10 @@ body {
 /* ═══════════════════════════════════════════════════════════
    TABLA
 ═══════════════════════════════════════════════════════════ */
+/* Contenedor de scroll horizontal para tablas anchas (usado por Reportes,
+   Historial de Solicitudes e Historial de Cargos). */
+.table-responsive { overflow-x: auto; }
+
 .table-wrapper {
     overflow-x: auto;
     border-radius: 14px;

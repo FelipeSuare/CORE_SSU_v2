@@ -89,8 +89,8 @@ class TestCalcularRetorno(TestCase):
     fecha_retorno = primer día posterior al último día de vacación.
     """
 
-    def _run(self, fecha_salida, dias, nacimiento=None, feriados=None):
-        return _calcular_retorno(fecha_salida, dias, nacimiento, feriados or set())
+    def _run(self, fecha_salida, dias, feriados=None):
+        return _calcular_retorno(fecha_salida, dias, feriados or set())
 
     # ── Casos básicos ──────────────────────────────────────────────────────────
 
@@ -147,25 +147,6 @@ class TestCalcularRetorno(TestCase):
         # El sáb ya era skip por fin de semana, el feriado no añade días extras
         self.assertEqual(r_sin['fecha_retorno'], r_con['fecha_retorno'])
         self.assertEqual(r_con['dias_feriados'], 0)
-
-    # ── Cumpleaños (medio asueto) ───────────────────────────────────────────────
-
-    def test_cumpleanios_en_primer_dia_agrega_medio_dia(self):
-        nacimiento = date(1990, 1, 8)  # cumple el 8 de enero
-        # Sin cumpleaños: 1 hábil → retorno día siguiente (9/1)
-        r_sin = self._run(date(2024, 1, 8), Decimal('1'))
-        self.assertEqual(r_sin['fecha_retorno'], date(2024, 1, 9))
-        # Con cumpleaños el 8/1 cuenta 0.5, después el 9/1 completa a 1.5 → retorno 10/1
-        r_con = self._run(date(2024, 1, 8), Decimal('1'), nacimiento=nacimiento)
-        self.assertEqual(r_con['fecha_retorno'], date(2024, 1, 10))
-        self.assertEqual(r_con['dias_cumpleanos'], 1)
-
-    def test_cumpleanios_fuera_del_periodo_no_afecta(self):
-        # Cumpleaños el 31 de diciembre; vacaciones en enero → no hay efecto
-        nacimiento = date(1990, 12, 31)
-        r = self._run(date(2024, 1, 8), Decimal('5'), nacimiento=nacimiento)
-        self.assertEqual(r['dias_cumpleanos'], 0)
-        self.assertEqual(r['fecha_retorno'], date(2024, 1, 13))
 
     # ── Días fraccionarios ─────────────────────────────────────────────────────
 

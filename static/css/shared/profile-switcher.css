@@ -191,6 +191,19 @@
 }
 
 @media (max-width: 600px) {
+    /* El botón ocupa el ancho de su celda; sin esto desborda y pisa al vecino */
+    .profile-switcher-container .btn-profile-trigger {
+        width: 100%;
+        min-width: 0;
+        justify-content: center;
+        padding: 10px 12px;
+        font-size: 0.9em;
+    }
+    .profile-switcher-container .btn-profile-trigger span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
     .profile-panel {
         position: fixed;
         top: auto;

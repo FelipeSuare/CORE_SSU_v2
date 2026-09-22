@@ -113,8 +113,8 @@ function renderizarTabla(lista) {
             : '';
         const colPDF = esInactivo
             ? `<td style="text-align:center">
-                <button class="action-btn" onclick="descargarPDFVacaciones('${f.cod}')" title="Descargar PDF de vacaciones al cierre">
-                    <i class="material-symbols-outlined" style="color:#c62828">picture_as_pdf</i>
+                <button class="btn-pdf" onclick="descargarPDFVacaciones('${f.cod}')" title="Descargar PDF de vacaciones al cierre">
+                    <i class="material-symbols-outlined">picture_as_pdf</i>
                 </button>
                </td>`
             : '';

@@ -20,14 +20,9 @@
     user-select: none;
 }
 
-/* El widget de "a punto de perder días" debe quedar por encima de los
-   demás cuando varios paneles están abiertos y se superponen. */
-#alertaGestionesRiesgo {
-    z-index: 1;
-}
-#alertaGestionesRiesgo .alerta-panel {
-    z-index: 3;
-}
+/* El widget abierto queda por encima de los demás (si no, el trigger del
+   siguiente widget pisa el panel desplegado). */
+.alerta-flotante.open { z-index: 5; }
 
 .alerta-trigger {
     display: inline-flex;
@@ -798,6 +793,18 @@ body {
 
 /* RESPONSIVE */
 @media (max-width: 768px) {
+    /* Alertas flotantes: bajo la topbar (56px) y el panel ocupa el ancho de pantalla
+       (en escritorio tiene min-width 560px, imposible en móvil). */
+    .alerta-stack { top: 64px; right: 10px; left: 10px; }
+    .alerta-trigger { white-space: normal; max-width: 100%; }
+    .alerta-trigger-text { font-size: 0.72em; }
+    .alerta-panel {
+        width: calc(100vw - 20px);
+        min-width: 0;
+        max-width: none;
+    }
+    .alerta-panel-body { max-height: 60vh; }
+
     .sidebar {
         transform: translateX(-100%);
         transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);

@@ -106,11 +106,10 @@ def _saldos_para_js(gv):
     }
 
 
-def _calcular_retorno(fecha_salida, dias_solicitados, fecha_nacimiento, feriados_set):
+def _calcular_retorno(fecha_salida, dias_solicitados, feriados_set):
     dias_habiles       = Decimal('0')
     dias_fines_semana  = 0
     dias_feriados_count = 0
-    dias_cumple        = 0
     target             = Decimal(str(dias_solicitados))
     fecha_actual       = fecha_salida
 
@@ -127,14 +126,6 @@ def _calcular_retorno(fecha_salida, dias_solicitados, fecha_nacimiento, feriados
             fecha_actual += timedelta(days=1)
             continue
 
-        if (fecha_nacimiento
-                and fecha_actual.month == fecha_nacimiento.month
-                and fecha_actual.day == fecha_nacimiento.day):
-            dias_cumple  += 1
-            dias_habiles += Decimal('0.5')
-            fecha_actual += timedelta(days=1)
-            continue
-
         dias_habiles += Decimal('1')
         fecha_actual += timedelta(days=1)
 
@@ -142,7 +133,6 @@ def _calcular_retorno(fecha_salida, dias_solicitados, fecha_nacimiento, feriados
         'fecha_retorno':   fecha_actual,
         'dias_fines_semana': dias_fines_semana,
         'dias_feriados':   dias_feriados_count,
-        'dias_cumpleanos': dias_cumple,
     }
 
 
@@ -151,21 +141,6 @@ def _siguiente_dia_habil(fecha, feriados_set):
     while fecha.weekday() >= 5 or fecha in feriados_set:
         fecha += timedelta(days=1)
     return fecha
-
-
-def _contar_cumples_en_periodo(fecha_salida, fecha_retorno, fecha_nacimiento, feriados_set):
-    """Cuenta cumpleaños del empleado que caen en día hábil dentro del período
-    de vacaciones (excluye fecha_retorno). Cada uno descuenta 0.5 días."""
-    if not fecha_nacimiento:
-        return 0
-    count = 0
-    actual = fecha_salida
-    while actual < fecha_retorno:
-        if actual.weekday() < 5 and actual not in feriados_set:
-            if actual.month == fecha_nacimiento.month and actual.day == fecha_nacimiento.day:
-                count += 1
-        actual += timedelta(days=1)
-    return count
 
 
 def _get_usuario_rrhh(request):
@@ -308,7 +283,6 @@ class CalcularRetornoView(APIView):
     def post(self, request):
         fecha_salida_str = request.data.get('fecha_salida', '').strip()
         dias_str         = str(request.data.get('dias_solicitados', '')).strip()
-        cod_funcionario  = request.data.get('cod_funcionario', '').strip()
 
         if not fecha_salida_str or not dias_str:
             return Response({'error': 'Datos incompletos.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -324,32 +298,20 @@ class CalcularRetornoView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        fecha_nacimiento = None
-        if cod_funcionario:
-            try:
-                fobj = Funcionario.objects.select_related('ci').get(cod_funcionario=cod_funcionario)
-                fecha_nacimiento = fobj.ci.fecha_nacimiento
-            except Funcionario.DoesNotExist:
-                pass
-
         feriados_set = set(Feriado.objects.values_list('fecha', flat=True))
-        result       = _calcular_retorno(fecha_salida, dias, fecha_nacimiento, feriados_set)
+        result       = _calcular_retorno(fecha_salida, dias, feriados_set)
 
         fecha_retorno   = result['fecha_retorno']
         fecha_conclusion = fecha_retorno - timedelta(days=1)
-
-        cumples    = result['dias_cumpleanos']
-        efectivos  = float(dias - Decimal(str(cumples)) * Decimal('0.5'))
 
         return Response({
             'fecha_retorno':    fecha_retorno.strftime('%Y-%m-%d'),
             'fecha_conclusion': fecha_conclusion.strftime('%Y-%m-%d'),
             'dias_fines_semana': result['dias_fines_semana'],
             'dias_feriados':    result['dias_feriados'],
-            'dias_cumpleanos':  cumples,
             'dias_no_habiles':  result['dias_fines_semana'] + result['dias_feriados'],
             'dias_solicitados':  float(dias),
-            'dias_efectivos':   efectivos,
+            'dias_efectivos':   float(dias),
         })
 
 
@@ -411,11 +373,6 @@ class CrearSolicitudView(APIView):
                 {'error': 'No se encontró el registro de gestión de vacaciones.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        feriados_set = set(Feriado.objects.values_list('fecha', flat=True))
-        cumples      = _contar_cumples_en_periodo(fecha_salida, fecha_retorno, f.ci.fecha_nacimiento, feriados_set)
-        descuento    = Decimal(str(cumples)) * Decimal('0.5')
-        dias         = dias - descuento
 
         saldo_total = gv.dias_adeudados or Decimal('0')
         if dias > saldo_total:
@@ -1323,7 +1280,7 @@ class SolicitudesAnulacionView(APIView):
 
         qs = (
             SolicitudVacacion.objects
-            .filter(estado__in=('APROBADA', 'ANULADA'))
+            .filter(estado__in=('APROBADA', 'ANULADA'), fecha_retorno__gte=date.today())
             .select_related('cod_funcionario__ci', 'cod_funcionario__id_unidad')
             .order_by('-fecha_solicitud')
         )

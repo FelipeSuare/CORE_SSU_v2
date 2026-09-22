@@ -283,7 +283,7 @@ async function calcularFechaRetorno() {
 
     } catch (err) {
         console.error('Error al calcular retorno:', err);
-        // Fallback: cálculo local básico (sin feriados ni cumpleaños)
+        // Fallback: cálculo local básico (sin feriados)
         calcularRetornoLocal(fechaSalida, parseInt(diasTomar));
     }
 }
@@ -365,8 +365,6 @@ function poblarModal(diasTomar, saldoTotal, motivo) {
 
     document.getElementById('summaryDiasNoHabiles').textContent =
         rd.dias_no_habiles !== undefined ? rd.dias_no_habiles : '—';
-    document.getElementById('summaryDiasCumpleanos').textContent =
-        rd.dias_cumpleanos !== undefined ? rd.dias_cumpleanos : '—';
     document.getElementById('summaryDiasEfectivos').textContent =
         rd.dias_efectivos !== undefined ? rd.dias_efectivos.toFixed(1) : diasTomar.toFixed(1);
     document.getElementById('summaryDiasFestivos').textContent =
