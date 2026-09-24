@@ -124,6 +124,14 @@
                 </a>
             </li>
             {% endif %}
+            {% if 'acuerdos_vacacion' in modulos_permitidos %}
+            <li class="menu-item">
+                <a href="AcuerdosVacacion.html" data-page="acuerdos-vacacion">
+                    <i class="material-symbols-outlined">gavel</i>
+                    <span>Acuerdos de Vacación</span>
+                </a>
+            </li>
+            {% endif %}
             {% if 'anulacion' in modulos_permitidos %}
             <li class="menu-item">
                 <a href="Anulacion.html" data-page="anulacion-ajuste">

@@ -150,7 +150,7 @@ Modelo: `vacations.GestionVacacion`. El "saldo" de vacaciones de cada funcionari
 | cod_funcionario | varchar(20) (FK → `funcionario`, único) | No | — | Un registro por funcionario. |
 | dias_gestionN (N=1..4) | numeric(4,1) | No | 0 | Días acreditados en el slot N. |
 | anio_gestionN (N=1..4) | integer | Sí | — | A qué año/gestión corresponde ese slot (null = slot vacío). El número de slot **no** refleja antigüedad real — se asigna al primer slot libre que encuentra el código. |
-| dias_negados | numeric(4,1) | No | 0 | Días descontados por solicitudes rechazadas u otros ajustes negativos. |
+| dias_negados | numeric(4,1) | No | 0 | Histórico informativo: días de solicitudes rechazadas. Se suma al rechazar; esos días ya se repusieron en la gestión más antigua, por eso no entra en `dias_adeudados`. |
 | dias_adeudados | numeric(4,1) | Sí | — | Columna **generada por PostgreSQL** (`GENERATED ALWAYS AS`, `db_persist=True` en el modelo) = suma de `dias_gestion1..4`. Nunca se escribe desde código, solo se lee. |
 | dias_perdidos | numeric(4,1) | No | 0 | Días perdidos por evicción automática cuando el funcionario supera el tope de **2 gestiones activas** simultáneas (`aplicar_limite_gestiones_activas()` en `vacations/utils.py`). Se actualiza automáticamente cada vez que se acredita una gestión nueva que empuja a la más antigua fuera del tope. **Esta columna no existe en el modelo de v1** — ver [Diferencias entre v1 y v2](#diferencias-entre-v1-y-v2). |
 
@@ -194,6 +194,32 @@ Modelo: `vacations.AnulacionAjuste`. Anulación total o ajuste parcial de una so
 | dias_devolver | numeric(4,1) | No | 0 | Días que se devuelven al saldo de `gestion_vacacion`. |
 | fecha_registro | timestamp | Sí | now() | Cuándo se registró. |
 | registrado_por | varchar(20) (FK → `funcionario`) | Sí | — | Quién hizo la anulación/ajuste (típicamente RRHH). |
+
+### `acuerdo_vacacion`
+Modelo: `vacations.AcuerdoVacacion`. Excepción a la pérdida por tope de gestiones activas (migración `vacations/0002`). Mientras esté `activo` y `fecha_hasta >= hoy`, las gestiones listadas en `acuerdo_vacacion_funcionario` no se evictan a `dias_perdidos` (`aplicar_limite_gestiones_activas()` las excluye). Al vencer, el poblado diario las evicta normalmente.
+
+| Columna | Tipo | Null | Default | Descripción |
+|---|---|---|---|---|
+| id_acuerdo | integer (PK) | No | secuencia | Identificador. |
+| tipo | varchar(10) | No | — | `COLECTIVO` (registrado por RRHH con respaldo documental, ej. pandemia) o `RECHAZO` (generado por el sistema al rechazar una solicitud hecha dentro de 60 días antes de la fecha límite; protege hasta fecha límite + 6 meses). |
+| nro_documento | varchar(60) | Sí | — | Resolución/memorándum. Obligatorio en `COLECTIVO`. |
+| motivo | text | No | — | Motivo del acuerdo. |
+| fecha_acuerdo | date | No | — | Fecha del acuerdo. |
+| fecha_hasta | date | No | — | Nueva fecha límite: después de esta fecha la gestión se pierde por el tope normal. |
+| id_formulario | integer (FK → `solicitud_vacacion`) | Sí | — | Solicitud rechazada que originó el acuerdo (`RECHAZO`). |
+| registrado_por | varchar(20) (FK → `funcionario`) | Sí | — | RRHH que lo registró, o el aprobador que rechazó. |
+| fecha_registro | timestamptz | No | now() | Cuándo se registró. |
+| activo | boolean | No | true | `false` = revocado (no se borra, queda para auditoría). |
+
+### `acuerdo_vacacion_funcionario`
+Modelo: `vacations.AcuerdoVacacionFuncionario`. Gestiones protegidas por cada acuerdo. `UNIQUE (id_acuerdo, cod_funcionario, anio_gestion)`.
+
+| Columna | Tipo | Null | Default | Descripción |
+|---|---|---|---|---|
+| id | integer (PK) | No | secuencia | Identificador. |
+| id_acuerdo | integer (FK → `acuerdo_vacacion`, cascade) | No | — | Acuerdo. |
+| cod_funcionario | varchar(20) (FK → `funcionario`, cascade) | No | — | Funcionario afectado. |
+| anio_gestion | integer | No | — | Año de gestión protegido (en `COLECTIVO`, las gestiones activas del funcionario al registrar el acuerdo). |
 
 ---
 

@@ -43,6 +43,7 @@ urlpatterns = [
     path('Anulacion.html', vacations_views.anulacion_view, name='anulacion'),
     path('HistorialRRHH.html', vacations_views.historial_rrhh_view, name='historial_rrhh'),
     path('SolicitudesRechazadas.html', vacations_views.rechazadas_view, name='solicitudes_rechazadas'),
+    path('AcuerdosVacacion.html', vacations_views.acuerdos_view, name='acuerdos_vacacion'),
 
     # Reports
     path('ReporteP.html', reports_views.reporte_personal_view, name='reporte_p'),

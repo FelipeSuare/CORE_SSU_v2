@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 
 from employees.models import Funcionario
 from vacations.models import GestionVacacion, SolicitudVacacion
-from vacations.utils import calcular_gestioneS_pendientes, LIMITE_GESTIONES_ACTIVAS
+from vacations.utils import anios_protegidos, calcular_gestioneS_pendientes, LIMITE_GESTIONES_ACTIVAS
 
 
 class Command(BaseCommand):
@@ -34,6 +34,11 @@ class Command(BaseCommand):
 
             tiene_aprobada = SolicitudVacacion.objects.filter(cod_funcionario=f, estado='APROBADA').exists()
             if tiene_aprobada:
+                continue
+
+            # Gestiones protegidas por un acuerdo vigente: el recálculo desde cero
+            # las volvería a descontar.
+            if anios_protegidos(f.cod_funcionario):
                 continue
 
             sin_aprobada_con_gv += 1

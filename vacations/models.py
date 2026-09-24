@@ -85,3 +85,37 @@ class AnulacionAjuste(models.Model):
     class Meta:
         db_table = 'anulacion_ajuste'
         managed = False
+
+class AcuerdoVacacion(models.Model):
+    """
+    Excepción a la pérdida por tope de gestiones activas. Mientras esté activo
+    y vigente (fecha_hasta >= hoy), las gestiones listadas en
+    AcuerdoVacacionFuncionario no se evictan a dias_perdidos.
+      COLECTIVO: registrado por RRHH con respaldo documental (ej. pandemia).
+      RECHAZO:   generado por el sistema al rechazar una solicitud hecha
+                 cerca de la fecha límite de la gestión más antigua.
+    """
+    id_acuerdo = models.AutoField(primary_key=True)
+    tipo = models.CharField(max_length=10)
+    nro_documento = models.CharField(max_length=60, blank=True, null=True)
+    motivo = models.TextField()
+    fecha_acuerdo = models.DateField()
+    fecha_hasta = models.DateField()
+    id_formulario = models.ForeignKey(SolicitudVacacion, models.DO_NOTHING, db_column='id_formulario', blank=True, null=True)
+    registrado_por = models.ForeignKey('employees.Funcionario', models.DO_NOTHING, db_column='registrado_por', blank=True, null=True, related_name='+')
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'acuerdo_vacacion'
+        managed = False
+
+class AcuerdoVacacionFuncionario(models.Model):
+    id_acuerdo = models.ForeignKey(AcuerdoVacacion, models.CASCADE, db_column='id_acuerdo', related_name='afectados')
+    cod_funcionario = models.ForeignKey('employees.Funcionario', models.CASCADE, db_column='cod_funcionario', related_name='+')
+    anio_gestion = models.IntegerField()
+
+    class Meta:
+        db_table = 'acuerdo_vacacion_funcionario'
+        managed = False
+        unique_together = (('id_acuerdo', 'cod_funcionario', 'anio_gestion'),)

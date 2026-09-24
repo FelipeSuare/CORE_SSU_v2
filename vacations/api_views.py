@@ -18,6 +18,7 @@ from core.api_permissions import NoCambioPendiente, EsRRHH, EsAprobador, EsFunci
 from employees.models import Funcionario, HistorialCargo
 from accounts.models import FuncionarioRol
 from vacations.models import (
+    AcuerdoVacacion, AcuerdoVacacionFuncionario,
     AnulacionAjuste, AprobacionSolicitud, GestionVacacion,
     JerarquiaAprobacion, SolicitudVacacion,
 )
@@ -27,6 +28,13 @@ from vacations.utils import (
     dias_por_antiguedad,
     poblar_gestion_vacacion,
     aplicar_limite_gestiones_activas,
+    anios_protegidos,
+    devolver_dias,
+    gestion_en_riesgo,
+    gestiones_ocupadas,
+    sumar_meses,
+    DIAS_ANTICIPO_RECHAZO_PROTEGIDO,
+    MESES_EXTENSION_RECHAZO,
     LIMITE_GESTIONES_ACTIVAS,
 )
 
@@ -405,7 +413,10 @@ class CrearSolicitudView(APIView):
                     estado=estado_inicial,
                 )
                 pendientes = dias
-                for i in range(4, 0, -1):
+                orden = [slot for slot, _, _ in gestiones_ocupadas(gv)] + [
+                    i for i in range(4, 0, -1) if getattr(gv, f'anio_gestion{i}') is None
+                ]
+                for i in orden:
                     if pendientes <= 0:
                         break
                     campo      = f'dias_gestion{i}'
@@ -835,6 +846,37 @@ class SolicitudesParaAprobarView(APIView):
         })
 
 
+def _proteger_si_rechazo_cerca_de_vencer(solicitud, gv, aprobador, observacion):
+    """
+    Si la solicitud rechazada se pidió dentro de DIAS_ANTICIPO_RECHAZO_PROTEGIDO
+    días antes de la fecha límite de la gestión en riesgo, crea un
+    AcuerdoVacacion tipo RECHAZO que la protege hasta fecha límite +
+    MESES_EXTENSION_RECHAZO: el funcionario intentó tomarla a tiempo.
+    Retorna el acuerdo creado o None.
+    """
+    solicitante = solicitud.cod_funcionario
+    protegidos  = anios_protegidos(solicitante.cod_funcionario)
+    riesgo      = gestion_en_riesgo(gv, solicitante.fecha_ingreso, protegidos)
+    if not riesgo:
+        return None
+    _, anio, _, fecha_limite = riesgo
+    if not 0 <= (fecha_limite - solicitud.fecha_solicitud).days <= DIAS_ANTICIPO_RECHAZO_PROTEGIDO:
+        return None
+
+    acuerdo = AcuerdoVacacion.objects.create(
+        tipo='RECHAZO',
+        motivo=f'Solicitud G{solicitud.id_formulario:03d} rechazada cerca del vencimiento: {observacion}',
+        fecha_acuerdo=date.today(),
+        fecha_hasta=sumar_meses(fecha_limite, MESES_EXTENSION_RECHAZO),
+        id_formulario=solicitud,
+        registrado_por=aprobador,
+    )
+    AcuerdoVacacionFuncionario.objects.create(
+        id_acuerdo=acuerdo, cod_funcionario=solicitante, anio_gestion=anio,
+    )
+    return acuerdo
+
+
 class RegistrarDecisionView(APIView):
     permission_classes = [NoCambioPendiente, EsAprobador]
 
@@ -916,22 +958,17 @@ class RegistrarDecisionView(APIView):
                 if decision == 'RECHAZADO':
                     solicitud.estado = 'RECHAZADA'
                     solicitud.save(update_fields=['estado'])
-                    try:
-                        gv = GestionVacacion.objects.get(cod_funcionario=solicitante)
-                        a_devolver = solicitud.dias_solicitados
-                        for i in range(4, 0, -1):
-                            if a_devolver <= 0:
-                                break
-                            campo = f'dias_gestion{i}'
-                            anio  = getattr(gv, f'anio_gestion{i}')
-                            if anio is not None or i == 4:
-                                setattr(gv, campo, getattr(gv, campo) + a_devolver)
-                                a_devolver = Decimal('0')
+                    gv = GestionVacacion.objects.select_for_update().filter(
+                        cod_funcionario=solicitante
+                    ).first()
+                    if gv:
+                        devolver_dias(gv, solicitud.dias_solicitados)
+                        gv.dias_negados = (gv.dias_negados or Decimal('0')) + solicitud.dias_solicitados
                         gv.save(update_fields=[
-                            'dias_gestion1', 'dias_gestion2', 'dias_gestion3', 'dias_gestion4'
+                            'dias_gestion1', 'dias_gestion2', 'dias_gestion3', 'dias_gestion4',
+                            'dias_negados',
                         ])
-                    except GestionVacacion.DoesNotExist:
-                        pass
+                        _proteger_si_rechazo_cerca_de_vencer(solicitud, gv, aprobador, observacion)
                 else:
                     total_niveles = JerarquiaAprobacion.objects.filter(
                         cod_funcionario=solicitante, activo=True
@@ -1417,14 +1454,7 @@ class RegistrarAnulacionView(APIView):
                     registrado_por=f_rrhh,
                 )
 
-                a_devolver = dias_devolver
-                for i in range(4, 0, -1):
-                    if a_devolver <= 0:
-                        break
-                    if getattr(gv, f'anio_gestion{i}') is not None or i == 4:
-                        setattr(gv, f'dias_gestion{i}',
-                                getattr(gv, f'dias_gestion{i}') + a_devolver)
-                        a_devolver = Decimal('0')
+                devolver_dias(gv, dias_devolver)
                 gv.save(update_fields=[
                     'dias_gestion1', 'dias_gestion2', 'dias_gestion3', 'dias_gestion4'
                 ])
@@ -1625,6 +1655,13 @@ def _calcular_alertas_gestiones_vencidas(funcionarios, hoy=None):
         gv.cod_funcionario_id: gv
         for gv in GestionVacacion.objects.filter(cod_funcionario__in=funcionarios)
     }
+    protegidos_map = {}
+    for cod, anio in AcuerdoVacacionFuncionario.objects.filter(
+        cod_funcionario__in=funcionarios,
+        id_acuerdo__activo=True,
+        id_acuerdo__fecha_hasta__gte=hoy,
+    ).values_list('cod_funcionario', 'anio_gestion'):
+        protegidos_map.setdefault(cod, set()).add(anio)
 
     alertas = []
     for f in funcionarios:
@@ -1632,11 +1669,8 @@ def _calcular_alertas_gestiones_vencidas(funcionarios, hoy=None):
         if not gv:
             continue
 
-        ocupados = [
-            (i, getattr(gv, f'anio_gestion{i}'), getattr(gv, f'dias_gestion{i}'))
-            for i in range(1, 5)
-            if getattr(gv, f'anio_gestion{i}') is not None
-        ]
+        # Las gestiones protegidas por un acuerdo vigente no están en riesgo.
+        ocupados = gestiones_ocupadas(gv, protegidos_map.get(f.cod_funcionario, set()))
         if len(ocupados) < LIMITE_GESTIONES_ACTIVAS:
             continue
 
@@ -1661,8 +1695,7 @@ def _calcular_alertas_gestiones_vencidas(funcionarios, hoy=None):
         if fecha_limite < hoy:
             continue  # ya venció: los días se perdieron, no hay nada que avisar
 
-        ocupados.sort(key=lambda t: t[1])  # año ascendente = más antigua primero
-        _, anio_riesgo, dias_riesgo = ocupados[0]
+        _, anio_riesgo, dias_riesgo = ocupados[0]  # año ascendente = más antigua
 
         p = f.ci
         alertas.append({
@@ -1801,3 +1834,143 @@ class AlertaPoblarHoyView(APIView):
             del a['_aniversario_dt']
 
         return Response({'funcionarios': resultado})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MÓDULO: ACUERDOS DE VACACIÓN (RRHH)
+#  Suspensión/prórroga: las gestiones afectadas no se pierden por el tope de
+#  gestiones activas mientras el acuerdo esté activo y vigente.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _parse_fecha(valor):
+    try:
+        return date.fromisoformat(str(valor))
+    except (TypeError, ValueError):
+        return None
+
+
+class AcuerdosVacacionView(APIView):
+    """GET: acuerdos + funcionarios activos para seleccionar. POST: registra un acuerdo COLECTIVO."""
+    permission_classes = [NoCambioPendiente, EsRRHH]
+
+    def get(self, request):
+        tiene_acceso, f_user = _check_acceso_historial(request)
+        if not tiene_acceso:
+            return Response({'error': 'Sin acceso.'}, status=status.HTTP_403_FORBIDDEN)
+
+        hoy = date.today()
+        afectados_por_acuerdo = {}
+        for a in AcuerdoVacacionFuncionario.objects.select_related('cod_funcionario__ci'):
+            p = a.cod_funcionario.ci
+            afectados_por_acuerdo.setdefault(a.id_acuerdo_id, []).append({
+                'nombre': f"{p.nombre} {p.ap_paterno}".strip(),
+                'anio':   a.anio_gestion,
+            })
+
+        acuerdos = [{
+            'id':             ac.id_acuerdo,
+            'tipo':           ac.tipo,
+            'nro_documento':  ac.nro_documento or '—',
+            'motivo':         ac.motivo,
+            'fecha_acuerdo':  ac.fecha_acuerdo.isoformat(),
+            'fecha_hasta':    ac.fecha_hasta.isoformat(),
+            'solicitud':      f"G{ac.id_formulario_id:03d}" if ac.id_formulario_id else None,
+            'registrado_por': (
+                f"{ac.registrado_por.ci.nombre} {ac.registrado_por.ci.ap_paterno}".strip()
+                if ac.registrado_por else '—'
+            ),
+            'vigente':        ac.activo and ac.fecha_hasta >= hoy,
+            'activo':         ac.activo,
+            'afectados':      afectados_por_acuerdo.get(ac.id_acuerdo, []),
+        } for ac in AcuerdoVacacion.objects.select_related('registrado_por__ci').order_by('-fecha_registro')]
+
+        funcionarios = [{
+            'cod':       f.cod_funcionario,
+            'nombre':    f"{f.ci.nombre} {f.ci.ap_paterno} {f.ci.ap_materno or ''}".strip(),
+            'id_unidad': f.id_unidad_id,
+        } for f in Funcionario.objects.filter(estado='ACTIVO').select_related('ci').order_by('ci__ap_paterno', 'ci__nombre')]
+
+        roles_activos = list(FuncionarioRol.objects.filter(
+            cod_funcionario=f_user, activo=True
+        ).values_list('id_roles__tipo_rol', flat=True))
+        if 'Funcionario' not in roles_activos:
+            roles_activos.insert(0, 'Funcionario')
+
+        return Response({
+            'acuerdos':     acuerdos,
+            'funcionarios': funcionarios,
+            'unidades':     list(UnidadOrganizacional.objects.filter(activo=True)
+                                 .values('id_unidad', 'nombre').order_by('nombre')),
+            'usuario': {
+                'nombre': f"{f_user.ci.nombre} {f_user.ci.ap_paterno}".strip(),
+                'roles':  roles_activos,
+            },
+        })
+
+    def post(self, request):
+        tiene_acceso, f_user = _check_acceso_historial(request)
+        if not tiene_acceso:
+            return Response({'error': 'Sin acceso.'}, status=status.HTTP_403_FORBIDDEN)
+
+        nro_documento = str(request.data.get('nro_documento', '')).strip()
+        motivo        = str(request.data.get('motivo', '')).strip()
+        fecha_acuerdo = _parse_fecha(request.data.get('fecha_acuerdo'))
+        fecha_hasta   = _parse_fecha(request.data.get('fecha_hasta'))
+        cods          = request.data.get('funcionarios') or []
+
+        if not nro_documento or len(nro_documento) > 60:
+            return Response({'error': 'Ingrese el N° de documento del acuerdo (máx. 60 caracteres).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(motivo) < 10:
+            return Response({'error': 'El motivo debe tener al menos 10 caracteres.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not fecha_acuerdo or not fecha_hasta:
+            return Response({'error': 'Fechas inválidas.'}, status=status.HTTP_400_BAD_REQUEST)
+        if fecha_hasta <= fecha_acuerdo or fecha_hasta < date.today():
+            return Response({'error': 'La nueva fecha límite debe ser posterior a la del acuerdo y a hoy.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(cods, list) or not cods:
+            return Response({'error': 'Seleccione al menos un funcionario.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Se protegen las gestiones activas de cada funcionario al momento del acuerdo.
+        filas = [
+            (gv.cod_funcionario_id, anio)
+            for gv in GestionVacacion.objects.filter(
+                cod_funcionario__in=[str(c) for c in cods], cod_funcionario__estado='ACTIVO'
+            )
+            for _, anio, _ in gestiones_ocupadas(gv)
+        ]
+        if not filas:
+            return Response({'error': 'Los funcionarios seleccionados no tienen gestiones activas.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            acuerdo = AcuerdoVacacion.objects.create(
+                tipo='COLECTIVO',
+                nro_documento=nro_documento,
+                motivo=motivo,
+                fecha_acuerdo=fecha_acuerdo,
+                fecha_hasta=fecha_hasta,
+                registrado_por=f_user,
+            )
+            AcuerdoVacacionFuncionario.objects.bulk_create([
+                AcuerdoVacacionFuncionario(id_acuerdo=acuerdo, cod_funcionario_id=cod, anio_gestion=anio)
+                for cod, anio in filas
+            ])
+
+        return Response({
+            'ok':           True,
+            'id':           acuerdo.id_acuerdo,
+            'funcionarios': len({cod for cod, _ in filas}),
+            'gestiones':    len(filas),
+        }, status=status.HTTP_201_CREATED)
+
+
+class RevocarAcuerdoView(APIView):
+    """Desactiva un acuerdo (no se borra: queda para auditoría)."""
+    permission_classes = [NoCambioPendiente, EsRRHH]
+
+    def post(self, request, id_acuerdo):
+        tiene_acceso, _ = _check_acceso_historial(request)
+        if not tiene_acceso:
+            return Response({'error': 'Sin acceso.'}, status=status.HTTP_403_FORBIDDEN)
+        actualizados = AcuerdoVacacion.objects.filter(id_acuerdo=id_acuerdo, activo=True).update(activo=False)
+        if not actualizados:
+            return Response({'error': 'Acuerdo no encontrado o ya revocado.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'ok': True})

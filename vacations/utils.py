@@ -70,8 +70,81 @@ def calcular_gestioneS_pendientes(fecha_ingreso: date, hoy: date = None):
 
 LIMITE_GESTIONES_ACTIVAS = 2
 
+# Rechazo cerca del vencimiento: si la solicitud se hizo dentro de estos días
+# antes de la fecha límite de la gestión en riesgo, esa gestión queda
+# protegida hasta fecha límite + estos meses.
+DIAS_ANTICIPO_RECHAZO_PROTEGIDO = 60
+MESES_EXTENSION_RECHAZO = 6
 
-def aplicar_limite_gestiones_activas(gv, limite: int = LIMITE_GESTIONES_ACTIVAS) -> list:
+
+def sumar_meses(fecha: date, meses: int) -> date:
+    """fecha + N meses, ajustando el día al último válido del mes destino."""
+    import calendar
+    total = fecha.month - 1 + meses
+    anio, mes = fecha.year + total // 12, total % 12 + 1
+    return date(anio, mes, min(fecha.day, calendar.monthrange(anio, mes)[1]))
+
+
+def aniversario(fecha_ingreso: date, anio: int) -> date:
+    """Aniversario de ingreso en `anio` (29/02 → 01/03 en año no bisiesto)."""
+    try:
+        return fecha_ingreso.replace(year=anio)
+    except ValueError:
+        return date(anio, 3, 1)
+
+
+def anios_protegidos(cod_funcionario, hoy: date = None) -> set:
+    """Años de gestión del funcionario cubiertos por un acuerdo activo y vigente."""
+    from vacations.models import AcuerdoVacacionFuncionario
+
+    if not cod_funcionario:
+        return set()
+    return set(AcuerdoVacacionFuncionario.objects.filter(
+        cod_funcionario=cod_funcionario,
+        id_acuerdo__activo=True,
+        id_acuerdo__fecha_hasta__gte=hoy or date.today(),
+    ).values_list('anio_gestion', flat=True))
+
+
+def gestiones_ocupadas(gv, excluir: set = frozenset()) -> list:
+    """[(slot, anio, dias)] de slots con año, ordenado por año ascendente."""
+    return sorted(
+        (
+            (i, getattr(gv, f'anio_gestion{i}'), getattr(gv, f'dias_gestion{i}'))
+            for i in range(1, 5)
+            if getattr(gv, f'anio_gestion{i}') is not None
+            and getattr(gv, f'anio_gestion{i}') not in excluir
+        ),
+        key=lambda t: t[1],
+    )
+
+
+def gestion_en_riesgo(gv, fecha_ingreso: date, protegidos: set = frozenset()):
+    """
+    (slot, anio, dias, fecha_limite) de la gestión no protegida que se
+    perdería con la próxima acreditación, o None si aún hay espacio en el tope.
+    fecha_limite = aniversario en que se acredita la gestión siguiente a la
+    más reciente activa.
+    """
+    activas = gestiones_ocupadas(gv, protegidos)
+    if len(activas) < LIMITE_GESTIONES_ACTIVAS:
+        return None
+    slot, anio, dias = activas[0]
+    return slot, anio, dias, aniversario(fecha_ingreso, activas[-1][1] + 1)
+
+
+def devolver_dias(gv, dias: Decimal) -> None:
+    """
+    Repone días (rechazo/anulación) en la gestión más antigua por año, que es
+    de donde CrearSolicitudView los descuenta primero. Solo en memoria.
+    """
+    ocupadas = gestiones_ocupadas(gv)
+    # Sin gestiones con año (caso anómalo): slot 4, comportamiento previo.
+    slot = ocupadas[0][0] if ocupadas else 4
+    setattr(gv, f'dias_gestion{slot}', getattr(gv, f'dias_gestion{slot}') + dias)
+
+
+def aplicar_limite_gestiones_activas(gv, limite: int = LIMITE_GESTIONES_ACTIVAS, protegidos: set = None) -> list:
     """
     Recorta las gestiones activas (anio_gestion1..4) al límite dado, moviendo
     el exceso -empezando por la gestión con año más antiguo- a gv.dias_perdidos.
@@ -86,18 +159,18 @@ def aplicar_limite_gestiones_activas(gv, limite: int = LIMITE_GESTIONES_ACTIVAS)
     Idempotente: si ya hay <= limite gestiones activas, no hace nada y
     retorna [].
 
+    Las gestiones protegidas por un AcuerdoVacacion vigente no cuentan para el
+    tope ni se evictan; al vencer el acuerdo, la próxima pasada (poblado
+    diario) las evicta normalmente. `protegidos=None` los consulta en BD.
+
     Retorna la lista de evicciones aplicadas: [{'slot', 'anio', 'dias'}, ...]
     """
-    ocupados = [
-        (i, getattr(gv, f'anio_gestion{i}'), getattr(gv, f'dias_gestion{i}'))
-        for i in range(1, 5)
-        if getattr(gv, f'anio_gestion{i}') is not None
-    ]
+    if protegidos is None:
+        protegidos = anios_protegidos(gv.cod_funcionario_id)
+    ocupados = gestiones_ocupadas(gv, protegidos)  # año ascendente
     exceso = len(ocupados) - limite
     if exceso <= 0:
         return []
-
-    ocupados.sort(key=lambda t: t[1])  # año ascendente = más antiguo primero
 
     evictados = []
     for slot, anio, dias in ocupados[:exceso]:
@@ -141,19 +214,30 @@ def poblar_gestion_vacacion(funcionario):
         if getattr(gv, f'anio_gestion{i}') is not None
     }
 
+    protegidos = anios_protegidos(funcionario.cod_funcionario, hoy)
+    evictadas = []
+
+    # Años anteriores al más reciente ya registrado fueron consumidos o
+    # evictados: re-acreditarlos los volvería a evictar y sumaría otra vez a
+    # dias_perdidos en cada pasada del poblado diario.
+    ultimo_existente = max(anios_existentes, default=None)
+
     for slot, anio, dias in gestioneS:
-        if anio in anios_existentes:
+        if anio in anios_existentes or (ultimo_existente is not None and anio < ultimo_existente):
             ya_existentes += 1
             continue
         if getattr(gv, f'anio_gestion{slot}') is not None:
             # Slot ocupado por otro año → buscar el próximo slot libre
-            for alt in range(4, 0, -1):
-                if getattr(gv, f'anio_gestion{alt}') is None:
-                    slot = alt
-                    break
-            else:
+            libre = next((alt for alt in range(4, 0, -1) if getattr(gv, f'anio_gestion{alt}') is None), None)
+            if libre is None:
+                # 4 slots llenos (gestiones protegidas o datos legado): se libera
+                # espacio evictando la no protegida más antigua, como AcreditarGestionView.
+                evictadas += aplicar_limite_gestiones_activas(gv, LIMITE_GESTIONES_ACTIVAS - 1, protegidos)
+                libre = next((alt for alt in range(4, 0, -1) if getattr(gv, f'anio_gestion{alt}') is None), None)
+            if libre is None:
                 ya_existentes += 1
                 continue
+            slot = libre
 
         setattr(gv, f'anio_gestion{slot}', anio)
         setattr(gv, f'dias_gestion{slot}', dias)
@@ -161,7 +245,7 @@ def poblar_gestion_vacacion(funcionario):
         anios_existentes.add(anio)
         acreditadas += 1
 
-    evictadas = aplicar_limite_gestiones_activas(gv)
+    evictadas += aplicar_limite_gestiones_activas(gv, protegidos=protegidos)
     if evictadas:
         campos_a_guardar.append('dias_perdidos')
         for ev in evictadas:

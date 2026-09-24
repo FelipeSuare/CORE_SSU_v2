@@ -25,6 +25,7 @@ PERMISOS: dict[str, frozenset] = {
     'historial_rrhh':   _F(['RRHH', 'Administrador']),
     'anulacion':        _F(['RRHH', 'Administrador']),
     'solicitudes_rechazadas': _F(['RRHH', 'Administrador']),
+    'acuerdos_vacacion':      _F(['RRHH', 'Administrador']),
 
     # Reportes
     'reporte_p':        _F(['RRHH', 'Administrador', 'Auditoria']),

@@ -28,4 +28,7 @@ urlpatterns = [
     path('api/vacaciones/alerta-poblar-hoy/',       api_views.AlertaPoblarHoyView.as_view(),           name='vac_alerta_poblar_hoy'),
     # Alerta para Jefe de Area / Gerentes: gestiones vencidas de su gente a cargo
     path('api/vacaciones/alerta-jefe-area/', api_views.AlertaGestionesJefeAreaView.as_view(), name='vac_alerta_jefe_area'),
+    # Acuerdos de vacación: suspensión/prórroga de vencimiento (RRHH)
+    path('api/vacaciones/acuerdos/',                          api_views.AcuerdosVacacionView.as_view(), name='vac_acuerdos'),
+    path('api/vacaciones/acuerdos/<int:id_acuerdo>/revocar/', api_views.RevocarAcuerdoView.as_view(),   name='vac_acuerdo_revocar'),
 ]

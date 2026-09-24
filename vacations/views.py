@@ -644,3 +644,11 @@ def rechazadas_view(request):
     if not tiene_acceso:
         return render(request, 'shared/sin_acceso.html', status=403)
     return render(request, 'vacations/Solicitudes_Rechazadas.html')
+
+
+@login_required(login_url='login_home')
+def acuerdos_view(request):
+    tiene_acceso, _ = _check_acceso_historial(request)
+    if not tiene_acceso:
+        return render(request, 'shared/sin_acceso.html', status=403)
+    return render(request, 'vacations/Acuerdos_Vacacion.html')
