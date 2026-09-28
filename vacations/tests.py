@@ -864,16 +864,18 @@ class ResincronizarGestionesTests(TestCase):
 #  Acuerdos de vacación: gestiones protegidas contra la evicción por tope
 # ══════════════════════════════════════════════════════════════════════════════
 
-from vacations.models import AcuerdoVacacion, AcuerdoVacacionFuncionario
-from vacations.utils import anios_protegidos, poblar_gestion_vacacion
+from django.db import transaction
+from vacations.models import AcuerdoVacacion, AcuerdoVacacionFuncionario, AprobacionSolicitud
+from vacations.utils import anios_protegidos, poblar_gestion_vacacion, siguiente_correlativo
 
 
-def _proteger(funcionario, anio, fecha_hasta, activo=True):
+def _proteger(funcionario, anio, fecha_hasta, estado='VIGENTE', tipo='COLECTIVO', **kw):
     ac = AcuerdoVacacion.objects.create(
-        tipo='COLECTIVO', nro_documento='RA-1', motivo='Emergencia sanitaria',
-        fecha_acuerdo=date.today(), fecha_hasta=fecha_hasta, activo=activo,
+        tipo=tipo, motivo='Emergencia sanitaria',
+        fecha_acuerdo=date.today(), fecha_hasta=fecha_hasta, estado=estado, **kw,
     )
-    AcuerdoVacacionFuncionario.objects.create(id_acuerdo=ac, cod_funcionario=funcionario, anio_gestion=anio)
+    AcuerdoVacacionFuncionario.objects.create(id_acuerdo=ac, cod_funcionario=funcionario, anio_gestion=anio,
+                                              dias_protegidos=Decimal('15'))
     return ac
 
 
@@ -893,10 +895,11 @@ class TestAcuerdosProteccion(TestCase):
         self.assertEqual(gv.anio_gestion1, 2023)
         self.assertEqual(gv.dias_perdidos, Decimal('0'))
 
-    def test_acuerdo_vencido_o_revocado_ya_no_protege(self):
+    def test_acuerdo_vencido_anulado_o_modificado_ya_no_protege(self):
         f, gv = self._gv_tres_gestiones()
         _proteger(f, 2023, date.today() - timedelta(days=1))
-        _proteger(f, 2023, date.today() + timedelta(days=30), activo=False)
+        _proteger(f, 2023, date.today() + timedelta(days=30), estado='ANULADO')
+        _proteger(f, 2023, date.today() + timedelta(days=30), estado='MODIFICADO')
         evictadas = aplicar_limite_gestiones_activas(gv)
         self.assertEqual([e['anio'] for e in evictadas], [2023])
         self.assertEqual(gv.dias_perdidos, Decimal('15'))
@@ -917,6 +920,30 @@ class TestAcuerdosProteccion(TestCase):
             self.assertEqual(poblar_gestion_vacacion(f)['acreditadas'], 0)
         gv.refresh_from_db()
         self.assertEqual(gv.dias_perdidos, Decimal('40'))
+
+
+class TestNumeracionAcuerdo(TestCase):
+
+    def _crear(self, anio, correlativo):
+        return AcuerdoVacacion.objects.create(
+            tipo='COLECTIVO', anio_nro=anio, correlativo=correlativo, motivo='Emergencia',
+            fecha_acuerdo=date.today(), fecha_hasta=date.today() + timedelta(days=30),
+        )
+
+    def test_empieza_en_01_sigue_y_se_reinicia_por_anio(self):
+        with transaction.atomic():
+            self.assertEqual(siguiente_correlativo(2026), 1)
+        self._crear(2026, 1)
+        self._crear(2026, 2)
+        self._crear(2025, 7)
+        with transaction.atomic():
+            self.assertEqual(siguiente_correlativo(2026), 3)
+            self.assertEqual(siguiente_correlativo(2027), 1)
+
+    def test_formato(self):
+        self.assertEqual(self._crear(2026, 1).nro_acuerdo, 'RA-01/2026')
+        self.assertEqual(self._crear(2026, 100).nro_acuerdo, 'RA-100/2026')
+        self.assertIsNone(AcuerdoVacacion(tipo='RECHAZO').nro_acuerdo)
 
 
 class TestRechazoCercaDelVencimiento(APITestCase):
@@ -965,17 +992,19 @@ class TestRechazoCercaDelVencimiento(APITestCase):
 
         ac = AcuerdoVacacion.objects.get(id_formulario=sol)
         self.assertEqual(ac.tipo, 'RECHAZO')
+        self.assertIsNone(ac.nro_acuerdo)
         self.assertGreater(ac.fecha_hasta, date.today() + timedelta(days=30))
         self.assertEqual(anios_protegidos(f.cod_funcionario), {anio_viejo})
 
-    def test_rechazo_lejos_del_vencimiento_no_crea_acuerdo(self):
-        f, sol, _ = self._escenario('92000003', dias_hasta_limite=200)
-        r = self._rechazar(sol)
-        self.assertEqual(r.status_code, status.HTTP_200_OK, r.content)
-        self.assertFalse(AcuerdoVacacion.objects.filter(id_formulario=sol).exists())
-        gv = GestionVacacion.objects.get(cod_funcionario=f)
-        self.assertEqual(gv.dias_gestion2, Decimal('15'))
-        self.assertEqual(gv.dias_negados, Decimal('5'))
+    def test_rechazo_fuera_del_ultimo_mes_no_crea_acuerdo(self):
+        for ci, dias in (('92000003', 45), ('92000004', 200)):
+            f, sol, _ = self._escenario(ci, dias_hasta_limite=dias)
+            r = self._rechazar(sol)
+            self.assertEqual(r.status_code, status.HTTP_200_OK, r.content)
+            self.assertFalse(AcuerdoVacacion.objects.filter(id_formulario=sol).exists())
+            gv = GestionVacacion.objects.get(cod_funcionario=f)
+            self.assertEqual(gv.dias_gestion2, Decimal('15'))
+            self.assertEqual(gv.dias_negados, Decimal('5'))
 
 
 class TestAcuerdosAPI(APITestCase):
@@ -985,47 +1014,173 @@ class TestAcuerdosAPI(APITestCase):
         vacations_apps._primer_request_ejecutado = True
         self.user_rrhh, _ = hacer_usuario_y_funcionario(ci='93000001', nombre='RRHH', roles=['RRHH'])
         self.user_normal, _ = hacer_usuario_y_funcionario(ci='93000002', nombre='Normal')
-        self.f = hacer_funcionario(ci='93000003', fecha_ingreso=date(2015, 1, 1))
-        gv = hacer_gestion(self.f, anio1=2025, dias1=Decimal('20'))
-        gv.anio_gestion2, gv.dias_gestion2 = 2024, Decimal('20')
-        gv.save(update_fields=['anio_gestion2', 'dias_gestion2'])
+        self.user_f, self.f = hacer_usuario_y_funcionario(ci='93000003', fecha_ingreso=date(2015, 1, 1))
+        self.f2 = hacer_funcionario(ci='93000004', fecha_ingreso=date(2015, 1, 1))
+        self.gg = hacer_funcionario(ci='93000005', nombre='Gerente', tipo='GERENTE GENERAL')
+        for func in (self.f, self.f2):
+            gv = hacer_gestion(func, anio1=2025, dias1=Decimal('20'))
+            gv.anio_gestion2, gv.dias_gestion2 = 2024, Decimal('18')
+            gv.save(update_fields=['anio_gestion2', 'dias_gestion2'])
         self.url = reverse('vac_acuerdos')
+        self.client.force_login(self.user_rrhh)
 
-    def _payload(self, **kw):
+    def _payload(self, funcionarios=None, **kw):
         return {
-            'nro_documento': 'RA-015/2026', 'motivo': 'Suspensión por emergencia sanitaria',
+            'tipo': 'COLECTIVO', 'motivo': 'Emergencia Sanitaria',
             'fecha_acuerdo': date.today().isoformat(),
             'fecha_hasta': (date.today() + timedelta(days=365)).isoformat(),
-            'funcionarios': [self.f.cod_funcionario], **kw,
+            'autorizado_por': self.gg.cod_funcionario,
+            'funcionarios': funcionarios or [{'cod': self.f.cod_funcionario, 'anios': [2024, 2025]}],
+            **kw,
         }
+
+    def _crear(self, **kw):
+        r = self.client.post(self.url, self._payload(**kw), format='json')
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.content)
+        return r.json()
 
     def test_sin_rol_rrhh_403(self):
         self.client.force_login(self.user_normal)
         r = self.client.post(self.url, self._payload(), format='json')
         self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_registrar_protege_gestiones_activas_y_revocar(self):
-        self.client.force_login(self.user_rrhh)
-        r = self.client.post(self.url, self._payload(), format='json')
+    def test_crear_numera_y_toma_dias_del_sistema(self):
+        anio = date.today().year
+        data = self._crear(funcionarios=[{'cod': self.f.cod_funcionario, 'anios': [2024, 2025], 'dias': 99}])
+        self.assertEqual(data['nro'], f'RA-01/{anio}')
+        self.assertEqual(anios_protegidos(self.f.cod_funcionario), {2024, 2025})
+        ac = AcuerdoVacacion.objects.get(id_acuerdo=data['id'])
+        self.assertEqual(ac.estado, 'VIGENTE')
+        self.assertEqual(ac.registrado_por.ci_id, '93000001')
+        dias = dict(ac.afectados.values_list('anio_gestion', 'dias_protegidos'))
+        self.assertEqual(dias, {2024: Decimal('18'), 2025: Decimal('20')})
+
+        data2 = self._crear(tipo='INDIVIDUAL', funcionarios=[{'cod': self.f2.cod_funcionario, 'anios': [2025]}])
+        self.assertEqual(data2['nro'], f'RA-02/{anio}')
+
+    def test_validaciones(self):
+        casos = [
+            self._payload(tipo='INDIVIDUAL', funcionarios=[
+                {'cod': self.f.cod_funcionario, 'anios': [2025]},
+                {'cod': self.f2.cod_funcionario, 'anios': [2025]},
+            ]),
+            self._payload(funcionarios=[{'cod': self.f.cod_funcionario, 'anios': [2019]}]),
+            self._payload(funcionarios=[{'cod': self.f.cod_funcionario, 'anios': []}]),
+            self._payload(autorizado_por=self.f2.cod_funcionario),
+            self._payload(fecha_hasta=date.today().isoformat()),
+            self._payload(tipo='RECHAZO'),
+        ]
+        for payload in casos:
+            r = self.client.post(self.url, payload, format='json')
+            self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST, payload)
+        self.assertFalse(AcuerdoVacacion.objects.exists())
+
+    def test_gestion_ya_protegida_no_se_repite(self):
+        self._crear()
+        r = self.client.post(self.url, self._payload(tipo='INDIVIDUAL'), format='json')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_vincular_a_colectivo_reutiliza_numero(self):
+        data = self._crear()
+        r = self.client.post(self.url, {
+            'vincular_id': data['id'], 'motivo': 'ignorado',
+            'funcionarios': [{'cod': self.f2.cod_funcionario, 'anios': [2024]}],
+        }, format='json')
         self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.content)
-        self.assertEqual(r.json()['gestiones'], 2)
+        self.assertEqual((r.json()['id'], r.json()['nro']), (data['id'], data['nro']))
+        self.assertEqual(AcuerdoVacacion.objects.count(), 1)
+        self.assertEqual(anios_protegidos(self.f2.cod_funcionario), {2024})
+
+        r = self.client.post(self.url, {
+            'vincular_id': data['id'], 'funcionarios': [{'cod': self.f.cod_funcionario, 'anios': [2024]}],
+        }, format='json')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_vincula_a_anulado(self):
+        data = self._crear()
+        AcuerdoVacacion.objects.filter(id_acuerdo=data['id']).update(estado='ANULADO')
+        r = self.client.post(self.url, {
+            'vincular_id': data['id'], 'funcionarios': [{'cod': self.f2.cod_funcionario, 'anios': [2024]}],
+        }, format='json')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_modificar_reemplaza_al_original(self):
+        original = self._crear()
+        nuevo = self._crear(modifica_id=original['id'], motivo='Emergencia Sanitaria ampliada')
+        self.assertNotEqual(nuevo['nro'], original['nro'])
+        ac = AcuerdoVacacion.objects.get(id_acuerdo=original['id'])
+        self.assertEqual((ac.estado, ac.reemplazado_por_id), ('MODIFICADO', nuevo['id']))
         self.assertEqual(anios_protegidos(self.f.cod_funcionario), {2024, 2025})
 
-        r = self.client.post(reverse('vac_acuerdo_revocar', args=[r.json()['id']]))
-        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        listado = {a['id']: a for a in self.client.get(self.url).json()['acuerdos']}
+        self.assertEqual(listado[nuevo['id']]['modifica_a']['nro'], original['nro'])
+
+        r = self.client.post(self.url, self._payload(modifica_id=original['id']), format='json')
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_anular_desprotege_y_aplica_tope(self):
+        gv = GestionVacacion.objects.get(cod_funcionario=self.f)
+        gv.anio_gestion3, gv.dias_gestion3 = 2023, Decimal('15')
+        gv.save(update_fields=['anio_gestion3', 'dias_gestion3'])
+        data = self._crear(funcionarios=[{'cod': self.f.cod_funcionario, 'anios': [2023]}])
+
+        url = reverse('vac_acuerdo_anular', args=[data['id']])
+        self.assertEqual(self.client.post(url, {'motivo': 'corto'}).status_code, status.HTTP_400_BAD_REQUEST)
+        r = self.client.post(url, {'motivo': 'Se levantó la emergencia sanitaria'})
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.content)
+
+        ac = AcuerdoVacacion.objects.get(id_acuerdo=data['id'])
+        self.assertEqual(ac.estado, 'ANULADO')
+        self.assertIsNotNone(ac.fecha_anulacion)
         self.assertEqual(anios_protegidos(self.f.cod_funcionario), set())
+        gv.refresh_from_db()
+        self.assertIsNone(gv.anio_gestion3)
+        self.assertEqual(gv.dias_perdidos, Decimal('15'))
+        self.assertEqual(self.client.post(url, {'motivo': 'Se levantó la emergencia'}).status_code,
+                         status.HTTP_404_NOT_FOUND)
 
-    def test_valida_documento_y_fechas(self):
-        self.client.force_login(self.user_rrhh)
-        r = self.client.post(self.url, self._payload(nro_documento=''), format='json')
-        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
-        hoy = date.today().isoformat()
-        r = self.client.post(self.url, self._payload(fecha_acuerdo=hoy, fecha_hasta=hoy), format='json')
-        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+    def test_listado_incluye_gestiones_y_gerentes(self):
+        data = self._crear()
+        r = self.client.get(self.url).json()
+        self.assertTrue(r['acuerdos'][0]['vigente'])
+        self.assertEqual(r['gerentes'][0]['cod'], self.gg.cod_funcionario)
+        func = {x['cod']: x for x in r['funcionarios']}
+        self.assertEqual(
+            [(g['anio'], g['protegida_por']) for g in func[self.f.cod_funcionario]['gestiones']],
+            [(2024, data['id']), (2025, data['id'])],
+        )
 
-    def test_listado(self):
+    def test_constancia_pdf(self):
+        data = self._crear()
+        url = reverse('vac_acuerdo_constancia', args=[data['id'], self.f.cod_funcionario])
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r['Content-Type'], 'application/pdf')
+        self.assertTrue(r.content.startswith(b'%PDF'))
+
+        self.client.force_login(self.user_f)
+        self.assertEqual(self.client.get(url).status_code, status.HTTP_200_OK)
+        self.client.force_login(self.user_normal)
+        self.assertEqual(self.client.get(url).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_datos_formulario_contenedores(self):
+        self.client.force_login(self.user_f)
+        r = self.client.get(reverse('vac_datos')).json()
+        self.assertEqual((r['acuerdos_protegidos'], r['rechazos_reprogramar']), ([], []))
+
         self.client.force_login(self.user_rrhh)
-        self.client.post(self.url, self._payload(), format='json')
-        data = self.client.get(self.url).json()
-        self.assertEqual(len(data['acuerdos']), 1)
-        self.assertTrue(data['acuerdos'][0]['vigente'])
+        data = self._crear(funcionarios=[{'cod': self.f.cod_funcionario, 'anios': [2025]}])
+        sol = SolicitudVacacion.objects.create(
+            cod_funcionario=self.f, fecha_salida=date.today(), fecha_retorno=date.today(),
+            dias_solicitados=Decimal('1'), estado='RECHAZADA',
+        )
+        AprobacionSolicitud.objects.create(id_formulario=sol, cod_aprobador=self.gg, nivel=1,
+                                           decision='RECHAZADO', observacion='Falta de personal')
+        _proteger(self.f, 2024, date.today() + timedelta(days=90), tipo='RECHAZO', id_formulario=sol)
+
+        self.client.force_login(self.user_f)
+        r = self.client.get(reverse('vac_datos')).json()
+        self.assertEqual([(a['nro'], a['anio'], a['dias']) for a in r['acuerdos_protegidos']],
+                         [(data['nro'], 2025, 20.0)])
+        self.assertEqual([(x['anio'], x['motivo']) for x in r['rechazos_reprogramar']],
+                         [(2024, 'Falta de personal')])

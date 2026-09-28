@@ -127,6 +127,7 @@ async function cargarDatosFormulario() {
 
         // Renderizar saldos
         renderizarSaldos(data.saldos, data.gestiones_con_saldo);
+        renderizarProtecciones(data.acuerdos_protegidos || [], data.rechazos_reprogramar || []);
 
         // Notificación de gestiones acumuladas
         const n = data.gestiones_con_saldo;
@@ -161,6 +162,31 @@ async function cargarDatosFormulario() {
         console.error('Error al cargar datos del formulario:', err);
         AppDialog.alert('No se pudieron cargar los datos del formulario. Verifique su conexión.');
     }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  GESTIONES PROTEGIDAS (acuerdo / rechazo cerca del vencimiento)
+//  Cada contenedor solo se muestra si tiene datos.
+// ══════════════════════════════════════════════════════════════
+function renderizarProtecciones(acuerdos, rechazos) {
+    const fmt = iso => iso.split('-').reverse().join('/');
+
+    document.getElementById('seccionAcuerdos').hidden = !acuerdos.length;
+    document.getElementById('acuerdosProtegidos').innerHTML = acuerdos.map(a => `
+        <div class="proteccion-card">
+            <div class="proteccion-head"><strong>${esc(a.nro)}</strong> · Gestión ${a.anio}</div>
+            <div><span class="proteccion-dias">${a.dias}</span> días protegidos</div>
+            <div class="proteccion-nota">Protegidos hasta el ${fmt(a.fecha_hasta)}</div>
+        </div>`).join('');
+
+    document.getElementById('seccionReprogramar').hidden = !rechazos.length;
+    document.getElementById('rechazosReprogramar').innerHTML = rechazos.map(r => `
+        <div class="proteccion-card">
+            <div class="proteccion-head"><strong>Gestión ${r.anio}</strong> · Solicitud ${esc(r.solicitud)}</div>
+            <div>Rechazada el ${fmt(r.fecha_rechazo)}</div>
+            <div class="proteccion-nota">Motivo: ${esc(r.motivo)}</div>
+            <div class="proteccion-aviso">Esta gestión no se pierde: puede volver a solicitar estos días hasta el ${fmt(r.fecha_hasta)}.</div>
+        </div>`).join('');
 }
 
 // ══════════════════════════════════════════════════════════════

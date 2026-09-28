@@ -73,7 +73,7 @@ LIMITE_GESTIONES_ACTIVAS = 2
 # Rechazo cerca del vencimiento: si la solicitud se hizo dentro de estos días
 # antes de la fecha límite de la gestión en riesgo, esa gestión queda
 # protegida hasta fecha límite + estos meses.
-DIAS_ANTICIPO_RECHAZO_PROTEGIDO = 60
+DIAS_ANTICIPO_RECHAZO_PROTEGIDO = 30
 MESES_EXTENSION_RECHAZO = 6
 
 
@@ -94,16 +94,36 @@ def aniversario(fecha_ingreso: date, anio: int) -> date:
 
 
 def anios_protegidos(cod_funcionario, hoy: date = None) -> set:
-    """Años de gestión del funcionario cubiertos por un acuerdo activo y vigente."""
+    """Años de gestión del funcionario cubiertos por un acuerdo VIGENTE no vencido."""
     from vacations.models import AcuerdoVacacionFuncionario
 
     if not cod_funcionario:
         return set()
     return set(AcuerdoVacacionFuncionario.objects.filter(
         cod_funcionario=cod_funcionario,
-        id_acuerdo__activo=True,
+        id_acuerdo__estado='VIGENTE',
         id_acuerdo__fecha_hasta__gte=hoy or date.today(),
     ).values_list('anio_gestion', flat=True))
+
+
+# Clave del advisory lock de numeración RA (arbitraria, fija para el proyecto).
+_LOCK_NRO_ACUERDO = 7101
+
+
+def siguiente_correlativo(anio: int) -> int:
+    """
+    Próximo correlativo RA-XX/`anio`. Debe llamarse dentro de
+    transaction.atomic(): el advisory lock serializa creaciones simultáneas
+    hasta el commit, y UNIQUE(anio_nro, correlativo) es la red de seguridad.
+    """
+    from django.db import connection
+    from django.db.models import Max
+    from vacations.models import AcuerdoVacacion
+
+    with connection.cursor() as cur:
+        cur.execute('SELECT pg_advisory_xact_lock(%s, %s)', [_LOCK_NRO_ACUERDO, anio])
+    ultimo = AcuerdoVacacion.objects.filter(anio_nro=anio).aggregate(m=Max('correlativo'))['m']
+    return (ultimo or 0) + 1
 
 
 def gestiones_ocupadas(gv, excluir: set = frozenset()) -> list:

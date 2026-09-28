@@ -30,5 +30,6 @@ urlpatterns = [
     path('api/vacaciones/alerta-jefe-area/', api_views.AlertaGestionesJefeAreaView.as_view(), name='vac_alerta_jefe_area'),
     # Acuerdos de vacación: suspensión/prórroga de vencimiento (RRHH)
     path('api/vacaciones/acuerdos/',                          api_views.AcuerdosVacacionView.as_view(), name='vac_acuerdos'),
-    path('api/vacaciones/acuerdos/<int:id_acuerdo>/revocar/', api_views.RevocarAcuerdoView.as_view(),   name='vac_acuerdo_revocar'),
+    path('api/vacaciones/acuerdos/<int:id_acuerdo>/anular/',  api_views.AnularAcuerdoView.as_view(),    name='vac_acuerdo_anular'),
+    path('api/vacaciones/acuerdos/<int:id_acuerdo>/constancia/<str:cod>/', api_views.ConstanciaAcuerdoView.as_view(), name='vac_acuerdo_constancia'),
 ]

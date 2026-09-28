@@ -386,6 +386,216 @@ def _generar_pdf_solicitud(solicitud):
     return buffer.getvalue()
 
 
+_MESES = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+          'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre')
+
+
+def _fecha_larga(d):
+    return f"{d.day:02d} de {_MESES[d.month - 1]} de {d.year}"
+
+
+def _generar_pdf_constancia_acuerdo(acuerdo, filas):
+    """
+    Constancia individual de un acuerdo de vacación para el funcionario de
+    `filas` (sus AcuerdoVacacionFuncionario en `acuerdo`). Paleta institucional.
+    """
+    import os
+    from html import escape
+    from django.utils import timezone
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (
+        SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, HRFlowable, KeepTogether,
+    )
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+    from vacations.models import AcuerdoVacacionFuncionario
+
+    INDIGO = colors.HexColor('#333399')
+    VINO   = colors.HexColor('#5C1033')
+    BLUSH  = colors.HexColor('#e8b4b8')
+    NAVY   = colors.HexColor('#1e1e52')
+    GRIS   = colors.HexColor('#6b6b7b')
+    BLUSH_BG  = colors.Color(BLUSH.red, BLUSH.green, BLUSH.blue, alpha=0.45)
+    INDIGO_BG = colors.Color(INDIGO.red, INDIGO.green, INDIGO.blue, alpha=0.22)
+    GRID      = colors.Color(INDIGO.red, INDIGO.green, INDIGO.blue, alpha=0.3)
+    COLOR_ESTADO = {'VIGENTE': colors.HexColor('#1e8449'), 'ANULADO': VINO, 'MODIFICADO': GRIS}
+
+    f = filas[0].cod_funcionario
+    p = f.ci
+    nro = acuerdo.nro_acuerdo
+    es_colectivo = acuerdo.tipo == 'COLECTIVO'
+    generado = timezone.localtime()
+
+    def cargo_de(func):
+        return HistorialCargo.objects.filter(cod_funcionario=func, es_actual=True).first() if func else None
+
+    def nombre(func):
+        return f"{func.ci.nombre} {func.ci.ap_paterno} {func.ci.ap_materno or ''}".strip() if func else '—'
+
+    def persona_cargo(func):
+        c = cargo_de(func)
+        return f"{nombre(func)} – {c.cargo}" if c else nombre(func)
+
+    cargo_f = cargo_de(f)
+
+    def sty(name, font='Helvetica', size=9, align=TA_LEFT, color=colors.black, leading=None):
+        return ParagraphStyle(name, fontName=font, fontSize=size, alignment=align,
+                              textColor=color, leading=leading or size + 3)
+
+    sInst    = sty('inst', 'Helvetica-Bold', 13, color=INDIGO, leading=15)
+    sSub     = sty('sub', size=8, color=GRIS)
+    sFecha   = sty('fecha', 'Helvetica-Bold', 9, TA_RIGHT, GRIS)
+    sTitulo  = sty('titulo', 'Helvetica-Bold', 11, TA_CENTER, VINO, 13)
+    sEstado  = sty('estado', 'Helvetica-Bold', 11, TA_CENTER, COLOR_ESTADO.get(acuerdo.estado, GRIS), 13)
+    sSeccion = sty('seccion', 'Helvetica-Bold', 10, color=VINO)
+    sLabel   = sty('label', 'Helvetica-Bold', 9, color=INDIGO)
+    sVal     = sty('val', size=9)
+    sTexto   = sty('texto', size=9.5, align=TA_JUSTIFY, leading=13)
+    sFirmaN  = sty('firman', 'Helvetica-Bold', 8.5, TA_CENTER, NAVY)
+    sFirmaC  = sty('firmac', 'Helvetica-Bold', 8, TA_CENTER, VINO)
+
+    def P(txt, style):
+        return Paragraph(str(txt), style)
+
+    def seccion(txt):
+        return [Spacer(1, 0.35 * cm), P(txt, sSeccion), Spacer(1, 0.12 * cm)]
+
+    def tabla_datos(rows):
+        t = Table([[P(l, sLabel), P(escape(str(v)), sVal)] for l, v in rows], colWidths=[W * 0.45, W * 0.55])
+        t.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (0, -1), BLUSH_BG),
+            ('GRID',          (0, 0), (-1, -1), 0.5, GRID),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING',    (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+        ]))
+        return t
+
+    def pie(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(NAVY)
+        canvas.setLineWidth(0.6)
+        canvas.line(2 * cm, 1.5 * cm, A4[0] - 2 * cm, 1.5 * cm)
+        canvas.setFont('Helvetica', 7)
+        canvas.setFillColor(GRIS)
+        canvas.drawString(2 * cm, 1.1 * cm, f"Generado el {generado:%d/%m/%Y %H:%M} · Sistema de Gestión de Vacaciones – SSU")
+        canvas.drawRightString(A4[0] - 2 * cm, 1.1 * cm, f"Página {doc.page}")
+        canvas.restoreState()
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm,
+                            topMargin=1.5 * cm, bottomMargin=2.2 * cm,
+                            title=f"Acuerdo de vacaciones {nro}")
+    W = A4[0] - 4 * cm
+    el = []
+
+    # ── Cabecera ──
+    logo_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'static', 'img', 'login', 'LOGOSSU.png'))
+    logo = Image(logo_path, width=2.2 * cm, height=2.2 * cm) if os.path.exists(logo_path) else P('', sVal)
+    cab = Table([[logo, [P('SEGURO SOCIAL UNIVERSITARIO', sInst), P('RECURSOS HUMANOS', sSub)],
+                  P(f"Trinidad, {_fecha_larga(generado.date())}", sFecha)]],
+                colWidths=[2.6 * cm, W * 0.5, W * 0.5 - 2.6 * cm])
+    cab.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('VALIGN', (2, 0), (2, 0), 'TOP'),
+                             ('LEFTPADDING', (0, 0), (-1, -1), 0)]))
+    el += [cab, Spacer(1, 0.15 * cm), HRFlowable(width='100%', thickness=2, color=NAVY), Spacer(1, 0.4 * cm)]
+
+    el += [P('ACUERDO DE VACACIONES', sTitulo), P(f'N.º {nro}', sTitulo),
+           P(f'ESTADO DEL ACUERDO: {acuerdo.estado}', sEstado)]
+
+    # ── I. Funcionario ──
+    el += seccion('I. DATOS DEL FUNCIONARIO')
+    el.append(tabla_datos([
+        ('Carnet', p.ci),
+        ('Nombre Completo', nombre(f)),
+        ('Unidad Organizacional', f.id_unidad.nombre if f.id_unidad_id else '—'),
+        ('Tipo de Contrato', cargo_f.tipo_contrato if cargo_f else '—'),
+        ('Fecha de Ingreso', f.fecha_ingreso.strftime('%d/%m/%Y')),
+        ('Cargo', cargo_f.cargo if cargo_f else '—'),
+    ]))
+
+    # ── II. Acuerdo ──
+    datos = []
+    if es_colectivo:
+        n_func = AcuerdoVacacionFuncionario.objects.filter(id_acuerdo=acuerdo).values('cod_funcionario').distinct().count()
+        datos += [('Tipo de acuerdo', f'Colectivo – Acuerdo institucional {nro}'),
+                  ('Nº de funcionarios comprometidos en el acuerdo colectivo', f'{n_func} (ver anexo del acuerdo institucional)')]
+    else:
+        datos.append(('Tipo de acuerdo', 'Individual'))
+    datos += [
+        ('Motivo', acuerdo.motivo),
+        ('Fecha del acuerdo', acuerdo.fecha_acuerdo.strftime('%d/%m/%Y')),
+        ('Nueva fecha límite', acuerdo.fecha_hasta.strftime('%d/%m/%Y')),
+        ('Registrado por', persona_cargo(acuerdo.registrado_por)),
+        ('Autorizado por', persona_cargo(acuerdo.autorizado_por)),
+    ]
+    modifica = acuerdo.modifica_a.first()
+    if modifica:
+        datos.append(('Modifica al acuerdo', modifica.nro_acuerdo))
+    if acuerdo.estado == 'MODIFICADO' and acuerdo.reemplazado_por_id:
+        datos.append(('Reemplazado por', acuerdo.reemplazado_por.nro_acuerdo))
+    if acuerdo.estado == 'ANULADO':
+        fecha_an = timezone.localtime(acuerdo.fecha_anulacion).strftime('%d/%m/%Y %H:%M') if acuerdo.fecha_anulacion else '—'
+        datos += [('Anulado por', f"{nombre(acuerdo.anulado_por)} – {fecha_an}"),
+                  ('Motivo de anulación', acuerdo.motivo_anulacion or '—')]
+    el += seccion('II. DATOS DEL ACUERDO')
+    el.append(tabla_datos(datos))
+
+    # ── III. Gestiones ──
+    el += seccion('III. GESTIONES DE VACACIONES PROTEGIDAS')
+    t_g = Table([[P('Gestión', sLabel), P('Días protegidos', sLabel)]] +
+                [[P(str(fl.anio_gestion), sVal), P(f"{float(fl.dias_protegidos):g}", sVal)] for fl in filas],
+                colWidths=[W * 0.3, W * 0.3], hAlign='LEFT')
+    t_g.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, 0), INDIGO_BG),
+        ('GRID',          (0, 0), (-1, -1), 0.5, GRID),
+        ('TOPPADDING',    (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+    ]))
+    el.append(t_g)
+
+    # ── IV / V. Texto ──
+    derivado = (f" La presente es la constancia individual derivada del acuerdo colectivo N.° {nro}."
+                if es_colectivo else '')
+    el += seccion('IV. OBJETO DEL ACUERDO')
+    el.append(P(
+        f"Por medio del presente documento, el Área de Recursos Humanos deja constancia del acuerdo de "
+        f"vacaciones registrado bajo el documento N.° {nro}, mediante el cual se establece la suspensión "
+        f"temporal del cómputo de vencimiento de las gestiones de vacaciones correspondientes al funcionario "
+        f"identificado en el presente documento, con motivo de: {escape(acuerdo.motivo)}.{derivado}<br/>"
+        f"Las gestiones detalladas en la sección III quedan protegidas —es decir, no se pierden ni se descuentan "
+        f"automáticamente hasta la nueva fecha límite establecida, correspondiente al "
+        f"{_fecha_larga(acuerdo.fecha_hasta)}, conforme al registro efectuado en el Sistema de Gestión de Vacaciones.",
+        sTexto))
+    el += seccion('V. CONSTANCIA')
+    el.append(P(
+        "El presente documento constituye constancia del acuerdo registrado y contiene el detalle del "
+        "funcionario y de las gestiones de vacaciones comprendidas en el acuerdo. La información registrada "
+        "deberá coincidir con los datos almacenados en el Sistema de Gestión de Vacaciones. Cualquier "
+        "modificación o revocación de este acuerdo deberá quedar registrada mediante un nuevo documento "
+        "que referencie el presente número de acuerdo.", sTexto))
+
+    # ── Firmas: RR.HH., funcionario y Gerencia General ──
+    def firma(func, cargo_defecto):
+        c = cargo_de(func)
+        return [P(escape(nombre(func)), sFirmaN), P(escape((c.cargo if c else cargo_defecto).upper()), sFirmaC)]
+
+    wf = W * 0.4
+    linea = TableStyle([('LINEABOVE', (0, 0), (0, 0), 1.5, NAVY), ('LINEABOVE', (2, 0), (2, 0), 1.5, NAVY)])
+    firmas = Table([[firma(acuerdo.registrado_por, 'Recursos Humanos'), '', firma(f, 'Funcionario')]],
+                   colWidths=[wf, W - 2 * wf, wf])
+    firmas.setStyle(linea)
+    firma_gg = Table([[firma(acuerdo.autorizado_por, 'Gerente General')]], colWidths=[wf])
+    firma_gg.setStyle(TableStyle([('LINEABOVE', (0, 0), (0, 0), 1.5, NAVY)]))
+    el += [Spacer(1, 2.2 * cm), KeepTogether([firmas, Spacer(1, 1.8 * cm), firma_gg])]
+
+    doc.build(el, onFirstPage=pie, onLaterPages=pie)
+    return buffer.getvalue()
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  VISTAS DE TEMPLATE
 # ══════════════════════════════════════════════════════════════════════════════

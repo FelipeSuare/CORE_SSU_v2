@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{% staticv 'css/vacations/Frm_Solicitud.css' %}">
     <link rel="stylesheet" href="{% staticv 'css/shared/notifications.css' %}">
     <style>
-        .badge-tipo {
+        .badge {
             display: inline-block;
             border-radius: 6px;
             padding: 2px 8px;
@@ -23,29 +23,61 @@
             white-space: nowrap;
             border: 1px solid currentColor;
         }
-        .badge-colectivo { color: #1565c0; background: rgba(21,101,192,0.08); }
-        .badge-rechazo   { color: #720035; background: rgba(114,0,53,0.08); }
-        .estado-vigente  { color: #2e7d32; font-weight: 600; }
-        .estado-inactivo { color: #999; }
+        .badge-colectivo  { color: #333399; background: rgba(51,51,153,0.08); }
+        .badge-individual { color: var(--color-navy); background: rgba(30,30,82,0.06); }
+        .badge-rechazo    { color: #5C1033; background: rgba(92,16,51,0.08); }
+        .estado-vigente    { color: var(--color-success); }
+        .estado-anulado    { color: var(--color-danger); }
+        .estado-modificado { color: #6b6b7b; }
+        .estado-vencido    { color: #999; }
+        .nro { font-weight: 700; color: #333399; white-space: nowrap; }
         .obs-cell { max-width: 260px; white-space: normal; line-height: 1.4; font-size: 0.85em; color: #555; }
-        .afectados-cell { max-width: 240px; white-space: normal; font-size: 0.82em; color: #444; }
-        .func-list {
-            max-height: 260px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 8px 12px;
+        .acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+        .btn-accion {
+            background: none; border: 1px solid currentColor; border-radius: 6px;
+            padding: 4px 10px; cursor: pointer; font-size: 0.8em; font-family: inherit;
         }
-        .func-list label { display: flex; gap: 8px; align-items: center; padding: 4px 0; font-weight: 400; }
-        .func-toolbar { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 8px; flex-wrap: wrap; }
-        .func-toolbar .filter-group { flex: 1; min-width: 180px; }
+        .btn-ver       { color: var(--color-navy); }
+        .btn-modificar { color: #333399; }
+        .btn-anular    { color: var(--color-danger); }
+        .btn-ver:hover       { background: var(--color-navy); border-color: var(--color-navy); color: #fff; }
+        .btn-modificar:hover { background: #333399; border-color: #333399; color: #fff; }
+        .btn-anular:hover    { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
+
         .form-row { display: flex; gap: 16px; flex-wrap: wrap; }
         .form-row .form-group { flex: 1; min-width: 180px; }
-        .btn-revocar {
-            background: none; border: 1px solid #c62828; color: #c62828;
-            border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.8em;
+        .radio-row { display: flex; gap: 20px; flex-wrap: wrap; padding: 6px 0; }
+        .radio-row label { display: flex; gap: 6px; align-items: center; font-weight: 400; cursor: pointer; }
+        .aviso {
+            border-left: 4px solid #333399; background: rgba(51,51,153,0.06);
+            padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 0.9em;
         }
-        .btn-revocar:hover { background: #c62828; color: #fff; }
+        input:disabled, select:disabled, textarea:disabled { background: #f3f3f6; color: #555; }
+
+        .func-toolbar { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 8px; flex-wrap: wrap; }
+        .func-toolbar .filter-group { flex: 1; min-width: 180px; }
+        .func-list {
+            max-height: 320px; overflow-y: auto;
+            border: 1px solid #ddd; border-radius: 8px; padding: 6px 12px;
+        }
+        .func-item { padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+        .func-item:last-child { border-bottom: none; }
+        .func-item > label { display: flex; gap: 8px; align-items: center; font-weight: 500; cursor: pointer; }
+        .gestiones { margin: 6px 0 2px 28px; display: flex; flex-direction: column; gap: 4px; }
+        .gestiones label { display: flex; gap: 8px; align-items: center; font-weight: 400; font-size: 0.88em; }
+        .gestiones .dias { color: #333399; font-weight: 600; }
+        .gestiones .nota { color: #999; font-size: 0.9em; }
+
+        .detalle-grid { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; font-size: 0.9em; margin-bottom: 14px; }
+        .detalle-grid dt { font-weight: 600; color: #333399; }
+        .detalle-grid dd { margin: 0; }
+        .link-acuerdo { color: #333399; font-weight: 600; cursor: pointer; text-decoration: underline; }
+        .btn-pdf {
+            display: inline-flex; align-items: center; gap: 4px; color: #5C1033;
+            border: 1px solid #5C1033; border-radius: 6px; padding: 3px 8px; font-size: 0.8em; text-decoration: none;
+        }
+        .btn-pdf:hover { background: #5C1033; color: #fff; }
+        .btn-pdf .material-symbols-outlined { font-size: 16px; }
     </style>
 </head>
 <body>
@@ -87,7 +119,7 @@
         <div class="filters-container">
             <div class="filter-actions">
                 <button class="btn btn-primary" id="btnNuevo">
-                    <i class="material-symbols-outlined">add</i> Registrar acuerdo colectivo
+                    <i class="material-symbols-outlined">add</i> Registrar acuerdo
                 </button>
             </div>
         </div>
@@ -98,15 +130,15 @@
                 <table>
                     <thead>
                         <tr>
+                            <th>N.° / Solicitud</th>
                             <th>Tipo</th>
-                            <th>Documento / Solicitud</th>
                             <th>Motivo</th>
                             <th>Fecha Acuerdo</th>
                             <th>Nueva Fecha Límite</th>
-                            <th>Funcionarios (gestión)</th>
-                            <th>Registrado por</th>
+                            <th>Funcionarios</th>
+                            <th>Autorizado por</th>
                             <th>Estado</th>
-                            <th></th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="acuerdosTableBody">
@@ -119,36 +151,70 @@
         </div>
     </div>
 
-    <!-- Modal nuevo acuerdo colectivo -->
+    <!-- Modal registrar / modificar acuerdo -->
     <div id="modalAcuerdo" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2><i class="material-symbols-outlined">gavel</i> Registrar acuerdo colectivo</h2>
-                <button class="close-modal" id="btnCerrarModal"><i class="material-symbols-outlined">close</i></button>
+                <h2><i class="material-symbols-outlined">gavel</i> <span id="modalTitulo">Registrar acuerdo</span></h2>
+                <button class="close-modal" data-cerrar="modalAcuerdo"><i class="material-symbols-outlined">close</i></button>
             </div>
             <div class="modal-body">
+                <div class="aviso" id="avisoModifica" hidden>
+                    Modifica al Acuerdo <strong id="modificaNro"></strong>. Al guardar, el original pasará a estado <strong>Modificado</strong>.
+                </div>
+
+                <div class="form-group" id="bloqueVincular">
+                    <label>¿Vincular a un acuerdo colectivo existente?</label>
+                    <div class="radio-row">
+                        <label><input type="radio" name="vincular" value="no" checked> No, crear acuerdo nuevo</label>
+                        <label><input type="radio" name="vincular" value="si"> Sí</label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="bloqueColectivo" hidden>
+                    <label for="colectivoBuscar">Acuerdo colectivo vigente *</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="colectivoBuscar" list="colectivosList" placeholder="Buscar por N.° de acuerdo o motivo...">
+                        <datalist id="colectivosList"></datalist>
+                    </div>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="nroDocumento">N° de documento / resolución *</label>
-                        <div class="input-wrapper"><input type="text" id="nroDocumento" maxlength="60" placeholder="Ej. RA-015/2026"></div>
+                        <label>Tipo de acuerdo *</label>
+                        <div class="radio-row">
+                            <label><input type="radio" name="tipo" value="COLECTIVO" checked> Colectivo</label>
+                            <label><input type="radio" name="tipo" value="INDIVIDUAL"> Individual</label>
+                        </div>
                     </div>
                     <div class="form-group">
+                        <label for="nroAcuerdo">N.° de acuerdo</label>
+                        <div class="input-wrapper"><input type="text" id="nroAcuerdo" readonly disabled></div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
                         <label for="fechaAcuerdo">Fecha del acuerdo *</label>
-                        <div class="input-wrapper"><input type="date" id="fechaAcuerdo"></div>
+                        <div class="input-wrapper"><input type="date" id="fechaAcuerdo" data-heredado></div>
                     </div>
                     <div class="form-group">
                         <label for="fechaHasta">Nueva fecha límite *</label>
-                        <div class="input-wrapper"><input type="date" id="fechaHasta"></div>
+                        <div class="input-wrapper"><input type="date" id="fechaHasta" data-heredado></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="autorizadoPor">Autorizado por (Gerencia General) *</label>
+                        <div class="select-wrapper"><select id="autorizadoPor" data-heredado></select></div>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="motivo">Motivo *</label>
                     <div class="textarea-wrapper">
-                        <textarea id="motivo" rows="3" placeholder="Ej. Suspensión de vacaciones del personal de salud por emergencia sanitaria"></textarea>
+                        <textarea id="motivo" rows="2" data-heredado placeholder="Ej. Emergencia Sanitaria"></textarea>
                     </div>
                 </div>
+
                 <div class="form-group">
-                    <label>Funcionarios afectados * <span style="font-weight:400;color:#888">(se protegen sus gestiones activas actuales)</span></label>
+                    <label>Funcionarios y gestiones protegidas * <span style="font-weight:400;color:#888">(los días se toman del sistema)</span></label>
                     <div class="func-toolbar">
                         <div class="filter-group">
                             <div class="select-wrapper">
@@ -158,7 +224,7 @@
                         <div class="filter-group">
                             <div class="input-wrapper"><input type="text" id="buscarFunc" placeholder="Buscar funcionario..."></div>
                         </div>
-                        <label style="display:flex;gap:6px;align-items:center;font-weight:400">
+                        <label id="lblTodos" style="display:flex;gap:6px;align-items:center;font-weight:400">
                             <input type="checkbox" id="chkTodos"> Marcar visibles
                         </label>
                     </div>
@@ -167,9 +233,46 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-cancel" id="btnCancelar">Cancelar</button>
+                <button class="btn btn-cancel" data-cerrar="modalAcuerdo">Cancelar</button>
                 <button class="btn btn-primary" id="btnGuardar">
-                    <i class="material-symbols-outlined">save</i> Registrar
+                    <i class="material-symbols-outlined">save</i> Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal detalle (solo lectura) -->
+    <div id="modalDetalle" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="material-symbols-outlined">description</i> <span id="detalleTitulo">Acuerdo</span></h2>
+                <button class="close-modal" data-cerrar="modalDetalle"><i class="material-symbols-outlined">close</i></button>
+            </div>
+            <div class="modal-body" id="detalleBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" data-cerrar="modalDetalle">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal anular -->
+    <div id="modalAnular" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2><i class="material-symbols-outlined">block</i> Anular acuerdo <span id="anularNro"></span></h2>
+                <button class="close-modal" data-cerrar="modalAnular"><i class="material-symbols-outlined">close</i></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.9em;color:#555">Las gestiones dejarán de estar protegidas y vuelven a regir las reglas normales de vencimiento.</p>
+                <div class="form-group">
+                    <label for="motivoAnulacion">Motivo de anulación *</label>
+                    <div class="textarea-wrapper"><textarea id="motivoAnulacion" rows="3"></textarea></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" data-cerrar="modalAnular">Cancelar</button>
+                <button class="btn btn-primary" id="btnConfirmarAnular">
+                    <i class="material-symbols-outlined">block</i> Anular
                 </button>
             </div>
         </div>

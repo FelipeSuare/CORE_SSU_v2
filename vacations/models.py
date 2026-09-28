@@ -88,32 +88,47 @@ class AnulacionAjuste(models.Model):
 
 class AcuerdoVacacion(models.Model):
     """
-    Excepción a la pérdida por tope de gestiones activas. Mientras esté activo
-    y vigente (fecha_hasta >= hoy), las gestiones listadas en
+    Excepción a la pérdida por tope de gestiones activas. Mientras esté
+    VIGENTE y fecha_hasta >= hoy, las gestiones listadas en
     AcuerdoVacacionFuncionario no se evictan a dias_perdidos.
-      COLECTIVO: registrado por RRHH con respaldo documental (ej. pandemia).
-      RECHAZO:   generado por el sistema al rechazar una solicitud hecha
-                 cerca de la fecha límite de la gestión más antigua.
+      COLECTIVO / INDIVIDUAL: registrados por RRHH, con N.° RA-XX/AAAA.
+      RECHAZO: generado por el sistema al rechazar una solicitud hecha
+               cerca de la fecha límite de la gestión más antigua (sin N.°).
+    Sin edición libre: ANULADO y MODIFICADO son de solo lectura.
     """
     id_acuerdo = models.AutoField(primary_key=True)
     tipo = models.CharField(max_length=10)
-    nro_documento = models.CharField(max_length=60, blank=True, null=True)
+    anio_nro = models.IntegerField(blank=True, null=True)
+    correlativo = models.IntegerField(blank=True, null=True)
     motivo = models.TextField()
     fecha_acuerdo = models.DateField()
     fecha_hasta = models.DateField()
+    estado = models.CharField(max_length=10, default='VIGENTE')
     id_formulario = models.ForeignKey(SolicitudVacacion, models.DO_NOTHING, db_column='id_formulario', blank=True, null=True)
     registrado_por = models.ForeignKey('employees.Funcionario', models.DO_NOTHING, db_column='registrado_por', blank=True, null=True, related_name='+')
+    autorizado_por = models.ForeignKey('employees.Funcionario', models.DO_NOTHING, db_column='autorizado_por', blank=True, null=True, related_name='+')
     fecha_registro = models.DateTimeField(auto_now_add=True)
-    activo = models.BooleanField(default=True)
+    reemplazado_por = models.ForeignKey('self', models.DO_NOTHING, db_column='reemplazado_por', blank=True, null=True, related_name='modifica_a')
+    motivo_anulacion = models.TextField(blank=True, null=True)
+    anulado_por = models.ForeignKey('employees.Funcionario', models.DO_NOTHING, db_column='anulado_por', blank=True, null=True, related_name='+')
+    fecha_anulacion = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         db_table = 'acuerdo_vacacion'
         managed = False
+        unique_together = (('anio_nro', 'correlativo'),)
+
+    @property
+    def nro_acuerdo(self):
+        if self.correlativo is None:
+            return None
+        return f"RA-{self.correlativo:02d}/{self.anio_nro}"
 
 class AcuerdoVacacionFuncionario(models.Model):
     id_acuerdo = models.ForeignKey(AcuerdoVacacion, models.CASCADE, db_column='id_acuerdo', related_name='afectados')
     cod_funcionario = models.ForeignKey('employees.Funcionario', models.CASCADE, db_column='cod_funcionario', related_name='+')
     anio_gestion = models.IntegerField()
+    dias_protegidos = models.DecimalField(max_digits=4, decimal_places=1, default=0)
 
     class Meta:
         db_table = 'acuerdo_vacacion_funcionario'

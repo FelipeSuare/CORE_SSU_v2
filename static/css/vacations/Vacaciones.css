@@ -341,3 +341,13 @@
     .module-title { font-size: 1.8em; }
     .new-holiday-card { padding: 20px; }
 }
+
+/* Gestiones protegidas por acuerdo / pendientes por reprogramar */
+.proteccion-section[hidden] { display: none; }
+.proteccion-card { border: 1px solid var(--color-blush); border-left: 4px solid #333399; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; font-size: 0.92em; line-height: 1.5; }
+.proteccion-card:last-child { margin-bottom: 0; }
+#rechazosReprogramar .proteccion-card { border-left-color: #5C1033; }
+.proteccion-head { color: var(--color-navy); margin-bottom: 2px; }
+.proteccion-dias { font-size: 1.3em; font-weight: 700; color: #333399; }
+.proteccion-nota { color: #666; font-size: 0.92em; }
+.proteccion-aviso { margin-top: 6px; color: #5C1033; font-weight: 600; font-size: 0.92em; }

@@ -196,26 +196,39 @@ Modelo: `vacations.AnulacionAjuste`. Anulación total o ajuste parcial de una so
 | registrado_por | varchar(20) (FK → `funcionario`) | Sí | — | Quién hizo la anulación/ajuste (típicamente RRHH). |
 
 ### `acuerdo_vacacion`
-Modelo: `vacations.AcuerdoVacacion`. Excepción a la pérdida por tope de gestiones activas (migración `vacations/0002`). Mientras esté `activo` y `fecha_hasta >= hoy`, las gestiones listadas en `acuerdo_vacacion_funcionario` no se evictan a `dias_perdidos` (`aplicar_limite_gestiones_activas()` las excluye). Al vencer, el poblado diario las evicta normalmente.
+Modelo: `vacations.AcuerdoVacacion`. Excepción a la pérdida por tope de gestiones activas (migraciones `vacations/0002` y `0003`). Mientras esté en `estado = 'VIGENTE'` y `fecha_hasta >= hoy`, las gestiones listadas en `acuerdo_vacacion_funcionario` no se evictan a `dias_perdidos` (`aplicar_limite_gestiones_activas()` las excluye). Al vencer, el poblado diario las evicta normalmente; al anularse, el tope se aplica en el momento. No hay edición libre: un acuerdo se anula o se "modifica" creando uno nuevo que lo reemplaza. `UNIQUE (anio_nro, correlativo)`.
 
 | Columna | Tipo | Null | Default | Descripción |
 |---|---|---|---|---|
 | id_acuerdo | integer (PK) | No | secuencia | Identificador. |
-| tipo | varchar(10) | No | — | `COLECTIVO` (registrado por RRHH con respaldo documental, ej. pandemia) o `RECHAZO` (generado por el sistema al rechazar una solicitud hecha dentro de 60 días antes de la fecha límite; protege hasta fecha límite + 6 meses). |
-| nro_documento | varchar(60) | Sí | — | Resolución/memorándum. Obligatorio en `COLECTIVO`. |
+| tipo | varchar(10) | No | — | `COLECTIVO` (varios funcionarios bajo un mismo N.°), `INDIVIDUAL` (un funcionario) o `RECHAZO` (generado por el sistema al rechazar una solicitud hecha dentro de los 30 días previos a la fecha límite; protege hasta fecha límite + 6 meses; sin N.°). |
+| anio_nro | integer | Sí | — | Año del N.° RA-XX/AAAA (año del servidor al crear). `NULL` en `RECHAZO`. |
+| correlativo | integer | Sí | — | XX del N.° RA; reinicia cada año. Se asigna con `siguiente_correlativo()` bajo `pg_advisory_xact_lock`. |
 | motivo | text | No | — | Motivo del acuerdo. |
 | fecha_acuerdo | date | No | — | Fecha del acuerdo. |
 | fecha_hasta | date | No | — | Nueva fecha límite: después de esta fecha la gestión se pierde por el tope normal. |
+| estado | varchar(10) | No | `VIGENTE` | `VIGENTE`, `ANULADO` o `MODIFICADO`. Solo `VIGENTE` protege. |
 | id_formulario | integer (FK → `solicitud_vacacion`) | Sí | — | Solicitud rechazada que originó el acuerdo (`RECHAZO`). |
 | registrado_por | varchar(20) (FK → `funcionario`) | Sí | — | RRHH que lo registró, o el aprobador que rechazó. |
+| autorizado_por | varchar(20) (FK → `funcionario`) | Sí | — | Gerente General que autoriza (`COLECTIVO`/`INDIVIDUAL`). |
 | fecha_registro | timestamptz | No | now() | Cuándo se registró. |
-| activo | boolean | No | true | `false` = revocado (no se borra, queda para auditoría). |
+| reemplazado_por | integer (FK → `acuerdo_vacacion`) | Sí | — | Acuerdo nuevo que reemplaza a este (`MODIFICADO`). |
+| motivo_anulacion | text | Sí | — | Motivo (`ANULADO`). |
+| anulado_por | varchar(20) (FK → `funcionario`) | Sí | — | Quién anuló. |
+| fecha_anulacion | timestamptz | Sí | — | Cuándo se anuló. |
 
 ### `acuerdo_vacacion_funcionario`
 Modelo: `vacations.AcuerdoVacacionFuncionario`. Gestiones protegidas por cada acuerdo. `UNIQUE (id_acuerdo, cod_funcionario, anio_gestion)`.
 
 | Columna | Tipo | Null | Default | Descripción |
 |---|---|---|---|---|
+| id | integer (PK) | No | secuencia | Identificador. |
+| id_acuerdo | integer (FK → `acuerdo_vacacion`, cascade) | No | — | Acuerdo. |
+| cod_funcionario | varchar(20) (FK → `funcionario`, cascade) | No | — | Funcionario afectado. |
+| anio_gestion | integer | No | — | Año de gestión protegido (gestión pendiente con saldo, elegida en el formulario). |
+| dias_protegidos | numeric(4,1) | No | 0 | Saldo de la gestión al registrar el acuerdo (tomado de `gestion_vacacion`, no se digita). |
+
+---|---|---|---|---|
 | id | integer (PK) | No | secuencia | Identificador. |
 | id_acuerdo | integer (FK → `acuerdo_vacacion`, cascade) | No | — | Acuerdo. |
 | cod_funcionario | varchar(20) (FK → `funcionario`, cascade) | No | — | Funcionario afectado. |
