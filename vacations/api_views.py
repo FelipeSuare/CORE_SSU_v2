@@ -1876,8 +1876,7 @@ class AlertaPoblarHoyView(APIView):
 #  MÓDULO: ACUERDOS DE VACACIÓN (RRHH)
 #  Suspensión/prórroga: las gestiones afectadas no se pierden por el tope de
 #  gestiones activas mientras el acuerdo esté VIGENTE y no vencido.
-#  Sin edición libre: se anula, o se "modifica" creando uno nuevo que
-#  reemplaza al original (queda MODIFICADO, enlazado y de solo lectura).
+#  Se anula, o se edita en su lugar conservando su N.° RA-XX/AAAA.
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _parse_fecha(valor):
@@ -2070,7 +2069,14 @@ class AcuerdosVacacionView(APIView):
                         cod_funcionario_id=cod, anio_gestion=anio, dias_protegidos=gest[anio][0],
                     ))
 
-            if not vincular_id:
+            if original:
+                # Editar conserva el mismo acuerdo y su N.° RA-XX/AAAA.
+                acuerdo = original
+                acuerdo.tipo, acuerdo.motivo, acuerdo.autorizado_por = tipo, motivo, autorizado
+                acuerdo.fecha_acuerdo, acuerdo.fecha_hasta = fecha_acuerdo, fecha_hasta
+                acuerdo.save(update_fields=['tipo', 'motivo', 'autorizado_por', 'fecha_acuerdo', 'fecha_hasta'])
+                acuerdo.afectados.all().delete()
+            elif not vincular_id:
                 anio_nro = hoy.year
                 acuerdo = AcuerdoVacacion.objects.create(
                     tipo=tipo,
@@ -2085,11 +2091,6 @@ class AcuerdosVacacionView(APIView):
             for fila in filas:
                 fila.id_acuerdo = acuerdo
             AcuerdoVacacionFuncionario.objects.bulk_create(filas)
-
-            if original:
-                original.estado = 'MODIFICADO'
-                original.reemplazado_por = acuerdo
-                original.save(update_fields=['estado', 'reemplazado_por'])
 
         return Response({
             'ok':           True,

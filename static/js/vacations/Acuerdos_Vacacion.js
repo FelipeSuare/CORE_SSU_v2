@@ -203,7 +203,7 @@ function abrirModal(original = null) {
     document.getElementById('bloqueVincular').hidden = !!original;
     document.querySelector('input[name=vincular][value=no]').checked = true;
     document.getElementById('colectivoBuscar').value = '';
-    document.getElementById('nroAcuerdo').value = 'Se asignará al guardar';
+    document.getElementById('nroAcuerdo').value = original ? original.nro : 'Se asignará al guardar';
     document.getElementById('buscarFunc').value = '';
     document.getElementById('unidadFiltro').value = '';
 

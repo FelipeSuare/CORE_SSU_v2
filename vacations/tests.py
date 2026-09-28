@@ -1104,19 +1104,14 @@ class TestAcuerdosAPI(APITestCase):
         }, format='json')
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_modificar_reemplaza_al_original(self):
+    def test_editar_conserva_numero(self):
         original = self._crear()
-        nuevo = self._crear(modifica_id=original['id'], motivo='Emergencia Sanitaria ampliada')
-        self.assertNotEqual(nuevo['nro'], original['nro'])
+        editado = self._crear(modifica_id=original['id'], motivo='Emergencia Sanitaria ampliada')
+        self.assertEqual((editado['id'], editado['nro']), (original['id'], original['nro']))
         ac = AcuerdoVacacion.objects.get(id_acuerdo=original['id'])
-        self.assertEqual((ac.estado, ac.reemplazado_por_id), ('MODIFICADO', nuevo['id']))
+        self.assertEqual((ac.estado, ac.motivo), ('VIGENTE', 'Emergencia Sanitaria ampliada'))
+        self.assertEqual(AcuerdoVacacion.objects.count(), 1)
         self.assertEqual(anios_protegidos(self.f.cod_funcionario), {2024, 2025})
-
-        listado = {a['id']: a for a in self.client.get(self.url).json()['acuerdos']}
-        self.assertEqual(listado[nuevo['id']]['modifica_a']['nro'], original['nro'])
-
-        r = self.client.post(self.url, self._payload(modifica_id=original['id']), format='json')
-        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_anular_desprotege_y_aplica_tope(self):
         gv = GestionVacacion.objects.get(cod_funcionario=self.f)
