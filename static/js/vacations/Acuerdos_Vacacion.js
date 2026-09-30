@@ -127,10 +127,10 @@ function renderTable() {
 
     tableBody.innerHTML = _acuerdos.map(a => {
         const nFunc = new Set(a.afectados.map(x => x.cod)).size;
-        const acciones = [`<button class="btn-accion btn-ver" data-accion="ver" data-id="${a.id}">Ver</button>`];
+        const acciones = [`<button class="action-btn action-btn-edit" title="Ver" data-accion="ver" data-id="${a.id}"><i class="material-symbols-outlined">visibility</i></button>`];
         if (a.estado === 'VIGENTE') {
-            if (a.tipo !== 'RECHAZO') acciones.push(`<button class="btn-accion btn-modificar" data-accion="modificar" data-id="${a.id}">Modificar</button>`);
-            acciones.push(`<button class="btn-accion btn-anular" data-accion="anular" data-id="${a.id}">Anular</button>`);
+            if (a.tipo !== 'RECHAZO') acciones.push(`<button class="action-btn action-btn-edit" title="Modificar" data-accion="modificar" data-id="${a.id}"><i class="material-symbols-outlined">edit</i></button>`);
+            acciones.push(`<button class="action-btn action-btn-delete" title="Anular" data-accion="anular" data-id="${a.id}"><i class="material-symbols-outlined">block</i></button>`);
         }
         return `
         <tr>
@@ -142,7 +142,7 @@ function renderTable() {
             <td>${nFunc}</td>
             <td>${esc(a.autorizado_por || '—')}</td>
             <td>${estadoHtml(a)}</td>
-            <td><div class="acciones">${acciones.join('')}</div></td>
+            <td style="white-space:nowrap">${acciones.join('')}</td>
         </tr>`;
     }).join('');
 }
@@ -177,13 +177,13 @@ function verDetalle(a) {
         <dl class="detalle-grid">${filas.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
         <div class="table-responsive">
             <table>
-                <thead><tr><th>Funcionario</th><th>Gestiones protegidas</th>${conPdf ? '<th>Constancia</th>' : ''}</tr></thead>
+                <thead><tr><th>Funcionario</th><th>Gestiones protegidas</th>${conPdf ? '<th style="text-align:center">Constancia</th>' : ''}</tr></thead>
                 <tbody>${[...porFunc].map(([cod, f]) => `
                     <tr>
                         <td>${esc(f.nombre)}</td>
                         <td>${esc(f.gest.join(', '))}</td>
-                        ${conPdf ? `<td><a class="btn-pdf" href="${API_ACUERDOS}${a.id}/constancia/${encodeURIComponent(cod)}/">
-                            <span class="material-symbols-outlined">picture_as_pdf</span> PDF</a></td>` : ''}
+                        ${conPdf ? `<td style="text-align:center"><a class="btn-pdf" title="Descargar constancia PDF" href="${API_ACUERDOS}${a.id}/constancia/${encodeURIComponent(cod)}/">
+                            <i class="material-symbols-outlined">picture_as_pdf</i></a></td>` : ''}
                     </tr>`).join('')}
                 </tbody>
             </table>
