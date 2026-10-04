@@ -42,7 +42,17 @@ const btnConfirmarRechazo    = document.getElementById('btnConfirmarRechazo');
 document.addEventListener('DOMContentLoaded', async () => {
     await cargarSolicitudes();
     registrarEventListeners();
+    abrirSolicitudDesdeURL();
 });
+
+// ?solicitud=<id> (desde la notificación del dashboard) abre esa solicitud.
+function abrirSolicitudDesdeURL() {
+    const id = Number(new URLSearchParams(location.search).get('solicitud'));
+    if (!id) return;
+    history.replaceState(null, '', location.pathname);
+    if (todasLasSolicitudes.some(s => s.id === id && s.puede_actuar)) abrirModalRevision(id);
+    else AppDialog.alert('La solicitud ya no está pendiente de su aprobación.');
+}
 
 // ══════════════════════════════════════════════════════════════
 //  CARGA DESDE BACKEND

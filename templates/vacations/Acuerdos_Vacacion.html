@@ -148,22 +148,6 @@
                     Editando el Acuerdo <strong id="modificaNro"></strong>. Se conserva el mismo número.
                 </div>
 
-                <div class="form-group" id="bloqueVincular">
-                    <label>¿Vincular a un acuerdo colectivo existente?</label>
-                    <div class="radio-row">
-                        <label><input type="radio" name="vincular" value="no" checked> No, crear acuerdo nuevo</label>
-                        <label><input type="radio" name="vincular" value="si"> Sí</label>
-                    </div>
-                </div>
-
-                <div class="form-group" id="bloqueColectivo" hidden>
-                    <label for="colectivoBuscar">Acuerdo colectivo vigente *</label>
-                    <div class="input-wrapper">
-                        <input type="text" id="colectivoBuscar" list="colectivosList" placeholder="Buscar por N.° de acuerdo o motivo...">
-                        <datalist id="colectivosList"></datalist>
-                    </div>
-                </div>
-
                 <div class="form-row">
                     <div class="form-group">
                         <label>Tipo de acuerdo *</label>
@@ -180,21 +164,21 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="fechaAcuerdo">Fecha del acuerdo *</label>
-                        <div class="input-wrapper"><input type="date" id="fechaAcuerdo" data-heredado></div>
+                        <div class="input-wrapper"><input type="date" id="fechaAcuerdo"></div>
                     </div>
                     <div class="form-group">
                         <label for="fechaHasta">Nueva fecha límite *</label>
-                        <div class="input-wrapper"><input type="date" id="fechaHasta" data-heredado></div>
+                        <div class="input-wrapper"><input type="date" id="fechaHasta"></div>
                     </div>
                     <div class="form-group">
                         <label for="autorizadoPor">Autorizado por (Gerencia General) *</label>
-                        <div class="select-wrapper"><select id="autorizadoPor" data-heredado></select></div>
+                        <div class="select-wrapper"><select id="autorizadoPor"></select></div>
                     </div>
                 </div>
                 <div class="form-group">
                     <label for="motivo">Motivo *</label>
                     <div class="textarea-wrapper">
-                        <textarea id="motivo" rows="2" data-heredado placeholder="Ej. Emergencia Sanitaria"></textarea>
+                        <textarea id="motivo" rows="2" placeholder="Ej. Emergencia Sanitaria"></textarea>
                     </div>
                 </div>
 

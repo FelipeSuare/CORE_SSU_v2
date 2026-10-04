@@ -94,14 +94,19 @@ def _estado_display(estado_db):
         return 'Aprobada'
     if estado_db in ('RECHAZADA', 'RECHAZADO'):
         return 'Rechazada'
+    if estado_db == 'ANULADA':
+        return 'Anulada Totalmente'
     return estado_db
 
 
-def _saldos_para_js(gv):
+def _saldos_para_js(gv, excluir=frozenset()):
+    """Saldos por gestión; `excluir` = años protegidos, que se muestran aparte."""
     gestiones = []
     for i in range(1, 5):
         anio = getattr(gv, f'anio_gestion{i}')
         dias = float(getattr(gv, f'dias_gestion{i}'))
+        if anio in excluir:
+            continue
         if anio is not None or dias > 0:
             gestiones.append({
                 'numero': i,
@@ -144,6 +149,14 @@ def _calcular_retorno(fecha_salida, dias_solicitados, feriados_set):
         'dias_fines_semana': dias_fines_semana,
         'dias_feriados':   dias_feriados_count,
     }
+
+
+def _contar_dias_habiles(desde, hasta, feriados_set):
+    """Días hábiles en [desde, hasta): sin fines de semana ni feriados."""
+    return sum(
+        1 for n in range((hasta - desde).days)
+        if (d := desde + timedelta(days=n)).weekday() < 5 and d not in feriados_set
+    )
 
 
 def _siguiente_dia_habil(fecha, feriados_set):
@@ -190,6 +203,15 @@ def _niveles_semanticos(tipo_funcionario):
     return _NIVELES_SEMANTICOS.get(tipo_funcionario, _NIVELES_SEMANTICOS['PERSONAL DE AREA'])
 
 
+def _nivel_a_actuar(niveles, aprs):
+    """
+    Nivel en el que el aprobador debe decidir: el menor de sus niveles aún sin
+    decisión. Un mismo aprobador puede figurar en varios niveles de un
+    funcionario (p. ej. Gerente que cubre la Jefatura de Área).
+    """
+    return min((n for n in niveles if n not in aprs), default=None)
+
+
 def _nivel_cols(tipo_funcionario):
     """Columnas de nivel para 'Mis Solicitudes', una por nivel semántico."""
     return [
@@ -224,10 +246,36 @@ class DatosFormularioView(APIView):
         p        = f.ci
         cargo_act = HistorialCargo.objects.filter(cod_funcionario=f, es_actual=True).first()
 
-        try:
-            gv    = GestionVacacion.objects.get(cod_funcionario=f)
-            saldos = _saldos_para_js(gv)
-        except GestionVacacion.DoesNotExist:
+        hoy = date.today()
+        gv  = GestionVacacion.objects.filter(cod_funcionario=f).first()
+
+        # Gestiones protegidas vigentes (por acuerdo o por rechazo al límite del
+        # vencimiento): se muestran en su propia sección con el saldo real que
+        # les queda y desaparecen al consumirse; no se repiten entre las 2
+        # gestiones normales.
+        protecciones = list(AcuerdoVacacionFuncionario.objects.filter(
+            cod_funcionario=f, id_acuerdo__estado='VIGENTE', id_acuerdo__fecha_hasta__gte=hoy,
+        ).select_related('id_acuerdo').order_by('anio_gestion'))
+        dias_por_anio = {anio: dias for _, anio, dias in gestiones_ocupadas(gv)} if gv else {}
+        dias_protegidos = []
+        for prot in protecciones:
+            dias = dias_por_anio.get(prot.anio_gestion, Decimal('0'))
+            if dias <= 0:
+                continue
+            ac = prot.id_acuerdo
+            dias_protegidos.append({
+                'titulo':      (f'Días protegidos por Acuerdo N.° {ac.nro_acuerdo}' if ac.tipo != 'RECHAZO'
+                                else 'Días protegidos por solicitud rechazada al límite de vencimiento'),
+                'origen':      'RECHAZO' if ac.tipo == 'RECHAZO' else 'ACUERDO',
+                'solicitud':   f"G{ac.id_formulario_id:03d}" if ac.id_formulario_id else None,
+                'anio':        prot.anio_gestion,
+                'dias':        float(dias),
+                'fecha_hasta': ac.fecha_hasta.isoformat(),
+            })
+
+        if gv:
+            saldos = _saldos_para_js(gv, excluir={pr.anio_gestion for pr in protecciones})
+        else:
             saldos = {'gestiones': [], 'dias_negados': 0.0, 'dias_adeudados': 0.0}
 
         jerarquia = [
@@ -245,7 +293,6 @@ class DatosFormularioView(APIView):
             ).select_related('cod_aprobador__ci').order_by('nivel_aprobacion')
         ]
 
-        hoy  = date.today()
         fi   = f.fecha_ingreso
         anios = calcular_anios_antiguedad(fi)
         puede_solicitar      = anios >= 1 and saldos['dias_adeudados'] > 0
@@ -266,41 +313,8 @@ class DatosFormularioView(APIView):
             ).exists()
             sin_jefe_area = not tiene_jefe
 
-        # Gestiones protegidas vigentes: por acuerdo formal o por rechazo
-        # cerca del vencimiento ("pendientes por reprogramar").
-        acuerdos_protegidos, rechazos_reprogramar = [], []
-        protecciones = list(AcuerdoVacacionFuncionario.objects.filter(
-            cod_funcionario=f, id_acuerdo__estado='VIGENTE', id_acuerdo__fecha_hasta__gte=hoy,
-        ).select_related('id_acuerdo').order_by('anio_gestion'))
-        rechazos = {
-            ap.id_formulario_id: ap
-            for ap in AprobacionSolicitud.objects.filter(
-                id_formulario__in=[p.id_acuerdo.id_formulario_id for p in protecciones if p.id_acuerdo.id_formulario_id],
-                decision='RECHAZADO',
-            )
-        }
-        for prot in protecciones:
-            ac = prot.id_acuerdo
-            if ac.tipo == 'RECHAZO':
-                ap = rechazos.get(ac.id_formulario_id)
-                rechazos_reprogramar.append({
-                    'anio':          prot.anio_gestion,
-                    'solicitud':     f"G{ac.id_formulario_id:03d}",
-                    'fecha_rechazo': timezone.localdate(ap.fecha_decision).isoformat() if ap else ac.fecha_acuerdo.isoformat(),
-                    'motivo':        (ap.observacion if ap else None) or '—',
-                    'fecha_hasta':   ac.fecha_hasta.isoformat(),
-                })
-            else:
-                acuerdos_protegidos.append({
-                    'nro':         ac.nro_acuerdo,
-                    'anio':        prot.anio_gestion,
-                    'dias':        float(prot.dias_protegidos),
-                    'fecha_hasta': ac.fecha_hasta.isoformat(),
-                })
-
         return Response({
-            'acuerdos_protegidos':  acuerdos_protegidos,
-            'rechazos_reprogramar': rechazos_reprogramar,
+            'dias_protegidos':      dias_protegidos,
             'cod_funcionario':      f.cod_funcionario,
             'nombre_completo':      f"{p.nombre} {p.ap_paterno} {p.ap_materno or ''}".strip(),
             'ci':                   p.ci,
@@ -371,17 +385,6 @@ class CrearSolicitudView(APIView):
         if not all([fecha_salida_str, fecha_retorno_str, dias_str, motivo]):
             return Response({'error': 'Todos los campos son requeridos.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if len(motivo) < 10:
-            return Response(
-                {'error': 'El motivo debe tener al menos 10 caracteres.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if len(motivo) > 500:
-            return Response(
-                {'error': 'El motivo no puede superar los 500 caracteres.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         try:
             fecha_salida  = date.fromisoformat(fecha_salida_str)
             fecha_retorno = date.fromisoformat(fecha_retorno_str)
@@ -449,7 +452,11 @@ class CrearSolicitudView(APIView):
                     estado=estado_inicial,
                 )
                 pendientes = dias
-                orden = [slot for slot, _, _ in gestiones_ocupadas(gv)] + [
+                # Primero los días protegidos (acuerdo o rechazo al límite),
+                # luego las gestiones normales de la más antigua a la reciente.
+                protegidos = anios_protegidos(f.cod_funcionario)
+                ocupadas = sorted(gestiones_ocupadas(gv), key=lambda g: (g[1] not in protegidos, g[1]))
+                orden = [slot for slot, _, _ in ocupadas] + [
                     i for i in range(4, 0, -1) if getattr(gv, f'anio_gestion{i}') is None
                 ]
                 for i in orden:
@@ -558,7 +565,8 @@ class MisSolicitudesView(APIView):
                 'fecha_retorno':   s.fecha_retorno.strftime('%Y-%m-%d'),
                 'dias':            float(s.dias_solicitados) - dias_ajust,
                 'motivo':          s.motivo_vacacion or '',
-                'estado':          _estado_display(s.estado),
+                # Aprobada con anulación parcial = Ajustada.
+                'estado':          'Ajustada' if s.estado == 'APROBADA' and dias_ajust else _estado_display(s.estado),
                 'nivel1':          niveles.get(1),
                 'nivel2':          niveles.get(2),
                 'nivel3':          niveles.get(3),
@@ -571,7 +579,7 @@ class MisSolicitudesView(APIView):
         except GestionVacacion.DoesNotExist:
             dias_adeudados = 0.0
 
-        dias_usados    = sum(r['dias'] for r in resultado if r['estado'] == 'Aprobada')
+        dias_usados    = sum(r['dias'] for r in resultado if r['estado'] in ('Aprobada', 'Ajustada'))
         dias_pendientes = sum(r['dias'] for r in resultado if r['estado'] == 'Pendiente')
 
         return Response({
@@ -731,8 +739,10 @@ class SolicitudesParaAprobarView(APIView):
                 cod_aprobador=aprobador, activo=True
             ).values('cod_funcionario_id', 'nivel_aprobacion'))
 
-            mi_nivel_por_func = {j['cod_funcionario_id']: j['nivel_aprobacion'] for j in jerarquias_qs}
-            cod_funcs = list(mi_nivel_por_func.keys())
+            mis_niveles_por_func = {}
+            for j in jerarquias_qs:
+                mis_niveles_por_func.setdefault(j['cod_funcionario_id'], []).append(j['nivel_aprobacion'])
+            cod_funcs = list(mis_niveles_por_func.keys())
 
             solicitudes_qs = list(SolicitudVacacion.objects.filter(
                 cod_funcionario__in=cod_funcs
@@ -740,7 +750,7 @@ class SolicitudesParaAprobarView(APIView):
                 'cod_funcionario__ci', 'cod_funcionario__id_unidad'
             ).order_by('-fecha_solicitud'))
         else:
-            mi_nivel_por_func = {}
+            mis_niveles_por_func = {}
             solicitudes_qs = list(SolicitudVacacion.objects.filter(
                 estado__in=list(_ESTADOS_PENDIENTE)
             ).select_related(
@@ -794,7 +804,7 @@ class SolicitudesParaAprobarView(APIView):
             cargo_act = cargos.get(f.cod_funcionario)
             gv        = gestiones.get(f.cod_funcionario)
             aprs      = aprobaciones_por_sol.get(sol.id_formulario, {})
-            mi_nivel  = mi_nivel_por_func.get(f.cod_funcionario)
+            mi_nivel  = _nivel_a_actuar(mis_niveles_por_func.get(f.cod_funcionario, []), aprs)
 
             if mi_nivel is not None and sol.estado not in ('APROBADA', 'RECHAZADA'):
                 prev_ok     = all(
@@ -884,19 +894,20 @@ class SolicitudesParaAprobarView(APIView):
 
 def _proteger_si_rechazo_cerca_de_vencer(solicitud, gv, aprobador, observacion):
     """
-    Si la solicitud rechazada se pidió dentro de DIAS_ANTICIPO_RECHAZO_PROTEGIDO
-    días antes de la fecha límite de la gestión en riesgo, crea un
-    AcuerdoVacacion tipo RECHAZO que la protege hasta fecha límite +
-    MESES_EXTENSION_RECHAZO: el funcionario intentó tomarla a tiempo.
-    Retorna el acuerdo creado o None.
+    Protege la gestión en riesgo solo si, al momento del rechazo, el
+    funcionario ya está al tope de perderla: su fecha límite cae dentro de los
+    próximos DIAS_ANTICIPO_RECHAZO_PROTEGIDO días y aún tiene saldo. Si todavía
+    tiene margen para volver a solicitar, no se protege nada.
+    Crea un AcuerdoVacacion tipo RECHAZO vigente hasta fecha límite +
+    MESES_EXTENSION_RECHAZO. Retorna el acuerdo creado o None.
     """
     solicitante = solicitud.cod_funcionario
     protegidos  = anios_protegidos(solicitante.cod_funcionario)
     riesgo      = gestion_en_riesgo(gv, solicitante.fecha_ingreso, protegidos)
     if not riesgo:
         return None
-    _, anio, _, fecha_limite = riesgo
-    if not 0 <= (fecha_limite - solicitud.fecha_solicitud).days <= DIAS_ANTICIPO_RECHAZO_PROTEGIDO:
+    _, anio, dias, fecha_limite = riesgo
+    if dias <= 0 or not 0 <= (fecha_limite - date.today()).days <= DIAS_ANTICIPO_RECHAZO_PROTEGIDO:
         return None
 
     acuerdo = AcuerdoVacacion.objects.create(
@@ -908,7 +919,7 @@ def _proteger_si_rechazo_cerca_de_vencer(solicitud, gv, aprobador, observacion):
         registrado_por=aprobador,
     )
     AcuerdoVacacionFuncionario.objects.create(
-        id_acuerdo=acuerdo, cod_funcionario=solicitante, anio_gestion=anio,
+        id_acuerdo=acuerdo, cod_funcionario=solicitante, anio_gestion=anio, dias_protegidos=dias,
     )
     return acuerdo
 
@@ -948,23 +959,27 @@ class RegistrarDecisionView(APIView):
         if solicitud.estado in ('APROBADA', 'RECHAZADA'):
             return Response({'error': 'Esta solicitud ya fue procesada.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            jerarquia = JerarquiaAprobacion.objects.get(
-                cod_funcionario=solicitud.cod_funcionario,
-                cod_aprobador=aprobador,
-                activo=True,
-            )
-        except JerarquiaAprobacion.DoesNotExist:
+        mis_niveles = list(JerarquiaAprobacion.objects.filter(
+            cod_funcionario=solicitud.cod_funcionario,
+            cod_aprobador=aprobador,
+            activo=True,
+        ).values_list('nivel_aprobacion', flat=True))
+        if not mis_niveles:
             return Response(
                 {'error': 'No tiene autoridad para aprobar esta solicitud.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        mi_nivel = jerarquia.nivel_aprobacion
         aprs     = {
             ap.nivel: ap
             for ap in AprobacionSolicitud.objects.filter(id_formulario=solicitud)
         }
+        mi_nivel = _nivel_a_actuar(mis_niveles, aprs)
+        if mi_nivel is None:
+            return Response(
+                {'error': 'Ya emitió su decisión sobre esta solicitud.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         for n in range(1, mi_nivel):
             if not aprs.get(n) or aprs[n].decision.upper() != 'APROBADO':
@@ -972,12 +987,6 @@ class RegistrarDecisionView(APIView):
                     {'error': f'El nivel {n} aún no ha aprobado la solicitud.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-
-        if mi_nivel in aprs:
-            return Response(
-                {'error': 'Ya emitió su decisión sobre esta solicitud.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         solicitante = solicitud.cod_funcionario
 
@@ -1272,6 +1281,8 @@ class HistorialRRHHView(APIView):
             cargo_act      = cargos.get(f.cod_funcionario)
             gv             = gestiones.get(f.cod_funcionario)
             dias_ajustados = ajustes_parciales.get(sol.id_formulario, 0.0)
+            if float(sol.dias_solicitados) - dias_ajustados <= 0:
+                continue  # anulada por completo vía ajustes (datos legado)
             resultado.append({
                 'id':             sol.id_formulario,
                 'codigo':         f"G{sol.id_formulario:03d}",
@@ -1404,6 +1415,9 @@ class SolicitudesAnulacionView(APIView):
 
         return Response({
             'solicitudes': resultado,
+            # Para previsualizar los días hábiles de una anulación parcial.
+            'feriados':    [d.isoformat() for d in Feriado.objects.filter(
+                fecha__gte=date.today() - timedelta(days=366)).values_list('fecha', flat=True)],
             'usuario': {
                 'nombre': f"{f_user.ci.nombre} {f_user.ci.ap_paterno}".strip(),
                 'roles':  roles_activos,
@@ -1423,22 +1437,13 @@ class RegistrarAnulacionView(APIView):
         tipo_anulacion   = str(request.data.get('tipo_anulacion', '')).strip().lower()
         motivo_anulacion = request.data.get('motivo_anulacion', '').strip()
         observaciones    = request.data.get('observaciones', '').strip()
-        dias_devolver_raw = request.data.get('dias_devolver')
 
         if not id_formulario or tipo_anulacion not in ('total', 'parcial'):
             return Response({'error': 'Datos inválidos.'}, status=status.HTTP_400_BAD_REQUEST)
         if not motivo_anulacion:
             return Response({'error': 'El motivo es requerido.'}, status=status.HTTP_400_BAD_REQUEST)
-        if not observaciones or len(observaciones) < 20:
-            return Response(
-                {'error': 'Las observaciones deben tener al menos 20 caracteres.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if len(observaciones) > 1000 or len(motivo_anulacion) > 500:
-            return Response(
-                {'error': 'El texto supera la longitud máxima permitida.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if not observaciones:
+            return Response({'error': 'Las observaciones son requeridas.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             solicitud = SolicitudVacacion.objects.select_related(
@@ -1455,16 +1460,33 @@ class RegistrarAnulacionView(APIView):
         ).aggregate(total=Sum('dias_devolver'))['total'] or Decimal('0')
         dias_efectivos = solicitud.dias_solicitados - ya_ajustados
 
+        nueva_salida = nueva_retorno = None
         if tipo_anulacion == 'total':
             dias_devolver = dias_efectivos
         else:
-            try:
-                dias_devolver = Decimal(str(dias_devolver_raw))
-                if dias_devolver <= 0 or dias_devolver > dias_efectivos:
-                    raise ValueError
-            except (TypeError, ValueError, InvalidOperation):
+            # Parcial por fechas: el nuevo período debe quedar dentro del
+            # original; se devuelven los días hábiles que se liberan.
+            nueva_salida  = _parse_fecha(request.data.get('nueva_fecha_inicio'))
+            nueva_retorno = _parse_fecha(request.data.get('nueva_fecha_final'))
+            if (not nueva_salida or not nueva_retorno
+                    or not solicitud.fecha_salida <= nueva_salida < nueva_retorno <= solicitud.fecha_retorno):
                 return Response(
-                    {'error': f'Días a devolver inválidos. Máximo disponible: {float(dias_efectivos)}.'},
+                    {'error': 'Las nuevas fechas deben estar dentro del período actual y la fecha final debe ser posterior a la de inicio.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            feriados_set   = set(Feriado.objects.values_list('fecha', flat=True))
+            dias_restantes = min(
+                Decimal(_contar_dias_habiles(nueva_salida, nueva_retorno, feriados_set)), dias_efectivos,
+            )
+            dias_devolver = dias_efectivos - dias_restantes
+            if dias_restantes <= 0:
+                return Response(
+                    {'error': 'El nuevo período no conserva ningún día hábil. Use Anulación Total.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if dias_devolver <= 0:
+                return Response(
+                    {'error': 'Las nuevas fechas no liberan ningún día hábil.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -1487,6 +1509,8 @@ class RegistrarAnulacionView(APIView):
                     motivo_anulacion=motivo_anulacion,
                     observaciones=observaciones,
                     dias_devolver=dias_devolver,
+                    fecha_salida_anterior=solicitud.fecha_salida,
+                    fecha_retorno_anterior=solicitud.fecha_retorno,
                     registrado_por=f_rrhh,
                 )
 
@@ -1498,6 +1522,9 @@ class RegistrarAnulacionView(APIView):
                 if tipo_anulacion == 'total':
                     solicitud.estado = 'ANULADA'
                     solicitud.save(update_fields=['estado'])
+                else:
+                    solicitud.fecha_salida, solicitud.fecha_retorno = nueva_salida, nueva_retorno
+                    solicitud.save(update_fields=['fecha_salida', 'fecha_retorno'])
 
         except Exception:
             logger.exception('Error al registrar anulación/ajuste de solicitud #%s', id_formulario)
@@ -1510,6 +1537,8 @@ class RegistrarAnulacionView(APIView):
             'ok':             True,
             'tipo':           tipo_anulacion,
             'dias_devueltos': float(dias_devolver),
+            'fecha_inicio':   solicitud.fecha_salida.isoformat(),
+            'fecha_final':    solicitud.fecha_retorno.isoformat(),
         })
 
 
@@ -1919,8 +1948,8 @@ def _error(msg, code=status.HTTP_400_BAD_REQUEST):
 class AcuerdosVacacionView(APIView):
     """
     GET: acuerdos + datos para el formulario (funcionarios con sus gestiones,
-    colectivos vigentes, gerentes). POST: registra un acuerdo nuevo, lo vincula
-    a un colectivo existente (vincular_id) o reemplaza uno vigente (modifica_id).
+    gerentes). POST: registra un acuerdo nuevo o edita uno vigente
+    (modifica_id), que es también la vía para sumar funcionarios a un colectivo.
     """
     permission_classes = [NoCambioPendiente, EsRRHH]
 
@@ -2016,45 +2045,35 @@ class AcuerdosVacacionView(APIView):
         if not all(pedidos.values()):
             return _error('Marque al menos una gestión por funcionario.')
 
-        vincular_id = d.get('vincular_id')
-        modifica_id = d.get('modifica_id')
+        modifica_id   = d.get('modifica_id')
+        tipo          = str(d.get('tipo', '')).upper()
+        motivo        = str(d.get('motivo', '')).strip()
+        fecha_acuerdo = _parse_fecha(d.get('fecha_acuerdo'))
+        fecha_hasta   = _parse_fecha(d.get('fecha_hasta'))
+        if tipo not in ('COLECTIVO', 'INDIVIDUAL'):
+            return _error('Tipo de acuerdo inválido.')
+        if tipo == 'INDIVIDUAL' and len(pedidos) != 1:
+            return _error('Un acuerdo individual se registra para un solo funcionario.')
+        if len(motivo) < 5:
+            return _error('Ingrese el motivo del acuerdo.')
+        if not fecha_acuerdo or not fecha_hasta:
+            return _error('Fechas inválidas.')
+        if fecha_hasta <= fecha_acuerdo or fecha_hasta < hoy:
+            return _error('La nueva fecha límite debe ser posterior a la del acuerdo y a hoy.')
+        autorizado = Funcionario.objects.filter(
+            cod_funcionario=d.get('autorizado_por'), estado='ACTIVO', tipo_funcionario='GERENTE GENERAL',
+        ).first()
+        if not autorizado:
+            return _error('Seleccione al Gerente General que autoriza el acuerdo.')
 
         with transaction.atomic():
             original = None
-            if vincular_id:
-                acuerdo = AcuerdoVacacion.objects.select_for_update().filter(
-                    id_acuerdo=vincular_id, tipo='COLECTIVO', estado='VIGENTE', fecha_hasta__gte=hoy,
-                ).first()
-                if not acuerdo:
-                    return _error('El acuerdo colectivo no existe o ya no está vigente.')
-                if acuerdo.afectados.filter(cod_funcionario__in=pedidos).exists():
-                    return _error('Algún funcionario ya está vinculado a este acuerdo.')
-            else:
-                tipo          = str(d.get('tipo', '')).upper()
-                motivo        = str(d.get('motivo', '')).strip()
-                fecha_acuerdo = _parse_fecha(d.get('fecha_acuerdo'))
-                fecha_hasta   = _parse_fecha(d.get('fecha_hasta'))
-                if tipo not in ('COLECTIVO', 'INDIVIDUAL'):
-                    return _error('Tipo de acuerdo inválido.')
-                if tipo == 'INDIVIDUAL' and len(pedidos) != 1:
-                    return _error('Un acuerdo individual se registra para un solo funcionario.')
-                if len(motivo) < 5:
-                    return _error('Ingrese el motivo del acuerdo.')
-                if not fecha_acuerdo or not fecha_hasta:
-                    return _error('Fechas inválidas.')
-                if fecha_hasta <= fecha_acuerdo or fecha_hasta < hoy:
-                    return _error('La nueva fecha límite debe ser posterior a la del acuerdo y a hoy.')
-                autorizado = Funcionario.objects.filter(
-                    cod_funcionario=d.get('autorizado_por'), estado='ACTIVO', tipo_funcionario='GERENTE GENERAL',
-                ).first()
-                if not autorizado:
-                    return _error('Seleccione al Gerente General que autoriza el acuerdo.')
-                if modifica_id:
-                    original = AcuerdoVacacion.objects.select_for_update().filter(
-                        id_acuerdo=modifica_id, estado='VIGENTE',
-                    ).exclude(tipo='RECHAZO').first()
-                    if not original:
-                        return _error('Solo se puede modificar un acuerdo vigente.')
+            if modifica_id:
+                original = AcuerdoVacacion.objects.select_for_update().filter(
+                    id_acuerdo=modifica_id, estado='VIGENTE',
+                ).exclude(tipo='RECHAZO').first()
+                if not original:
+                    return _error('Solo se puede modificar un acuerdo vigente.')
 
             # Solo gestiones pendientes del funcionario y no protegidas por
             # otro acuerdo (las del que se modifica sí pueden re-protegerse).
@@ -2076,7 +2095,7 @@ class AcuerdosVacacionView(APIView):
                 acuerdo.fecha_acuerdo, acuerdo.fecha_hasta = fecha_acuerdo, fecha_hasta
                 acuerdo.save(update_fields=['tipo', 'motivo', 'autorizado_por', 'fecha_acuerdo', 'fecha_hasta'])
                 acuerdo.afectados.all().delete()
-            elif not vincular_id:
+            else:
                 anio_nro = hoy.year
                 acuerdo = AcuerdoVacacion.objects.create(
                     tipo=tipo,

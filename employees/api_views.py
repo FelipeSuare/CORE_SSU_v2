@@ -652,23 +652,24 @@ class HistorialCargosView(APIView):
         )
         gv = GestionVacacion.objects.filter(cod_funcionario=f).first()
 
+        def gestiones_de(obj, anio_attr, dias_attr):
+            # Las gestiones pueden estar en cualquiera de los 4 slots (el
+            # poblado usa 4→1): se toman todas las que tienen año, por año.
+            if obj is None:
+                return []
+            return sorted(
+                ({'anio': getattr(obj, anio_attr.format(n)),
+                  'saldo': float(getattr(obj, dias_attr.format(n)) or 0)}
+                 for n in range(1, 5) if getattr(obj, anio_attr.format(n)) is not None),
+                key=lambda g: g['anio'],
+            )
+
         cargos = []
         for i, hc in enumerate(cargos_qs):
-            if hc.es_actual:
-                gestiones = [
-                    {'anio': getattr(gv, f'anio_gestion{n}'),
-                     'saldo': float(getattr(gv, f'dias_gestion{n}') or 0)}
-                    for n in range(1, 3)
-                ] if gv else [{'anio': None, 'saldo': 0.0}] * 4
-                saldo_total = float(gv.dias_adeudados or 0) if gv else 0.0
-            else:
-                gestiones = [
-                    {'anio':  getattr(hc, f'anio_gestion{n}_al_salir'),
-                     'saldo': float(getattr(hc, f'saldo_gestion{n}_al_salir') or 0)}
-                    for n in range(1, 3)
-                ]
-                saldo_total = sum(g['saldo'] for g in gestiones)
-
+            # Cargo vigente: en tiempo real. Cargos anteriores: congelados al salir.
+            gestiones = (gestiones_de(gv, 'anio_gestion{}', 'dias_gestion{}') if hc.es_actual
+                         else gestiones_de(hc, 'anio_gestion{}_al_salir', 'saldo_gestion{}_al_salir'))
+            saldo_total    = round(sum(g['saldo'] for g in gestiones), 1)
             saldo_anterior = cargos[i - 1]['saldo_total'] if i > 0 else 0.0
 
             cargos.append({

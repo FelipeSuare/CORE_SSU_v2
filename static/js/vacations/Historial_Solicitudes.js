@@ -97,22 +97,31 @@ function cambiarTab(tabElement, tab) {
 // ══════════════════════════════════════════════════════════════
 //  CONTADORES (siempre sobre el total, sin aplicar búsqueda)
 // ══════════════════════════════════════════════════════════════
+const ESTADO_POR_TAB = {
+    aprobada:  'Aprobada',
+    rechazada: 'Rechazada',
+    pendiente: 'Pendiente',
+    anulada:   'Anulada Totalmente',
+    ajustada:  'Ajustada',
+};
+
 function actualizarContadores() {
+    const contar = estado => todasLasSolicitudes.filter(s => s.estado === estado).length;
     document.getElementById('countTodas').textContent      = todasLasSolicitudes.length;
-    document.getElementById('countAprobadas').textContent  = todasLasSolicitudes.filter(s => s.estado === 'Aprobada').length;
-    document.getElementById('countRechazadas').textContent = todasLasSolicitudes.filter(s => s.estado === 'Rechazada').length;
-    document.getElementById('countPendientes').textContent = todasLasSolicitudes.filter(s => s.estado === 'Pendiente').length;
+    document.getElementById('countAprobadas').textContent  = contar('Aprobada');
+    document.getElementById('countRechazadas').textContent = contar('Rechazada');
+    document.getElementById('countPendientes').textContent = contar('Pendiente');
+    document.getElementById('countAnuladas').textContent   = contar('Anulada Totalmente');
+    document.getElementById('countAjustadas').textContent  = contar('Ajustada');
 }
 
 // ══════════════════════════════════════════════════════════════
 //  FILTRADO (tab + búsqueda combinados)
 // ══════════════════════════════════════════════════════════════
 function _getFiltradas() {
-    const mapTab = { aprobada: 'Aprobada', rechazada: 'Rechazada', pendiente: 'Pendiente' };
-
     let arr = tabActual === 'todas'
         ? [...todasLasSolicitudes]
-        : todasLasSolicitudes.filter(s => s.estado === mapTab[tabActual]);
+        : todasLasSolicitudes.filter(s => s.estado === ESTADO_POR_TAB[tabActual]);
 
     const q = textoBusqueda.trim().toLowerCase();
     if (q) {
@@ -137,7 +146,7 @@ function renderizarTabla() {
 
     if (filtradas.length === 0) {
         const msg = tabActual !== 'todas'
-            ? `No hay solicitudes ${tabActual}s`
+            ? `No hay solicitudes con estado "${ESTADO_POR_TAB[tabActual]}"`
             : 'No hay solicitudes registradas';
         tbody.innerHTML = `
             <tr>
@@ -200,6 +209,8 @@ function _badgeEstado(estado) {
         Pendiente: 'estado-pendiente',
         Aprobada:  'estado-aprobada',
         Rechazada: 'estado-rechazada',
+        'Anulada Totalmente': 'estado-anulada',
+        Ajustada:  'estado-ajustada',
     };
     return `<span class="estado-badge ${clases[estado] ?? ''}">${estado}</span>`;
 }
@@ -233,6 +244,8 @@ function generarPlanillaPDF() {
             Aprobada:  { color: '#1e8449', bg: '#eafaf1' },
             Rechazada: { color: '#c0392b', bg: '#fdedec' },
             Pendiente: { color: '#d68910', bg: '#fef9e7' },
+            'Anulada Totalmente': { color: '#5d6d7e', bg: '#f2f4f4' },
+            Ajustada:  { color: '#333399', bg: '#eeeefa' },
         };
         const { color, bg } = colores[s.estado] ?? colores.Pendiente;
 

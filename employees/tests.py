@@ -1,12 +1,14 @@
 import json
 from datetime import date
+from decimal import Decimal
 
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.test_utils import hacer_usuario_y_funcionario, hacer_cargo, hacer_unidad
-from employees.models import Funcionario, Persona
+from core.test_utils import hacer_usuario_y_funcionario, hacer_cargo, hacer_funcionario, hacer_unidad
+from employees.models import Funcionario, HistorialCargo, Persona
+from vacations.models import GestionVacacion
 from employees.utils import generar_matricula_seguro
 
 
@@ -212,3 +214,36 @@ class TestGenerarMatriculaSeguro(APITestCase):
         p = self._persona(nombre='Angela', ap_paterno='Nunez', ap_materno='Ibanez',
                           fecha_nacimiento=date(2001, 8, 3))
         self.assertEqual(generar_matricula_seguro(p), '015803NIA')
+
+
+class TestHistorialCargosSaldos(APITestCase):
+    """Saldo Total = suma de las gestiones del cargo, estén en el slot que estén."""
+
+    def setUp(self):
+        self.admin, _ = hacer_usuario_y_funcionario(ci='96000001', nombre='Admin', roles=['Administrador'])
+        self.f = hacer_funcionario(ci='96000002', fecha_ingreso=date(2015, 1, 1))
+        HistorialCargo.objects.create(
+            cod_funcionario=self.f, cargo='Auxiliar', tipo_contrato='Fijo',
+            fecha_inicio=date(2015, 1, 1), fecha_fin=date(2024, 1, 1), es_actual=False,
+            # El poblado guarda las 2 gestiones en los slots 4 y 3.
+            anio_gestion4_al_salir=2022, saldo_gestion4_al_salir=Decimal('10'),
+            anio_gestion3_al_salir=2023, saldo_gestion3_al_salir=Decimal('20'),
+        )
+        HistorialCargo.objects.create(
+            cod_funcionario=self.f, cargo='Analista', tipo_contrato='Fijo',
+            fecha_inicio=date(2024, 1, 1), es_actual=True,
+        )
+        GestionVacacion.objects.create(
+            cod_funcionario=self.f, anio_gestion3=2024, dias_gestion3=Decimal('5'),
+            anio_gestion4=2025, dias_gestion4=Decimal('20'),
+        )
+        self.client.force_login(self.admin)
+
+    def test_saldos_por_cargo(self):
+        r = self.client.get(reverse('funcionarios_historial_cargos', args=[self.f.cod_funcionario]))
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.content)
+        anterior, actual = r.json()['cargos']
+        self.assertEqual([g['anio'] for g in anterior['gestiones']], [2022, 2023])
+        self.assertEqual((anterior['saldo_anterior'], anterior['saldo_total']), (0.0, 30.0))
+        self.assertEqual([g['anio'] for g in actual['gestiones']], [2024, 2025])
+        self.assertEqual((actual['saldo_anterior'], actual['saldo_total']), (30.0, 25.0))

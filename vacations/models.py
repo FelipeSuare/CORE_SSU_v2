@@ -79,6 +79,8 @@ class AnulacionAjuste(models.Model):
     motivo_anulacion = models.TextField()
     observaciones = models.TextField(blank=True, null=True)
     dias_devolver = models.DecimalField(max_digits=4, decimal_places=1, default=0)
+    fecha_salida_anterior = models.DateField(blank=True, null=True)
+    fecha_retorno_anterior = models.DateField(blank=True, null=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
     registrado_por = models.ForeignKey('employees.Funcionario', models.DO_NOTHING, db_column='registrado_por', blank=True, null=True)
 

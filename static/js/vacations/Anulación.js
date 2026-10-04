@@ -2,6 +2,7 @@
 let solicitudesVacaciones = [];
 let solicitudesFiltradas  = [];
 let solicitudSeleccionada = null;
+let feriados              = new Set();   // ISO, para previsualizar días hábiles
 
 // ======================================== ELEMENTOS DEL DOM ========================================
 const funcionarioSearchInput = document.getElementById('funcionarioSearch');
@@ -18,9 +19,9 @@ const btnCancelar       = document.getElementById('btnCancelar');
 
 // Elementos del formulario del modal
 const tipoAnulacionSelect   = document.getElementById('tipoAnulacion');
-const diasAnularGroup       = document.getElementById('diasAnularGroup');
-const diasAnularInput       = document.getElementById('diasAnular');
-const maxDiasAnularSpan     = document.getElementById('maxDiasAnular');
+const fechasParcialGroup    = document.getElementById('fechasParcialGroup');
+const nuevaFechaInicioInput = document.getElementById('nuevaFechaInicio');
+const nuevaFechaFinalInput  = document.getElementById('nuevaFechaFinal');
 const motivoAnulacionSelect = document.getElementById('motivoAnulacion');
 const observacionesTextarea = document.getElementById('observaciones');
 const btnConfirmarAnulacion = document.getElementById('btnConfirmarAnulacion');
@@ -41,14 +42,23 @@ const nuevoSaldoSpan   = document.getElementById('nuevoSaldo');
 const modalConfirmacion        = document.getElementById('modalConfirmacion');
 const btnCancelarConfirmacion  = document.getElementById('btnCancelarConfirmacion');
 const btnConfirmarFinal        = document.getElementById('btnConfirmarFinal');
-const confirmTipoSpan          = document.getElementById('confirmTipo');
-const confirmDiasSpan          = document.getElementById('confirmDias');
+const confirmDetalles          = document.getElementById('confirmDetalles');
 
 // ======================================== FUNCIONES DE UTILIDAD ========================================
 
 function formatearFecha(fechaISO) {
     const [año, mes, dia] = fechaISO.split('-');
     return `${dia}/${mes}/${año}`;
+}
+
+// Días hábiles en [desde, hasta) — mismo criterio que el backend.
+function contarDiasHabiles(desdeISO, hastaISO) {
+    let n = 0;
+    for (let d = new Date(desdeISO + 'T00:00:00'); d < new Date(hastaISO + 'T00:00:00'); d.setDate(d.getDate() + 1)) {
+        const iso = d.toLocaleDateString('en-CA');
+        if (d.getDay() !== 0 && d.getDay() !== 6 && !feriados.has(iso)) n++;
+    }
+    return n;
 }
 
 function obtenerBadgeEstado(estado) {
@@ -153,8 +163,10 @@ function abrirModalAnulacion(idSolicitud) {
     modalDiasTotales.textContent = solicitudSeleccionada.diasTotales;
     modalSaldoActual.textContent = solicitudSeleccionada.saldoActual;
 
-    maxDiasAnularSpan.textContent = solicitudSeleccionada.diasTotales;
-    diasAnularInput.max = solicitudSeleccionada.diasTotales;
+    [nuevaFechaInicioInput, nuevaFechaFinalInput].forEach(input => {
+        input.min = solicitudSeleccionada.fechaInicio;
+        input.max = solicitudSeleccionada.fechaFinal;
+    });
 
     limpiarFormularioAnulacion();
     modalAnulacion.classList.add('show');
@@ -167,10 +179,11 @@ function cerrarModalAnulacion() {
 
 function limpiarFormularioAnulacion() {
     tipoAnulacionSelect.value   = '';
-    diasAnularInput.value       = '';
     motivoAnulacionSelect.value = '';
     observacionesTextarea.value = '';
-    diasAnularGroup.style.display = 'none';
+    fechasParcialGroup.hidden   = true;
+    nuevaFechaInicioInput.value = solicitudSeleccionada.fechaInicio;
+    nuevaFechaFinalInput.value  = solicitudSeleccionada.fechaFinal;
     actualizarResumen();
 }
 
@@ -183,11 +196,21 @@ function actualizarResumen() {
     if (tipo === 'total') {
         diasDevolver = solicitudSeleccionada.diasTotales;
     } else if (tipo === 'parcial') {
-        diasDevolver = parseFloat(diasAnularInput.value) || 0;
+        diasDevolver = diasDevolverParcial() ?? 0;
     }
 
     diasDevolverSpan.textContent = diasDevolver;
     nuevoSaldoSpan.textContent   = solicitudSeleccionada.saldoActual + diasDevolver;
+}
+
+// null si las fechas no forman un período válido dentro del original.
+function diasDevolverParcial() {
+    const s = solicitudSeleccionada;
+    const inicio = nuevaFechaInicioInput.value;
+    const final  = nuevaFechaFinalInput.value;
+    if (!inicio || !final || inicio < s.fechaInicio || final > s.fechaFinal || inicio >= final) return null;
+    const restantes = Math.min(contarDiasHabiles(inicio, final), s.diasTotales);
+    return restantes > 0 ? s.diasTotales - restantes : null;
 }
 
 function validarFormulario() {
@@ -200,12 +223,12 @@ function validarFormulario() {
         return false;
     }
 
-    if (tipo === 'parcial') {
-        const dias = parseFloat(diasAnularInput.value);
-        if (!dias || dias < 1 || dias > solicitudSeleccionada.diasTotales) {
-            AppDialog.alert(`Ingrese un número válido de días (1-${solicitudSeleccionada.diasTotales})`);
-            return false;
-        }
+    if (tipo === 'parcial' && !diasDevolverParcial()) {
+        AppDialog.alert(
+            `Indique un nuevo período dentro de ${formatearFecha(solicitudSeleccionada.fechaInicio)} – ` +
+            `${formatearFecha(solicitudSeleccionada.fechaFinal)} que conserve al menos un día hábil y libere alguno.`
+        );
+        return false;
     }
 
     if (!motivo) {
@@ -213,8 +236,8 @@ function validarFormulario() {
         return false;
     }
 
-    if (!observaciones || observaciones.length < 20) {
-        AppDialog.alert('Describa detalladamente el motivo (mínimo 20 caracteres)');
+    if (!observaciones) {
+        AppDialog.alert('Describa el motivo de la anulación en Observaciones');
         return false;
     }
 
@@ -224,11 +247,21 @@ function validarFormulario() {
 function abrirModalConfirmacion() {
     if (!validarFormulario()) return;
 
-    const tipo        = tipoAnulacionSelect.value;
-    const diasDevolver = parseFloat(diasDevolverSpan.textContent);
+    const s       = solicitudSeleccionada;
+    const parcial = tipoAnulacionSelect.value === 'parcial';
+    const fila    = (label, valor) => `
+        <div class="confirm-row">
+            <span class="confirm-label">${label}</span>
+            <span class="confirm-value">${valor}</span>
+        </div>`;
 
-    confirmTipoSpan.textContent = tipo === 'total' ? 'Anulación Total' : 'Anulación Parcial';
-    confirmDiasSpan.textContent = diasDevolver;
+    confirmDetalles.innerHTML =
+        fila('Funcionario', esc(s.funcionario)) +
+        fila('Tipo', parcial ? 'Anulación Parcial' : 'Anulación Total') +
+        (parcial
+            ? fila('Nuevo período', `${formatearFecha(nuevaFechaInicioInput.value)} – ${formatearFecha(nuevaFechaFinalInput.value)}`)
+            : fila('Período', `${formatearFecha(s.fechaInicio)} – ${formatearFecha(s.fechaFinal)}`)) +
+        fila('Días a devolver', diasDevolverSpan.textContent);
 
     modalConfirmacion.classList.add('show');
 }
@@ -241,7 +274,6 @@ function cerrarModalConfirmacion() {
 
 async function procesarAnulacion() {
     const tipo          = tipoAnulacionSelect.value;
-    const diasDevolver  = parseFloat(diasDevolverSpan.textContent);
     const motivo        = motivoAnulacionSelect.value;
     const observaciones = observacionesTextarea.value.trim();
 
@@ -257,7 +289,8 @@ async function procesarAnulacion() {
                 tipo_anulacion:  tipo,
                 motivo_anulacion: motivo,
                 observaciones,
-                dias_devolver:   diasDevolver,
+                nueva_fecha_inicio: nuevaFechaInicioInput.value,
+                nueva_fecha_final:  nuevaFechaFinalInput.value,
             }),
         });
 
@@ -272,12 +305,13 @@ async function procesarAnulacion() {
 
         cerrarModalConfirmacion();
         cerrarModalAnulacion();
+        const diasDevueltos = data.dias_devueltos;
 
         // Recargar la lista desde el servidor para reflejar el estado real
         await _cargarSolicitudes();
 
         AppDialog.alert(
-            `Anulación procesada. Se devolvieron ${diasDevolver} día(s) al saldo del funcionario.`,
+            `Anulación procesada. Se devolvieron ${diasDevueltos} día(s) al saldo del funcionario.`,
             { title: 'Operación completada', icon: 'check_circle', variant: 'success' }
         );
 
@@ -304,6 +338,7 @@ async function _cargarSolicitudes() {
         }
 
         solicitudesVacaciones = data.solicitudes || [];
+        feriados              = new Set(data.feriados || []);
         solicitudesFiltradas  = [...solicitudesVacaciones];
         renderizarTabla(solicitudesFiltradas);
 
@@ -333,12 +368,12 @@ btnCerrarModal.addEventListener('click', cerrarModalAnulacion);
 btnCancelar.addEventListener('click', cerrarModalAnulacion);
 
 tipoAnulacionSelect.addEventListener('change', () => {
-    diasAnularGroup.style.display = tipoAnulacionSelect.value === 'parcial' ? 'block' : 'none';
-    if (tipoAnulacionSelect.value !== 'parcial') diasAnularInput.value = '';
+    fechasParcialGroup.hidden = tipoAnulacionSelect.value !== 'parcial';
     actualizarResumen();
 });
 
-diasAnularInput.addEventListener('input', actualizarResumen);
+nuevaFechaInicioInput.addEventListener('change', actualizarResumen);
+nuevaFechaFinalInput.addEventListener('change', actualizarResumen);
 btnConfirmarAnulacion.addEventListener('click', abrirModalConfirmacion);
 btnCancelarConfirmacion.addEventListener('click', cerrarModalConfirmacion);
 btnConfirmarFinal.addEventListener('click', procesarAnulacion);

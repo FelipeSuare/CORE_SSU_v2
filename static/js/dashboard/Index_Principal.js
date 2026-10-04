@@ -350,6 +350,59 @@ function cerrarWidgetAlerta(id) {
 
 document.addEventListener('DOMContentLoaded', verificarAlertasVacaciones);
 
+// ── Notificación a RRHH: solicitudes rechazadas recientemente (en rojo) ──
+// Muestra las rechazadas en los últimos 30 días que aún no se descartaron;
+// al cerrarla se recuerda la última vista en localStorage.
+const _KEY_RECHAZADAS_VISTAS = 'vacRechazadasVistaHasta';
+const _DIAS_NOTIF_RECHAZADAS = 30;
+
+async function verificarSolicitudesRechazadas() {
+    try {
+        const res = await fetch('/api/vacaciones/rechazadas/');
+        if (!res.ok) return; // 403 = no es RRHH/Admin
+        const desde = new Date(Date.now() - _DIAS_NOTIF_RECHAZADAS * 864e5).toLocaleDateString('en-CA');
+        let vistaHasta = 0;
+        try { vistaHasta = Number(localStorage.getItem(_KEY_RECHAZADAS_VISTAS)) || 0; } catch (_) {}
+
+        const rechazadas = ((await res.json()).solicitudes || [])
+            .filter(s => s.id > vistaHasta && (s.fecha_rechazo || s.fecha_solicitud) >= desde);
+        if (rechazadas.length) mostrarAlertaRechazadas(rechazadas);
+    } catch (_) {}
+}
+
+function mostrarAlertaRechazadas(solicitudes) {
+    const fmtFecha = f => (f ? f.split('-').reverse().join('/') : '—');
+    const filas = solicitudes.map(s => `
+        <tr>
+            <td>${_esc(s.codigo)}</td>
+            <td>${_esc(s.funcionario)}</td>
+            <td>${fmtFecha(s.fecha_rechazo)}</td>
+            <td>${_esc(s.aprobador_rechazo)}</td>
+            <td>${_esc(s.observacion)}</td>
+        </tr>`);
+
+    const flotante = crearWidgetAlerta({
+        id:            'alertaSolicitudesRechazadas',
+        titulo:        'Solicitudes de vacación rechazadas',
+        subtitulo:     `Rechazadas en los últimos ${_DIAS_NOTIF_RECHAZADAS} días.`,
+        headers:       ['Solicitud', 'Funcionario', 'Fecha Rechazo', 'Rechazada por', 'Motivo'],
+        filas,
+        contadorLabel: solicitudes.length === 1 ? ' solicitud rechazada' : ' solicitudes rechazadas',
+    });
+    flotante.classList.add('rechazada');
+    flotante.querySelector('.alerta-panel').insertAdjacentHTML('beforeend', `
+        <div class="alerta-panel-footer">
+            <a class="alerta-accion-btn" href="SolicitudesRechazadas.html">Ver solicitudes rechazadas</a>
+        </div>`);
+
+    document.getElementById('alertaSolicitudesRechazadasClose').addEventListener('click', () => {
+        const maxId = Math.max(...solicitudes.map(s => s.id));
+        try { localStorage.setItem(_KEY_RECHAZADAS_VISTAS, String(maxId)); } catch (_) {}
+    });
+}
+
+document.addEventListener('DOMContentLoaded', verificarSolicitudesRechazadas);
+
 // ── Alertas para Jefe de Area / Gerentes (aprobadores): su gente a cargo ──
 // (1) Solicitudes de vacación pendientes de su aprobación
 // (2) Gestiones vencidas/por vencer de sus subordinados
@@ -374,23 +427,36 @@ async function verificarAlertasJefeArea() {
     } catch (_) {}
 }
 
+const _urlRevisarSolicitud = id => `/Aprobacion.html?solicitud=${encodeURIComponent(id)}`;
+
 function mostrarAlertaSolicitudesPendientes(solicitudes) {
     const filas = solicitudes.map(s => `
-        <tr data-cod="${_esc(s.cod_funcionario)}">
+        <tr data-cod="${_esc(s.cod_funcionario)}" data-href="${_urlRevisarSolicitud(s.id)}" class="alerta-fila-link" title="Revisar solicitud">
             <td>${_esc(s.funcionario)}</td>
             <td>${_esc(s.cargo)}</td>
             <td>${_esc(s.fecha_solicitud)}</td>
             <td>${s.dias} días</td>
         </tr>`);
 
-    crearWidgetAlerta({
+    const flotante = crearWidgetAlerta({
         id:            'alertaSolicitudesPendientes',
         titulo:        'Solicitudes de vacación pendientes de tu aprobación',
-        subtitulo:     'Funcionarios a tu cargo con una solicitud de vacación esperando tu decisión.',
+        subtitulo:     'Funcionarios a tu cargo con una solicitud de vacación esperando tu decisión. Haga clic en una para revisarla.',
         headers:       ['Funcionario', 'Cargo', 'Fecha Solicitud', 'Días'],
         filas,
-        contadorLabel: ' solicitudes esperando tu aprobación',
+        contadorLabel: solicitudes.length === 1 ? ' solicitud esperando tu aprobación' : ' solicitudes esperando tu aprobación',
     });
+
+    flotante.querySelectorAll('tr[data-href]').forEach(tr =>
+        tr.addEventListener('click', () => { window.location.href = tr.dataset.href; }));
+
+    // Con una sola pendiente, el clic en la notificación lleva directo a ella.
+    if (solicitudes.length === 1) {
+        document.getElementById('alertaSolicitudesPendientesTrigger').addEventListener('click', e => {
+            if (e.target.closest('.alerta-close-btn')) return;
+            window.location.href = _urlRevisarSolicitud(solicitudes[0].id);
+        });
+    }
 }
 
 function mostrarAlertaGestionesEquipo(funcionarios) {

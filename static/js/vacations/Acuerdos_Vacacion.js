@@ -6,7 +6,6 @@ let _acuerdos      = [];
 let _funcionarios  = [];
 let _seleccion     = new Map();   // cod → Set(anios)
 let _modificaId    = null;        // acuerdo que se está modificando
-let _vinculado     = null;        // colectivo existente al que se vincula
 let _anularId      = null;
 let _combosListos  = false;
 
@@ -19,12 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnConfirmarAnular').addEventListener('click', confirmarAnular);
     document.getElementById('unidadFiltro').addEventListener('change', renderFuncionarios);
     document.getElementById('buscarFunc').addEventListener('input', renderFuncionarios);
-    document.getElementById('colectivoBuscar').addEventListener('input', elegirColectivo);
 
     document.querySelectorAll('[data-cerrar]').forEach(b =>
         b.addEventListener('click', () => cerrar(b.dataset.cerrar)));
 
-    document.querySelectorAll('input[name=vincular]').forEach(r => r.addEventListener('change', cambiarModo));
     document.querySelectorAll('input[name=tipo]').forEach(r => r.addEventListener('change', () => {
         if (tipoActual() === 'INDIVIDUAL' && _seleccion.size > 1) _seleccion = new Map();
         renderFuncionarios();
@@ -194,15 +191,11 @@ function verDetalle(a) {
 // ── Registrar / modificar ─────────────────────────────────────
 function abrirModal(original = null) {
     _modificaId = original ? original.id : null;
-    _vinculado  = null;
     _seleccion  = new Map();
 
     document.getElementById('modalTitulo').textContent = original ? `Modificar acuerdo ${original.nro}` : 'Registrar acuerdo';
     document.getElementById('avisoModifica').hidden = !original;
     document.getElementById('modificaNro').textContent = original ? original.nro : '';
-    document.getElementById('bloqueVincular').hidden = !!original;
-    document.querySelector('input[name=vincular][value=no]').checked = true;
-    document.getElementById('colectivoBuscar').value = '';
     document.getElementById('nroAcuerdo').value = original ? original.nro : 'Se asignará al guardar';
     document.getElementById('buscarFunc').value = '';
     document.getElementById('unidadFiltro').value = '';
@@ -219,52 +212,12 @@ function abrirModal(original = null) {
         });
     }
 
-    cambiarModo();
+    renderFuncionarios();
     document.getElementById('modalAcuerdo').classList.add('show');
-}
-
-function cambiarModo() {
-    const vincular = document.querySelector('input[name=vincular]:checked').value === 'si';
-    document.getElementById('bloqueColectivo').hidden = !vincular;
-    if (vincular) {
-        document.getElementById('colectivosList').innerHTML = _acuerdos
-            .filter(a => a.tipo === 'COLECTIVO' && a.vigente)
-            .map(a => `<option value="${esc(a.nro)} — ${esc(a.motivo)}"></option>`).join('');
-        document.querySelector('input[name=tipo][value=COLECTIVO]').checked = true;
-    } else {
-        _vinculado = null;
-        document.getElementById('nroAcuerdo').value = 'Se asignará al guardar';
-    }
-    bloquearHeredados(vincular);
-    renderFuncionarios();
-}
-
-function elegirColectivo(e) {
-    const nro = e.target.value.split(' — ')[0].trim();
-    _vinculado = _acuerdos.find(a => a.tipo === 'COLECTIVO' && a.vigente && a.nro === nro) || null;
-    if (_vinculado) {
-        document.getElementById('nroAcuerdo').value   = _vinculado.nro;
-        document.getElementById('motivo').value       = _vinculado.motivo;
-        document.getElementById('fechaAcuerdo').value = _vinculado.fecha_acuerdo;
-        document.getElementById('fechaHasta').value   = _vinculado.fecha_hasta;
-        const sel = document.getElementById('autorizadoPor');
-        const opt = [...sel.options].find(o => o.text === _vinculado.autorizado_por);
-        if (opt) sel.value = opt.value;
-    }
-    _seleccion = new Map([..._seleccion].filter(([cod]) => !yaVinculado(cod)));
-    renderFuncionarios();
-}
-
-function bloquearHeredados(bloquear) {
-    document.querySelectorAll('[data-heredado], input[name=tipo]').forEach(el => { el.disabled = bloquear; });
 }
 
 function tipoActual() {
     return document.querySelector('input[name=tipo]:checked').value;
-}
-
-function yaVinculado(cod) {
-    return !!_vinculado && _vinculado.afectados.some(x => x.cod === cod);
 }
 
 function gestionLibre(g) {
@@ -272,7 +225,7 @@ function gestionLibre(g) {
 }
 
 function bloqueado(f) {
-    return yaVinculado(f.cod) || !f.gestiones.some(gestionLibre);
+    return !f.gestiones.some(gestionLibre);
 }
 
 function seleccionar(f) {
@@ -298,8 +251,7 @@ function renderFuncionarios() {
     document.getElementById('lblTodos').hidden = individual;
     document.getElementById('funcList').innerHTML = visibles.map(f => {
         const sel  = _seleccion.get(f.cod);
-        const nota = yaVinculado(f.cod) ? 'ya vinculado a este acuerdo'
-                   : !f.gestiones.length ? 'sin gestiones pendientes'
+        const nota = !f.gestiones.length ? 'sin gestiones pendientes'
                    : !f.gestiones.some(gestionLibre) ? 'gestiones ya protegidas' : '';
         const gestiones = sel ? `
             <div class="gestiones">${f.gestiones.map(g => {
@@ -326,23 +278,15 @@ function renderFuncionarios() {
 }
 
 async function guardar() {
-    const vincular = document.querySelector('input[name=vincular]:checked').value === 'si';
-    if (vincular && !_vinculado) {
-        AppDialog.alert('Seleccione un acuerdo colectivo vigente de la lista.', { title: 'Datos incompletos', icon: 'warning', variant: 'warning' });
-        return;
-    }
     const body = {
         funcionarios: [..._seleccion].map(([cod, anios]) => ({ cod, anios: [...anios] })),
-    };
-    if (vincular) body.vincular_id = _vinculado.id;
-    else Object.assign(body, {
         tipo:           tipoActual(),
         motivo:         document.getElementById('motivo').value.trim(),
         fecha_acuerdo:  document.getElementById('fechaAcuerdo').value,
         fecha_hasta:    document.getElementById('fechaHasta').value,
         autorizado_por: document.getElementById('autorizadoPor').value,
         modifica_id:    _modificaId,
-    });
+    };
 
     const btn = document.getElementById('btnGuardar');
     btn.disabled = true;

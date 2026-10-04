@@ -168,6 +168,14 @@
 .alerta-flotante.aprobada .alerta-trigger { background: #1e7d4f; box-shadow: 0 4px 18px rgba(30,125,79,0.4); }
 .alerta-flotante.aprobada .alerta-trigger:hover { background: #166039; }
 .alerta-flotante.aprobada .alerta-count { color: #1e7d4f; }
+/* Rechazos en rojo para diferenciarlos del resto de notificaciones */
+.alerta-flotante.rechazada .alerta-trigger { background: #c0392b; box-shadow: 0 4px 18px rgba(192,57,43,0.4); }
+.alerta-flotante.rechazada .alerta-trigger:hover { background: #962d22; }
+.alerta-flotante.rechazada .alerta-count { color: #c0392b; }
+.alerta-flotante.rechazada .alerta-panel-title { color: #c0392b; }
+.alerta-flotante.rechazada .alerta-accion-btn { background: #c0392b; }
+.alerta-flotante.rechazada .alerta-accion-btn:hover { background: #962d22; }
+.alerta-fila-link { cursor: pointer; }
 .alerta-decision { font-weight: 700; font-size: 0.9em; }
 .alerta-decision.approved, .alerta-decision.sent { color: #1e7d4f; }
 .alerta-decision.rejected { color: #c0392b; }

@@ -163,9 +163,11 @@ function renderizarCargos() {
     cargosDelFuncionario.forEach((c, idx) => {
         const mostrarSaldoAnt = idx > 0;
 
+        const gestiones = c.gestiones.length ? c.gestiones : [{ anio: null, saldo: 0 }];
+
         const thSaldoAnterior = mostrarSaldoAnt
             ? `<th class="th-saldo-ant">Saldo Anterior</th>` : '';
-        const thsGestiones = c.gestiones.map(g =>
+        const thsGestiones = gestiones.map(g =>
             `<th class="th-gestion">${g.anio ?? '—'}</th>`
         ).join('');
 
@@ -173,7 +175,7 @@ function renderizarCargos() {
             ? `<td class="td-saldo-ant">
                     <span class="dias-badge dias-ant">${c.saldo_anterior} días</span>
                 </td>` : '';
-        const tdsGestiones = c.gestiones.map(g =>
+        const tdsGestiones = gestiones.map(g =>
             `<td>${g.saldo > 0
                 ? `<span class="dias-badge dias-con-saldo">${g.saldo} días</span>`
                 : `<span class="dias-badge dias-sin-saldo">0</span>`
@@ -237,213 +239,53 @@ function limpiarFiltros() {
 function generarPlanillaPDF() {
     if (!funcionarioSeleccionado) return;
 
-    const hoy      = new Date();
-    const fechaHoy = `${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
-    const f        = funcionarioSeleccionado;
-    const T        = PDF_THEME.html;
+    const f = funcionarioSeleccionado;
+    const dias = n => n > 0 ? `<b>${n}</b> días` : '<span class="cero">0</span>';
 
     // ── Bloques por cargo ──────────────────────────────────────
     const bloquesPDF = cargosDelFuncionario.map((c, idx) => {
         const mostrarSaldoAnt = idx > 0;
         const fechaFinStr     = c.fecha_fin ? formatearFecha(c.fecha_fin) : 'Vigente';
-        const etiqueta        = c.es_actual ? '  [VIGENTE]' : '';
+        const gestiones       = c.gestiones.length ? c.gestiones : [{ anio: null, saldo: 0 }];
 
-        const thSaldoAnt = mostrarSaldoAnt
-            ? `<th class="th-ant">Saldo Días<br>Anterior</th>` : '';
-        const thsG = c.gestiones.map(g => `<th>${g.anio ?? '—'}</th>`).join('');
-
-        const tdSaldoAnt = mostrarSaldoAnt
-            ? `<td class="td-ant">${c.saldo_anterior > 0 ? `<b>${c.saldo_anterior}</b> días` : '0'}</td>` : '';
-        const tdsG = c.gestiones.map(g =>
-            `<td>${g.saldo > 0 ? `<b>${g.saldo}</b> días` : '<span class="cero">0</span>'}</td>`
-        ).join('');
+        const thSaldoAnt = mostrarSaldoAnt ? '<th>Saldo Anterior</th>' : '';
+        const thsG = gestiones.map(g => `<th>${g.anio ? `Gestión ${g.anio}` : 'Gestiones'}</th>`).join('');
+        const tdSaldoAnt = mostrarSaldoAnt ? `<td>${dias(c.saldo_anterior)}</td>` : '';
+        const tdsG = gestiones.map(g => `<td>${dias(g.saldo)}</td>`).join('');
 
         return `
         <div class="bloque">
             <div class="bloque-header">
-                <span>${idx + 1}. ${_escHtml(c.cargo)}${etiqueta}</span>
-                <span>${formatearFecha(c.fecha_inicio)} — ${fechaFinStr}&nbsp;&nbsp;·&nbsp;&nbsp;Total ${c.saldo_total} días</span>
+                <span>${idx + 1}. ${_escHtml(c.cargo)}${c.es_actual ? ' (vigente)' : ''}</span>
+                <span>${formatearFecha(c.fecha_inicio)} — ${fechaFinStr}</span>
             </div>
             <table>
-                <thead><tr>${thSaldoAnt}${thsG}</tr></thead>
-                <tbody><tr>${tdSaldoAnt}${tdsG}</tr></tbody>
+                <thead><tr>${thSaldoAnt}${thsG}<th>Saldo Total</th></tr></thead>
+                <tbody><tr>${tdSaldoAnt}${tdsG}<td class="total">${c.saldo_total} días</td></tr></tbody>
             </table>
         </div>`;
     }).join('');
 
-    // ── HTML del documento ─────────────────────────────────────
     const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
-    @page { size: A4 portrait; margin: 22mm 20mm 18mm; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Montserrat', Arial, sans-serif; font-size: 10px; color: ${T.textNavyMuted}; background: #fff; padding: 36px 44px; }
-
-    /* ── Encabezado institucional ── */
-    .inst-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 22px;
-        padding-bottom: 12px;
-        border-bottom: 2px solid ${T.navy};
-    }
-    .inst-nombre {
-        font-size: 13px;
-        font-weight: 700;
-        color: ${T.navy};
-        text-transform: uppercase;
-        line-height: 1.6;
-    }
-    .inst-fecha { font-size: 10px; color: ${T.grayDate}; text-align: right; line-height: 1.6; }
-
-    .titulo { text-align: center; margin-bottom: 20px; }
-    .titulo h2 {
-        color: ${T.pink};
-        font-size: 17px;
-        font-weight: 800;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-    }
-
-    /* ── Ficha del funcionario ── */
-    .datos {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px 30px;
-        background: #f4f5fb;
-        border: 1px solid #e3e5ef;
-        border-radius: 6px;
-        padding: 12px 18px;
-        margin-bottom: 20px;
-    }
-    .dato { display: flex; gap: 6px; align-items: baseline; }
-    .dato-label {
-        font-weight: 700;
-        color: ${T.pink};
-        font-size: 9px;
-        text-transform: uppercase;
-        min-width: 85px;
-    }
-    .dato-valor { font-weight: 600; color: ${T.navy}; font-size: 10px; }
-
-    /* ── Bloque por cargo ── */
-    .bloque { margin-bottom: 16px; }
-    .bloque-header {
-        background: ${T.headerFillLight};
-        color: ${T.navy};
-        padding: 7px 14px;
-        border-radius: 6px 6px 0 0;
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        font-weight: 700;
-        font-size: 9.5px;
-    }
-    .bloque-header span:last-child { font-weight: 400; opacity: 0.7; white-space: nowrap; }
-
-    table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
-    thead th {
-        background: ${T.headerFillLight};
-        color: ${T.navy};
-        padding: 7px 10px;
-        text-align: center;
-        font-weight: 700;
-        text-transform: uppercase;
-        border: 1px solid ${T.borderLight};
-    }
-    td { padding: 8px 10px; border: 1px solid ${T.borderLight}; text-align: center; }
-    tbody tr:nth-child(even) td { background: ${T.rowFillEven}; }
-
-    .th-ant { background: #cfd5ec; }
-    .td-ant { background: ${T.rowFillEven}; }
-    .cero   { color: ${T.grayLabel}; }
-
-    /* ── Nota al pie ── */
-    .nota {
-        font-size: 8.5px;
-        color: ${T.grayLabel};
-        font-style: italic;
-        margin-top: 10px;
-        padding-top: 8px;
-        border-top: 1px solid ${T.borderLight};
-        line-height: 1.5;
-    }
-
-    /* ── Firma — fija al fondo de la página ── */
-    .firma-seccion { position: fixed; bottom: 24mm; right: 20mm; text-align: center; }
-    .firma-linea {
-        border-top: 1.5px solid ${T.navy};
-        width: 220px;
-        margin: 40px auto 5px;
-    }
-    .firma-cargo {
-        font-size: 9px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        color: ${T.navy};
-    }
-
-    /* ── Pie del documento — fijo al fondo ── */
-    .pie-doc {
-        position: fixed;
-        bottom: 10mm;
-        left: 20mm;
-        right: 20mm;
-        padding-top: 5px;
-        border-top: 1px solid ${T.borderLight};
-        display: flex;
-        justify-content: space-between;
-        font-size: 8px;
-        color: ${T.pink};
-        opacity: .7;
-    }
-</style>
-</head>
+<html lang="es"><head><meta charset="UTF-8"><style>${PDF_THEME.htmlCss}</style></head>
 <body>
-
-<div class="inst-header">
-    <div style="display:flex;align-items:center;gap:14px;">
-        <img src="/static/img/login/LOGOSSU.png" style="height:54px;width:auto;">
-        <div class="inst-nombre">SEGURO SOCIAL UNIVERSITARIO<br>
-            <span style="font-weight:400;font-size:10px;color:${T.grayLabel};letter-spacing:.5px">${_escHtml(rolLabel)}</span>
-        </div>
+    ${PDF_THEME.htmlEncabezado(_escHtml(rolLabel), 'Historial de Cargos')}
+    <div class="datos">
+        <div class="dato"><span class="dato-label">Funcionario:</span><span class="dato-valor">${_escHtml(f.nombre_completo)}</span></div>
+        <div class="dato"><span class="dato-label">Cargo Actual:</span><span class="dato-valor">${_escHtml(f.cargo_actual)}</span></div>
+        <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${formatearFecha(f.fecha_ingreso)}</span></div>
+        <div class="dato"><span class="dato-label">Cargos:</span><span class="dato-valor">${cargosDelFuncionario.length}</span></div>
     </div>
-    <div class="inst-fecha">Trinidad, ${fechaHoy}</div>
-</div>
-
-<div class="titulo"><h2>Historial de Cargos</h2></div>
-
-<div class="datos">
-    <div class="dato"><span class="dato-label">Funcionario:</span><span class="dato-valor">${_escHtml(f.nombre_completo)}</span></div>
-    <div class="dato"><span class="dato-label">Cargo Actual:</span><span class="dato-valor">${_escHtml(f.cargo_actual)}</span></div>
-    <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${formatearFecha(f.fecha_ingreso)}</span></div>
-    <div class="dato"><span class="dato-label">Cargos:</span><span class="dato-valor">${cargosDelFuncionario.length}</span></div>
-</div>
-
-${bloquesPDF}
-
-<p class="nota">
-    El "Total días" de cada cargo es la suma de sus 2 gestiones propias únicamente.<br>
-    El "Saldo Días Anterior" no se incluye en ese cálculo — se muestra como referencia de auditoría.
-</p>
-
-<div class="firma-seccion">
-    <div class="firma-linea"></div>
-    <div class="firma-cargo">${_escHtml(rolLabel)}</div>
-</div>
-
-<div class="pie-doc">
-    <span>Sistema SSU — Historial de Cargos</span>
-    <span>Generado el ${fechaHoy}</span>
-</div>
-
-</body>
-</html>`;
+    ${bloquesPDF}
+    <p class="nota">
+        El Saldo Total de cada cargo es la suma de sus gestiones; el de los cargos anteriores quedó congelado al cambiar de cargo.<br>
+        El Saldo Anterior es el Saldo Total del cargo previo y se muestra como referencia.
+    </p>
+    <div class="firma">
+        <div class="firma-linea"></div>
+        <div class="firma-cargo">${_escHtml(rolLabel)}</div>
+    </div>
+</body></html>`;
 
     descargarPDFDesdeHTML(html, `HC-${nombreArchivoSeguro(f.nombre_completo)}.pdf`, 'portrait');
 }

@@ -12,6 +12,7 @@ from vacations.models import (
     AnulacionAjuste, AprobacionSolicitud, GestionVacacion,
     JerarquiaAprobacion,
 )
+from vacations.utils import LIMITE_GESTIONES_ACTIVAS, anios_protegidos, gestiones_ocupadas
 
 _ROLES_HISTORIAL = {'RRHH', 'Administrador'}
 
@@ -234,27 +235,23 @@ def _generar_pdf_solicitud(solicitud):
 
     elements.append(section_hdr("DÍAS PENDIENTES DE VACACIONES DESPUÉS DE LA SOLICITUD"))
 
-    def gest(i):
-        if gv:
-            anio = getattr(gv, f'anio_gestion{i}')
-            dias = float(getattr(gv, f'dias_gestion{i}'))
-            label = f"Gestión {anio}:" if anio else f"Gestión {i}:"
-            return label, f"{dias:.1f}"
-        return f"Gestión {i}:", "0.0"
-
-    g1l, g1v = gest(1); g2l, g2v = gest(2)
-    g3l, g3v = gest(3); g4l, g4v = gest(4)
+    # Solo las 2 gestiones normales del funcionario (cada una con su año);
+    # los días protegidos por acuerdo/rechazo se informan aparte si quedan.
+    protegidos = anios_protegidos(f.cod_funcionario) if gv else set()
+    gestiones = gestiones_ocupadas(gv, protegidos)[-LIMITE_GESTIONES_ACTIVAS:] if gv else []
+    dias_prot = sum((d for _, a, d in gestiones_ocupadas(gv) if a in protegidos), Decimal('0')) if gv else 0
     saldo_val = f"{float(gv.dias_adeudados or 0):.1f}" if gv else "0.0"
 
+    fila_gest = []
+    for _, anio, dias in gestiones:
+        fila_gest += [P(f"Gestión {anio}:", sLabel), P('Días disponibles:', sLabel), P(f"{float(dias):.1f}", sVal)]
+    fila_gest += [P('', sVal)] * (6 - len(fila_gest))
+    fila_saldo = ([P('', sVal), P('Días protegidos:', sLabel), P(f"{float(dias_prot):.1f}", sVal)]
+                  if dias_prot else [P('', sVal)] * 3)
+    fila_saldo += [P('', sVal), P('Saldo:', sLabel), P(saldo_val, sVal)]
+
     wa, wb, wc = W * 0.18, W * 0.24, W * 0.08
-    t_dias = Table([
-        [P(g1l, sLabel), P('Días disponibles:', sLabel), P(g1v, sVal),
-         P(g2l, sLabel), P('Días Disponibles:', sLabel), P(g2v, sVal)],
-        [P(g3l, sLabel), P('Días disponibles:', sLabel), P(g3v, sVal),
-         P(g4l, sLabel), P('Días Disponibles:', sLabel), P(g4v, sVal)],
-        [P('', sVal),    P('', sVal),                   P('', sVal),
-         P('', sVal),    P('Saldo:', sLabel),            P(saldo_val, sVal)],
-    ], colWidths=[wa, wb, wc, wa, wb, wc])
+    t_dias = Table([fila_gest, fila_saldo], colWidths=[wa, wb, wc, wa, wb, wc])
     t_dias.setStyle(TableStyle([
         ('BOX',           (0, 0), (-1, -1), 0.5, BLACK),
         ('INNERGRID',     (0, 0), (-1, -1), 0.25, GRAY),
@@ -566,8 +563,9 @@ def _generar_pdf_constancia_acuerdo(acuerdo, filas):
         f"vacaciones registrado bajo el documento N.° {nro}, mediante el cual se establece la suspensión "
         f"temporal del cómputo de vencimiento de las gestiones de vacaciones correspondientes al funcionario "
         f"identificado en el presente documento, con motivo de: {escape(acuerdo.motivo)}.{derivado}<br/>"
-        f"Las gestiones detalladas en la sección III quedan protegidas —es decir, no se pierden ni se descuentan "
-        f"automáticamente hasta la nueva fecha límite establecida, correspondiente al "
+        f"Las gestiones detalladas en la sección III quedan protegidas; es decir, no caducan automáticamente. "
+        f"Los días protegidos podrán ser tomados y descontados con normalidad hasta la nueva fecha límite "
+        f"establecida, correspondiente al "
         f"{_fecha_larga(acuerdo.fecha_hasta)}, conforme al registro efectuado en el Sistema de Gestión de Vacaciones.",
         sTexto))
     el += seccion('V. CONSTANCIA')

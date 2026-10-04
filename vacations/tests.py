@@ -14,7 +14,7 @@ from vacations.utils import (
 )
 from vacations.api_views import _calcular_retorno
 from core.models import Feriado
-from vacations.models import GestionVacacion, JerarquiaAprobacion, SolicitudVacacion
+from vacations.models import AnulacionAjuste, GestionVacacion, JerarquiaAprobacion, SolicitudVacacion
 from core.test_utils import hacer_usuario_y_funcionario, hacer_gestion, hacer_cargo, hacer_funcionario
 
 
@@ -482,11 +482,12 @@ class TestCrearSolicitudAPI(APITestCase):
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('Saldo insuficiente', r.json()['error'])
 
-    def test_motivo_muy_corto_devuelve_400(self):
+    def test_motivo_vacio_devuelve_400_y_corto_se_acepta(self):
         payload = self._payload_valido()
-        payload['motivo_vacacion'] = 'Corto'
-        r = self.client.post(self.url, payload)
-        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        payload['motivo_vacacion'] = '   '
+        self.assertEqual(self.client.post(self.url, payload).status_code, status.HTTP_400_BAD_REQUEST)
+        payload['motivo_vacacion'] = 'Viaje'
+        self.assertEqual(self.client.post(self.url, payload).status_code, status.HTTP_201_CREATED)
 
     def test_no_doble_solicitud_pendiente(self):
         # Primera solicitud queda PENDIENTE_JEFE (hay jerarquía)
@@ -1080,29 +1081,15 @@ class TestAcuerdosAPI(APITestCase):
         r = self.client.post(self.url, self._payload(tipo='INDIVIDUAL'), format='json')
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_vincular_a_colectivo_reutiliza_numero(self):
+    def test_editar_colectivo_suma_funcionarios_con_el_mismo_numero(self):
         data = self._crear()
-        r = self.client.post(self.url, {
-            'vincular_id': data['id'], 'motivo': 'ignorado',
-            'funcionarios': [{'cod': self.f2.cod_funcionario, 'anios': [2024]}],
-        }, format='json')
-        self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.content)
-        self.assertEqual((r.json()['id'], r.json()['nro']), (data['id'], data['nro']))
+        editado = self._crear(modifica_id=data['id'], funcionarios=[
+            {'cod': self.f.cod_funcionario, 'anios': [2024, 2025]},
+            {'cod': self.f2.cod_funcionario, 'anios': [2024]},
+        ])
+        self.assertEqual((editado['id'], editado['nro']), (data['id'], data['nro']))
         self.assertEqual(AcuerdoVacacion.objects.count(), 1)
         self.assertEqual(anios_protegidos(self.f2.cod_funcionario), {2024})
-
-        r = self.client.post(self.url, {
-            'vincular_id': data['id'], 'funcionarios': [{'cod': self.f.cod_funcionario, 'anios': [2024]}],
-        }, format='json')
-        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_no_vincula_a_anulado(self):
-        data = self._crear()
-        AcuerdoVacacion.objects.filter(id_acuerdo=data['id']).update(estado='ANULADO')
-        r = self.client.post(self.url, {
-            'vincular_id': data['id'], 'funcionarios': [{'cod': self.f2.cod_funcionario, 'anios': [2024]}],
-        }, format='json')
-        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_editar_conserva_numero(self):
         original = self._crear()
@@ -1158,10 +1145,11 @@ class TestAcuerdosAPI(APITestCase):
         self.client.force_login(self.user_normal)
         self.assertEqual(self.client.get(url).status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_datos_formulario_contenedores(self):
+    def test_datos_formulario_dias_protegidos(self):
         self.client.force_login(self.user_f)
         r = self.client.get(reverse('vac_datos')).json()
-        self.assertEqual((r['acuerdos_protegidos'], r['rechazos_reprogramar']), ([], []))
+        self.assertEqual(r['dias_protegidos'], [])
+        self.assertEqual([g['anio'] for g in r['saldos']['gestiones']], [2025, 2024])
 
         self.client.force_login(self.user_rrhh)
         data = self._crear(funcionarios=[{'cod': self.f.cod_funcionario, 'anios': [2025]}])
@@ -1175,7 +1163,139 @@ class TestAcuerdosAPI(APITestCase):
 
         self.client.force_login(self.user_f)
         r = self.client.get(reverse('vac_datos')).json()
-        self.assertEqual([(a['nro'], a['anio'], a['dias']) for a in r['acuerdos_protegidos']],
-                         [(data['nro'], 2025, 20.0)])
-        self.assertEqual([(x['anio'], x['motivo']) for x in r['rechazos_reprogramar']],
-                         [(2024, 'Falta de personal')])
+        self.assertEqual(
+            [(x['titulo'], x['anio'], x['dias']) for x in r['dias_protegidos']],
+            [('Días protegidos por solicitud rechazada al límite de vencimiento', 2024, 18.0),
+             (f"Días protegidos por Acuerdo N.° {data['nro']}", 2025, 20.0)],
+        )
+        # Las gestiones protegidas no se repiten entre las normales.
+        self.assertEqual(r['saldos']['gestiones'], [])
+
+        # Agotados los días protegidos, la sección desaparece.
+        GestionVacacion.objects.filter(cod_funcionario=self.f).update(dias_gestion2=Decimal('0'))
+        r = self.client.get(reverse('vac_datos')).json()
+        self.assertEqual([x['anio'] for x in r['dias_protegidos']], [2025])
+
+    def test_solicitud_descuenta_primero_los_dias_protegidos(self):
+        # 2025 protegida (aunque no sea la más antigua): se descuenta primero.
+        self._crear(funcionarios=[{'cod': self.f.cod_funcionario, 'anios': [2025]}])
+        self.client.force_login(self.user_f)
+        r = self.client.post(reverse('vac_crear'), {
+            'fecha_salida': (date.today() + timedelta(days=10)).isoformat(),
+            'fecha_retorno': (date.today() + timedelta(days=15)).isoformat(),
+            'dias_solicitados': '3', 'motivo_vacacion': 'Descanso',
+        })
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.content)
+        gv = GestionVacacion.objects.get(cod_funcionario=self.f)
+        self.assertEqual((gv.dias_gestion1, gv.dias_gestion2), (Decimal('17'), Decimal('18')))
+
+
+class TestAprobadorEnVariosNiveles(APITestCase):
+    """Regresión: un aprobador en 2 niveles del mismo funcionario daba 500."""
+
+    def setUp(self):
+        import vacations.apps as vacations_apps
+        vacations_apps._primer_request_ejecutado = True
+        self.user_ger, self.ger = hacer_usuario_y_funcionario(
+            ci='94000001', nombre='Gerente', roles=['Gerente Administrativo'],
+        )
+        _, gg = hacer_usuario_y_funcionario(ci='94000002', nombre='GG', roles=['Gerente General'])
+        self.f = hacer_funcionario(ci='94000003', fecha_ingreso=date(2015, 1, 1))
+        hacer_gestion(self.f, anio1=2025, dias1=Decimal('20'))
+        for nivel, aprobador in ((1, self.ger), (2, self.ger), (3, gg)):
+            JerarquiaAprobacion.objects.create(
+                cod_funcionario=self.f, cod_aprobador=aprobador, nivel_aprobacion=nivel, activo=True,
+            )
+        self.sol = SolicitudVacacion.objects.create(
+            cod_funcionario=self.f, fecha_salida=date.today() + timedelta(days=5),
+            fecha_retorno=date.today() + timedelta(days=8), dias_solicitados=Decimal('2'),
+        )
+        self.client.force_login(self.user_ger)
+
+    def _decidir(self, decision):
+        return self.client.post(reverse('vac_decision'), {
+            'id_formulario': self.sol.id_formulario, 'decision': decision,
+            'observacion': 'Falta de personal en el servicio',
+        })
+
+    def test_aparece_para_actuar_y_puede_rechazar(self):
+        sols = self.client.get(reverse('vac_para_aprobar')).json()['solicitudes']
+        self.assertTrue(sols[0]['puede_actuar'])
+        r = self._decidir('RECHAZADO')
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.content)
+        self.sol.refresh_from_db()
+        self.assertEqual(self.sol.estado, 'RECHAZADA')
+
+    def test_aprueba_nivel_por_nivel(self):
+        self.assertEqual(self._decidir('APROBADO').status_code, status.HTTP_200_OK)
+        self.assertEqual(self._decidir('APROBADO').status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            sorted(AprobacionSolicitud.objects.filter(id_formulario=self.sol).values_list('nivel', flat=True)),
+            [1, 2],
+        )
+        self.assertEqual(self._decidir('APROBADO').status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class TestAnulacionParcialPorFechas(APITestCase):
+
+    def setUp(self):
+        import vacations.apps as vacations_apps
+        vacations_apps._primer_request_ejecutado = True
+        self.user_rrhh, _ = hacer_usuario_y_funcionario(ci='95000001', nombre='RRHH', roles=['RRHH'])
+        self.user_f, self.f = hacer_usuario_y_funcionario(ci='95000002', fecha_ingreso=date(2015, 1, 1))
+        self.gv = hacer_gestion(self.f, anio1=2025, dias1=Decimal('10'))
+        self.lunes = lunes = date.today() + timedelta(days=14 - date.today().weekday())
+        # Lunes a viernes: 5 días hábiles, retorno el lunes siguiente.
+        self.sol = SolicitudVacacion.objects.create(
+            cod_funcionario=self.f, fecha_salida=lunes, fecha_retorno=lunes + timedelta(days=7),
+            dias_solicitados=Decimal('5'), estado='APROBADA',
+        )
+        self.client.force_login(self.user_rrhh)
+
+    def _anular(self, **kw):
+        return self.client.post(reverse('vac_anulacion_registrar'), {
+            'id_formulario': self.sol.id_formulario, 'tipo_anulacion': 'parcial',
+            'motivo_anulacion': 'solicitud_empleado', 'observaciones': 'Retorna antes',
+            **kw,
+        }, format='json')
+
+    def _mi_solicitud(self):
+        self.client.force_login(self.user_f)
+        return self.client.get(reverse('vac_mis_solicitudes')).json()['solicitudes'][0]
+
+    def test_recorta_periodo_y_devuelve_dias(self):
+        nueva_final = self.lunes + timedelta(days=3)   # jueves: quedan lun-mié = 3 días
+        r = self._anular(nueva_fecha_inicio=self.lunes.isoformat(), nueva_fecha_final=nueva_final.isoformat())
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.content)
+        self.assertEqual(r.json()['dias_devueltos'], 2.0)
+
+        self.sol.refresh_from_db()
+        self.assertEqual((self.sol.fecha_salida, self.sol.fecha_retorno, self.sol.estado),
+                         (self.lunes, nueva_final, 'APROBADA'))
+        aj = AnulacionAjuste.objects.get(id_formulario=self.sol)
+        self.assertEqual((aj.tipo_anulacion, aj.dias_devolver), ('AJUSTE', Decimal('2')))
+        self.assertEqual(aj.fecha_retorno_anterior, self.lunes + timedelta(days=7))
+        self.gv.refresh_from_db()
+        self.assertEqual(self.gv.dias_gestion1, Decimal('12'))
+
+        # Mis solicitudes la muestra como Ajustada con los días restantes.
+        mis = self._mi_solicitud()
+        self.assertEqual((mis['estado'], mis['dias']), ('Ajustada', 3.0))
+
+    def test_fechas_fuera_del_periodo_o_sin_cambio(self):
+        fuera = self._anular(nueva_fecha_inicio=(self.lunes - timedelta(days=1)).isoformat(),
+                             nueva_fecha_final=(self.lunes + timedelta(days=3)).isoformat())
+        igual = self._anular(nueva_fecha_inicio=self.lunes.isoformat(),
+                             nueva_fecha_final=(self.lunes + timedelta(days=7)).isoformat())
+        for r in (fuera, igual):
+            self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST, r.content)
+        self.assertFalse(AnulacionAjuste.objects.exists())
+
+    def test_anulacion_total_queda_anulada_totalmente(self):
+        r = self.client.post(reverse('vac_anulacion_registrar'), {
+            'id_formulario': self.sol.id_formulario, 'tipo_anulacion': 'total',
+            'motivo_anulacion': 'error_registro', 'observaciones': 'Error',
+        }, format='json')
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.content)
+        self.assertEqual(self._mi_solicitud()['estado'], 'Anulada Totalmente')
+

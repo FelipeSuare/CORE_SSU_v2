@@ -127,7 +127,7 @@ async function cargarDatosFormulario() {
 
         // Renderizar saldos
         renderizarSaldos(data.saldos, data.gestiones_con_saldo);
-        renderizarProtecciones(data.acuerdos_protegidos || [], data.rechazos_reprogramar || []);
+        renderizarProtecciones(data.dias_protegidos || []);
 
         // Notificación de gestiones acumuladas
         const n = data.gestiones_con_saldo;
@@ -165,27 +165,23 @@ async function cargarDatosFormulario() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  GESTIONES PROTEGIDAS (acuerdo / rechazo cerca del vencimiento)
-//  Cada contenedor solo se muestra si tiene datos.
+//  DÍAS PROTEGIDOS (acuerdo / rechazo al límite del vencimiento)
+//  Una sección por protección, titulada según su origen. Se descuentan
+//  primero al solicitar y desaparecen al agotarse (el backend solo envía
+//  las que aún tienen saldo).
 // ══════════════════════════════════════════════════════════════
-function renderizarProtecciones(acuerdos, rechazos) {
+function renderizarProtecciones(protegidos) {
     const fmt = iso => iso.split('-').reverse().join('/');
-
-    document.getElementById('seccionAcuerdos').hidden = !acuerdos.length;
-    document.getElementById('acuerdosProtegidos').innerHTML = acuerdos.map(a => `
-        <div class="proteccion-card">
-            <div class="proteccion-head"><strong>${esc(a.nro)}</strong> · Gestión ${a.anio}</div>
-            <div><span class="proteccion-dias">${a.dias}</span> días protegidos</div>
-            <div class="proteccion-nota">Protegidos hasta el ${fmt(a.fecha_hasta)}</div>
-        </div>`).join('');
-
-    document.getElementById('seccionReprogramar').hidden = !rechazos.length;
-    document.getElementById('rechazosReprogramar').innerHTML = rechazos.map(r => `
-        <div class="proteccion-card">
-            <div class="proteccion-head"><strong>Gestión ${r.anio}</strong> · Solicitud ${esc(r.solicitud)}</div>
-            <div>Rechazada el ${fmt(r.fecha_rechazo)}</div>
-            <div class="proteccion-nota">Motivo: ${esc(r.motivo)}</div>
-            <div class="proteccion-aviso">Esta gestión no se pierde: puede volver a solicitar estos días hasta el ${fmt(r.fecha_hasta)}.</div>
+    document.getElementById('seccionesProtegidas').innerHTML = protegidos.map(p => `
+        <div class="info-section proteccion-section">
+            <h3 class="info-title">
+                <i class="material-symbols-outlined">${p.origen === 'RECHAZO' ? 'event_repeat' : 'verified_user'}</i> ${esc(p.titulo)}
+            </h3>
+            <div class="proteccion-card ${p.origen === 'RECHAZO' ? 'rechazo' : ''}">
+                <div class="proteccion-head"><strong>Gestión ${p.anio}</strong>${p.solicitud ? ` · Solicitud ${esc(p.solicitud)}` : ''}</div>
+                <div><span class="proteccion-dias">${p.dias}</span> días protegidos</div>
+                <div class="proteccion-nota">Se descuentan primero al solicitar vacación. Disponibles hasta el ${fmt(p.fecha_hasta)}.</div>
+            </div>
         </div>`).join('');
 }
 
@@ -195,7 +191,7 @@ function renderizarProtecciones(acuerdos, rechazos) {
 let gestionesExpandidas = false;
 
 function renderizarSaldos(saldos, gestionesConSaldo) {
-    const { gestiones, dias_negados, dias_adeudados } = saldos;
+    const { gestiones, dias_adeudados } = saldos;
 
     if (!gestiones || gestiones.length === 0) {
         saldosContainer.innerHTML = `
@@ -216,17 +212,9 @@ function renderizarSaldos(saldos, gestionesConSaldo) {
         </div>`;
     });
 
-    if (dias_negados > 0) {
-        html += `
-        <div class="saldo-card saldo-card-negados">
-            <div class="saldo-label">DÍAS NEGADOS <i class="material-symbols-outlined" title="Registro histórico informativo de los días que la institución no permitió tomar. No vencen nunca. Ya fueron repuestos en la gestión más antigua por lo que no se suman al total adeudado." style="font-size:14px;cursor:help;vertical-align:middle">info</i></div>
-            <div class="saldo-value">${dias_negados} <span>días</span></div>
-        </div>`;
-    }
-
     html += `
     <div class="saldo-card saldo-card-total">
-        <div class="saldo-label">TOTAL ADEUDADO <i class="material-symbols-outlined" title="Calculado automáticamente por la BD sumando únicamente las gestiones activas (máx. 2). No incluye días negados para evitar doble conteo." style="font-size:14px;cursor:help;vertical-align:middle">info</i></div>
+        <div class="saldo-label">TOTAL ADEUDADO <i class="material-symbols-outlined" title="Suma de las gestiones activas más los días protegidos que aún tenga." style="font-size:14px;cursor:help;vertical-align:middle">info</i></div>
         <div class="saldo-value">${dias_adeudados} <span>días</span></div>
     </div>`;
 
@@ -336,8 +324,8 @@ function manejarEnvioFormulario(e) {
     }
 
     const motivo = motivoVacacionTextarea.value.trim();
-    if (!motivo || motivo.length < 10) {
-        AppDialog.alert('Ingrese un motivo válido para la vacación (mínimo 10 caracteres).');
+    if (!motivo) {
+        AppDialog.alert('Ingrese el motivo de la vacación.');
         motivoVacacionTextarea.focus();
         return;
     }

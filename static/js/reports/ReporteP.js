@@ -340,8 +340,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // PDF: HISTORIAL DE SOLICITUDES
     // ══════════════════════════════════════════════
     function generarHistorialPDF(data, desde, hasta) {
-        const hoy       = new Date();
-        const fechaStr  = `Trinidad, ${hoy.getDate()} de ${nombreMes(hoy.getMonth())} de ${hoy.getFullYear()}`;
         const rangoLabel = (desde || hasta) ? ` (${desde ?? '…'} – ${hasta ?? '…'})` : '';
 
         let gestiones = Object.keys(data.historial).sort((a, b) => b - a);
@@ -355,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const bloques = gestiones.map(g => {
             const solicitudes = data.historial[g] || [];
             const filas = solicitudes.length === 0
-                ? `<tr><td colspan="5" style="text-align:center;color:#aaa;padding:10px">Sin solicitudes</td></tr>`
+                ? `<tr><td colspan="5" class="cero">Sin solicitudes</td></tr>`
                 : solicitudes.map(s => `
                     <tr>
                         <td>${s.nro}</td>
@@ -379,46 +377,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
         }).join('');
 
-        const T = PDF_THEME.html;
         descargarPDFDesdeHTML(`<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8">
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap');
-    *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Montserrat',Arial,sans-serif;padding:36px 44px;font-size:10px;color:${T.textNavyMuted};background:#fff;}
-    .inst-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;padding-bottom:12px;border-bottom:2px solid ${T.navy};}
-    .inst-nombre{font-size:13px;font-weight:700;color:${T.navy};text-transform:uppercase;line-height:1.6;}
-    .inst-fecha{font-size:10px;color:${T.grayDate};text-align:right;line-height:1.6;}
-    .titulo{text-align:center;margin-bottom:20px;}
-    .titulo h2{color:${T.pink};font-size:17px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
-    .datos{display:grid;grid-template-columns:1fr 1fr;gap:6px 30px;background:#f4f5fb;border:1px solid #e3e5ef;border-radius:6px;padding:12px 18px;margin-bottom:20px;}
-    .dato{display:flex;gap:6px;align-items:baseline;}
-    .dato-label{font-weight:700;color:${T.pink};font-size:9px;text-transform:uppercase;min-width:85px;}
-    .dato-valor{font-weight:600;color:${T.navy};font-size:10px;}
-    .bloque{margin-bottom:16px;}
-    .bloque-header{background:${T.headerFillLight};color:${T.navy};padding:7px 14px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between;font-weight:700;font-size:9.5px;}
-    .bloque-header span:last-child{font-weight:400;opacity:0.7;}
-    table{width:100%;border-collapse:collapse;font-size:9.5px;}
-    thead th{background:${T.headerFillLight};color:${T.navy};padding:7px 10px;text-align:center;font-weight:700;text-transform:uppercase;border:1px solid ${T.borderLight};}
-    td{padding:8px 10px;border:1px solid ${T.borderLight};text-align:center;}
-    tbody tr:nth-child(even) td{background:${T.rowFillEven};}
-</style></head><body>
-    <div class="inst-header">
-        <div style="display:flex;align-items:center;gap:14px;">
-            <img src="/static/img/login/LOGOSSU.png" style="height:54px;width:auto;">
-            <div class="inst-nombre">SEGURO SOCIAL UNIVERSITARIO<br>
-                <span style="font-weight:400;font-size:10px;color:${T.grayLabel};letter-spacing:.5px">${areaLabel}</span>
-            </div>
-        </div>
-        <div class="inst-fecha">${fechaStr}</div>
-    </div>
-    <div class="titulo"><h2>HISTORIAL SOLICITUDES${rangoLabel}</h2></div>
+<html lang="es"><head><meta charset="UTF-8"><style>${PDF_THEME.htmlCss}</style></head><body>
+    ${PDF_THEME.htmlEncabezado(areaLabel, `Historial de Solicitudes${rangoLabel}`)}
     <div class="datos">
         <div class="dato"><span class="dato-label">Funcionario:</span><span class="dato-valor">${esc(data.nombre_completo)}</span></div>
         <div class="dato"><span class="dato-label">Cargo:</span><span class="dato-valor">${esc(data.cargo)}</span></div>
         <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${data.fecha_ingreso}</span></div>
-        <div class="dato"><span class="dato-label">Días disponibles:</span>
-            <span class="dato-valor" style="color:${T.pink}">${fmt(data.dias_adeudados)} días</span></div>
+        <div class="dato"><span class="dato-label">Días disponibles:</span><span class="dato-valor total">${fmt(data.dias_adeudados)} días</span></div>
     </div>
     ${bloques}
 </body></html>`, `Historial_${_nombreArchivo(data.nombre_completo)}.pdf`, 'portrait');

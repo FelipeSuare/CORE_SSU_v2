@@ -178,12 +178,20 @@
                             </div>
                         </div>
 
-                        <div class="form-group" id="diasAnularGroup" style="display: none;">
-                            <label for="diasAnular">Días a Anular *</label>
-                            <div class="input-wrapper">
-                                <input type="number" id="diasAnular" min="1" placeholder="Número de días">
+                        <div class="form-row" id="fechasParcialGroup" hidden>
+                            <div class="form-group">
+                                <label for="nuevaFechaInicio">Nueva Fecha de Inicio *</label>
+                                <div class="input-wrapper">
+                                    <input type="date" id="nuevaFechaInicio">
+                                </div>
                             </div>
-                            <span class="help-text">Máximo: <span id="maxDiasAnular">0</span> días</span>
+                            <div class="form-group">
+                                <label for="nuevaFechaFinal">Nueva Fecha Final *</label>
+                                <div class="input-wrapper">
+                                    <input type="date" id="nuevaFechaFinal">
+                                </div>
+                            </div>
+                            <span class="help-text">Los días a devolver se calculan con los días hábiles que quedan fuera del nuevo período (sin fines de semana ni feriados).</span>
                         </div>
 
                         <div class="form-group">
@@ -246,11 +254,8 @@
                     </h2>
                 </div>
                 <div class="modal-body">
-                    <p class="confirmation-text">¿Está seguro de realizar esta anulación? Esta acción no se puede deshacer.</p>
-                    <div class="confirmation-details">
-                        <p><strong>Tipo:</strong> <span id="confirmTipo">-</span></p>
-                        <p><strong>Días a devolver:</strong> <span id="confirmDias">-</span></p>
-                    </div>
+                    <p class="confirmation-text">¿Está seguro de realizar esta anulación?<br>Esta acción no se puede deshacer.</p>
+                    <div class="confirmation-details" id="confirmDetalles"></div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" id="btnCancelarConfirmacion">
