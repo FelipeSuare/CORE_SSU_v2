@@ -3,7 +3,6 @@ import sys
 import threading
 from datetime import date
 
-from django.conf import settings
 from django.apps import AppConfig
 from django.core.management import call_command
 
@@ -21,11 +20,10 @@ class VacationsConfig(AppConfig):
         # así funciona al clonar y arrancar sin necesidad de migrate adicional
         request_started.connect(_auto_poblar_vacaciones_primer_request)
         # request_started.connect(_corregir_dias_perdidos_primer_request)
-        # La acreditación diaria automática queda desactivada en DEBUG porque
-        # en el servidor de desarrollo se dispara al primer request de cada
-        # arranque y puede volver a tocar saldos cuando solo se está probando.
-        if not settings.DEBUG:
-            request_started.connect(_poblar_vacaciones_diario)
+        # Acreditación diaria (nueva gestión al cumplir aniversario y caducidad
+        # de la más antigua). Corre también en DEBUG: es idempotente, así que
+        # repetirse en cada arranque del servidor de desarrollo no altera saldos.
+        request_started.connect(_poblar_vacaciones_diario)
 
 
 def _auto_poblar_vacaciones(sender, **kwargs):
