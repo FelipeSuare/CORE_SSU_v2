@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from decimal import Decimal
+from io import StringIO
 
 from django.urls import reverse
 from rest_framework import status
@@ -501,6 +502,38 @@ class TestCrearSolicitudAPI(APITestCase):
         self.gv.delete()
         r = self.client.post(self.url, self._payload_valido())
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_descuenta_por_anio_aunque_la_mas_antigua_este_en_slot_1(self):
+        # Regresión: el descuento iba por slot (4→1); con la antigua en slot 1
+        # se consumía primero la reciente.
+        GestionVacacion.objects.filter(pk=self.gv.pk).update(
+            anio_gestion1=2024, dias_gestion1=Decimal('15'),
+            anio_gestion2=2025, dias_gestion2=Decimal('15'),
+        )
+        r = self.client.post(self.url, self._payload_valido(dias='20'))
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.content)
+        self.gv.refresh_from_db()
+        self.assertEqual((self.gv.dias_gestion1, self.gv.dias_gestion2), (Decimal('0'), Decimal('10')))
+
+    def test_comando_corrige_consumo_fuera_de_orden(self):
+        from django.core.management import call_command
+        # 2024 intacta (15) y 2025 consumida (10 de 20): estado del bug de consumo por slot.
+        GestionVacacion.objects.filter(pk=self.gv.pk).update(
+            anio_gestion1=2024, dias_gestion1=Decimal('15'),
+            anio_gestion2=2025, dias_gestion2=Decimal('10'),
+        )
+        call_command('corregir_orden_consumo', '--dry-run', stdout=StringIO())
+        self.gv.refresh_from_db()
+        self.assertEqual(self.gv.dias_gestion2, Decimal('10'))
+
+        call_command('corregir_orden_consumo', stdout=StringIO())
+        self.gv.refresh_from_db()
+        self.assertEqual((self.gv.dias_gestion1, self.gv.dias_gestion2), (Decimal('5'), Decimal('20')))
+
+        # Idempotente y no toca saldos ya en orden.
+        call_command('corregir_orden_consumo', stdout=StringIO())
+        self.gv.refresh_from_db()
+        self.assertEqual((self.gv.dias_gestion1, self.gv.dias_gestion2), (Decimal('5'), Decimal('20')))
 
 
 class TestMisSolicitudesAPI(APITestCase):
