@@ -45,11 +45,15 @@ function descargarPDFDesdeHTML(htmlCompleto, filename, orientation = 'landscape'
 
                 await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
+                // Márgenes verticales en pt: superior en cada página y espacio
+                // inferior para el pie (PDF_THEME.pieDePagina).
                 await html2pdf().from(doc.body).set({
-                    margin: 0,
+                    margin: [42, 0, 56, 0],
                     filename,
                     html2canvas: { scale: 2, useCORS: true },
                     jsPDF: { unit: 'pt', format: 'a4', orientation },
+                }).toPdf().get('pdf').then(pdf => {
+                    if (typeof PDF_THEME !== 'undefined' && PDF_THEME.pieDePagina) PDF_THEME.pieDePagina(pdf);
                 }).save();
             } catch (err) {
                 console.error('Error generando PDF:', err);

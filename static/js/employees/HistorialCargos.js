@@ -269,13 +269,15 @@ function generarPlanillaPDF() {
     const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><style>${PDF_THEME.htmlCss}</style></head>
 <body>
-    ${PDF_THEME.htmlEncabezado(_escHtml(rolLabel), 'Historial de Cargos')}
+    ${PDF_THEME.htmlEncabezado(_escHtml(rolLabel), 'Historial de Cargos Anteriores y Actuales')}
+    <div class="seccion">I. DATOS DEL FUNCIONARIO</div>
     <div class="datos">
         <div class="dato"><span class="dato-label">Funcionario:</span><span class="dato-valor">${_escHtml(f.nombre_completo)}</span></div>
         <div class="dato"><span class="dato-label">Cargo Actual:</span><span class="dato-valor">${_escHtml(f.cargo_actual)}</span></div>
         <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${formatearFecha(f.fecha_ingreso)}</span></div>
         <div class="dato"><span class="dato-label">Cargos:</span><span class="dato-valor">${cargosDelFuncionario.length}</span></div>
     </div>
+    <div class="seccion">II. CARGOS Y SALDOS DE VACACIONES</div>
     ${bloquesPDF}
     <p class="nota">
         El Saldo Total de cada cargo es la suma de sus gestiones; el de los cargos anteriores quedó congelado al cambiar de cargo.<br>

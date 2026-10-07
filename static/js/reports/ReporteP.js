@@ -379,14 +379,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         descargarPDFDesdeHTML(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><style>${PDF_THEME.htmlCss}</style></head><body>
-    ${PDF_THEME.htmlEncabezado(areaLabel, `Historial de Solicitudes${rangoLabel}`)}
+    ${PDF_THEME.htmlEncabezado(esc(areaLabel), `Historial de Vacaciones${rangoLabel}`)}
+    <div class="seccion">I. DATOS DEL FUNCIONARIO</div>
     <div class="datos">
         <div class="dato"><span class="dato-label">Funcionario:</span><span class="dato-valor">${esc(data.nombre_completo)}</span></div>
         <div class="dato"><span class="dato-label">Cargo:</span><span class="dato-valor">${esc(data.cargo)}</span></div>
-        <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${data.fecha_ingreso}</span></div>
+        <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${esc(data.fecha_ingreso)}</span></div>
         <div class="dato"><span class="dato-label">Días disponibles:</span><span class="dato-valor total">${fmt(data.dias_adeudados)} días</span></div>
     </div>
-    ${bloques}
+    <div class="seccion">II. VACACIONES APROBADAS POR GESTIÓN</div>
+    ${bloques || '<p class="nota">Sin historial para el rango seleccionado.</p>'}
 </body></html>`, `Historial_${_nombreArchivo(data.nombre_completo)}.pdf`, 'portrait');
     }
 
