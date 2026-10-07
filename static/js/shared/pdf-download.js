@@ -9,12 +9,17 @@ function descargarPDFDesdeHTML(htmlCompleto, filename, orientation = 'landscape'
         return;
     }
 
+    // html2pdf se ejecuta DENTRO del iframe: si corre en la página, clona el
+    // body a la página actual y se pierde el <style> del PDF (se aplica el CSS
+    // de la página en su lugar).
+    const h2pSrc = document.querySelector('script[src*="html2pdf"]').src;
+
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
-    iframe.style.right    = '0';
-    iframe.style.bottom   = '0';
-    iframe.style.width    = '0';
-    iframe.style.height   = '0';
+    iframe.style.left     = '-10000px';
+    iframe.style.top      = '0';
+    iframe.style.width    = '1200px';
+    iframe.style.height   = '800px';
     iframe.style.border   = '0';
     document.body.appendChild(iframe);
 
@@ -47,14 +52,22 @@ function descargarPDFDesdeHTML(htmlCompleto, filename, orientation = 'landscape'
 
                 // Márgenes verticales en pt: superior en cada página y espacio
                 // inferior para el pie (PDF_THEME.pieDePagina).
-                await html2pdf().from(doc.body).set({
-                    margin: [42, 0, 56, 0],
-                    filename,
+                const pdf = await iframe.contentWindow.html2pdf().from(doc.body).set({
+                    // Array del iframe: html2pdf valida con instanceof Array.
+                    margin: iframe.contentWindow.Array.of(42, 0, 56, 0),
                     html2canvas: { scale: 2, useCORS: true },
                     jsPDF: { unit: 'pt', format: 'a4', orientation },
-                }).toPdf().get('pdf').then(pdf => {
-                    if (typeof PDF_THEME !== 'undefined' && PDF_THEME.pieDePagina) PDF_THEME.pieDePagina(pdf);
-                }).save();
+                }).toPdf().get('pdf');
+                if (typeof PDF_THEME !== 'undefined' && PDF_THEME.pieDePagina) PDF_THEME.pieDePagina(pdf);
+
+                // Descarga desde la página (no con .save() del iframe: difiere
+                // el click y el iframe ya se eliminó en `finally`).
+                const url = URL.createObjectURL(pdf.output('blob'));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
             } catch (err) {
                 console.error('Error generando PDF:', err);
                 alert('No se pudo generar el PDF. Intente nuevamente.');
@@ -66,7 +79,7 @@ function descargarPDFDesdeHTML(htmlCompleto, filename, orientation = 'landscape'
 
     const htmlConBase = htmlCompleto.replace(
         '<head>',
-        `<head><base href="${window.location.origin}/">`
+        `<head><base href="${window.location.origin}/"><script src="${h2pSrc}"><\/script>`
     );
 
     iframe.srcdoc = htmlConBase;
