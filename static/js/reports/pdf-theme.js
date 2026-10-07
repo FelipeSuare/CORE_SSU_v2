@@ -39,36 +39,45 @@ PDF_THEME.fechaLarga = (d = new Date()) => {
 
 PDF_THEME.htmlCss = (() => {
     const I = PDF_THEME.inst;
-    const blushBg = 'rgba(232,180,184,0.45)', indigoBg = 'rgba(51,51,153,0.22)', grid = 'rgba(51,51,153,0.3)';
+    const navy = '#2b2f6d', vino = '#a1184b', lila = '#d9d7ea', lilaClaro = '#f7f6fb', rosa = '#fdd1fb', linea = '#e4e5ed';
     return `
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:Helvetica,Arial,sans-serif;font-size:10px;color:#000;background:#fff;padding:0 46px;}
-    .inst-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:6px;}
-    .inst-marca{display:flex;align-items:center;gap:12px;}
-    .inst-marca img{height:60px;width:auto;}
-    .inst-nombre{font-size:14px;font-weight:700;color:${I.indigo};}
-    .inst-area{font-size:9px;color:${I.gris};margin-top:3px;text-transform:uppercase;}
-    .inst-fecha{font-size:9.5px;font-weight:700;color:${I.gris};align-self:flex-start;}
-    .inst-hr{border-top:2.5px solid ${I.navy};margin-bottom:16px;}
-    .titulo{text-align:center;color:${I.vino};font-size:13px;font-weight:700;text-transform:uppercase;margin:4px 0 16px;}
-    .seccion{color:${I.vino};font-size:11px;font-weight:700;margin:14px 0 6px;}
-    .datos{display:grid;grid-template-columns:1fr 1fr;border:0.6px solid ${grid};margin-bottom:16px;}
-    .dato{display:grid;grid-template-columns:42% 58%;border:0.5px solid ${grid};}
-    .dato-label{background:${blushBg};font-weight:700;color:${I.indigo};font-size:9px;padding:6px 8px;}
-    .dato-valor{color:#000;font-size:9.5px;padding:6px 8px;}
-    .bloque{margin-bottom:14px;page-break-inside:avoid;}
-    .bloque-header{display:flex;justify-content:space-between;gap:12px;color:${I.vino};border-bottom:1px solid ${I.vino};padding:4px 2px;margin-bottom:6px;font-weight:700;font-size:10.5px;text-transform:uppercase;}
-    .bloque-header span:last-child{font-weight:400;color:${I.gris};text-transform:none;white-space:nowrap;font-size:9px;}
-    table{width:100%;border-collapse:collapse;font-size:9.5px;}
-    thead th{background:${indigoBg};color:${I.indigo};border:0.5px solid ${grid};padding:6px 8px;font-weight:700;font-size:9px;text-align:center;}
-    td{border:0.5px solid ${grid};padding:6px 8px;text-align:center;color:#000;background:#fff;}
-    td b, .fuerte{color:${I.navy};}
-    .total{color:${I.vino};font-weight:700;}
-    .cero{color:rgb(187,187,187);}
-    .nota{font-size:8.5px;color:${I.gris};font-style:italic;text-align:center;margin-top:12px;line-height:1.5;}
-    .firma{width:240px;margin:64px 0 0 auto;text-align:center;page-break-inside:avoid;}
-    .firma-linea{border-top:1.5px solid ${I.navy};margin-bottom:6px;}
-    .firma-cargo{font-size:9px;font-weight:700;color:${I.vino};text-transform:uppercase;}
+    body{font-family:Helvetica,Arial,sans-serif;font-size:10px;color:#333;background:#fff;padding:0 46px;}
+    .inst-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;}
+    .inst-marca{display:flex;align-items:center;gap:14px;}
+    .inst-marca img{height:56px;width:auto;}
+    .inst-nombre{font-size:17px;font-weight:700;color:${navy};}
+    .inst-area{font-size:10px;color:${I.gris};margin-top:2px;text-transform:uppercase;}
+    .inst-fecha{font-size:9.5px;color:${I.gris};align-self:flex-start;margin-top:6px;}
+    .inst-hr{border-top:2.5px solid ${navy};margin-bottom:18px;}
+    .titulo{text-align:center;color:${vino};font-size:22px;font-weight:700;text-transform:uppercase;margin:4px 0 20px;}
+    .datos{display:grid;grid-template-columns:1fr 1fr;row-gap:12px;margin-bottom:14px;font-size:9.5px;font-weight:700;}
+    .datos .lbl{color:${vino};}
+    .datos .val{color:${navy};}
+    .seccion{color:${vino};font-size:12px;font-weight:700;text-transform:uppercase;margin:14px 0 8px;}
+    .subseccion{color:${navy};font-size:10.5px;font-weight:700;text-transform:uppercase;margin:16px 0 8px;}
+    .bloque{margin-bottom:22px;page-break-inside:avoid;}
+    .bloque-header{background:${lila};padding:8px 10px;}
+    .bloque-titulo{color:${navy};font-size:12.5px;font-weight:700;}
+    .badge-actual{color:${vino};font-size:8.5px;font-weight:700;margin-left:16px;text-transform:uppercase;}
+    .bloque-periodo{color:${vino};font-size:9px;margin-top:2px;}
+    table{width:100%;border-collapse:collapse;}
+    .tabla-cargo th{background:${lilaClaro};color:${navy};font-size:8.5px;font-weight:700;text-transform:uppercase;padding:9px 6px;border-left:1px solid ${linea};}
+    .tabla-cargo td{font-size:12.5px;font-weight:700;color:#333;padding:10px 6px;text-align:center;border-left:1px solid ${linea};border-bottom:1px solid ${linea};}
+    .tabla-cargo th:first-child,.tabla-cargo td:first-child{border-left:1px solid ${linea};}
+    .tabla-cargo .ant{color:${vino};}
+    .tabla-cargo .col-total{background:${rosa};border-left:0;}
+    .tabla-cargo td.col-total.actual{color:${vino};}
+    .tabla-vac th{background:${lila};color:${navy};font-size:9.5px;font-weight:700;text-transform:uppercase;padding:10px 6px;}
+    .tabla-vac td{font-size:9.5px;color:#444;padding:10px 6px;text-align:center;border-left:1px solid ${linea};}
+    .tabla-vac tbody tr:nth-child(even) td{background:#faf9fc;}
+    .tabla-vac tbody tr:last-child td{border-bottom:1px solid ${linea};}
+    .tabla-vac td:last-child{border-right:1px solid ${linea};}
+    .tabla-vac td.aprobada{color:#2e7d32;font-weight:700;}
+    .totales{margin:12px 0 24px;font-size:10px;font-weight:700;color:${vino};}
+    .totales b{color:${navy};margin-right:16px;}
+    .cero{color:rgb(170,170,170);}
+    .nota{font-size:8px;color:${I.gris};margin-top:4px;}
     `;
 })();
 
@@ -85,6 +94,12 @@ PDF_THEME.htmlEncabezado = (area, titulo) => `
     </div>
     <div class="inst-hr"></div>
     <div class="titulo">${titulo}</div>`;
+
+// Fila de datos del funcionario (etiqueta vino + valor navy, en 2 columnas).
+// `pares` = [[etiqueta, valorYaEscapado], ...]
+PDF_THEME.htmlDatos = pares => `<div class="datos">${
+    pares.map(([l, v]) => `<div><span class="lbl">${l}:</span> <span class="val">${v}</span></div>`).join('')
+}</div>`;
 
 // Pie de cada página, igual al de la constancia: línea navy, fecha de
 // generación y "Página N". `pdf` es la instancia jsPDF de html2pdf (pt).

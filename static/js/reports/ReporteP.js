@@ -350,44 +350,43 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        const diasPdf = n => `${fmt(n).replace('.', ',')} día${n !== 1 ? 's' : ''}`;
         const bloques = gestiones.map(g => {
             const solicitudes = data.historial[g] || [];
+            const totalDias = solicitudes.reduce((t, s) => t + (Number(s.dias) || 0), 0);
             const filas = solicitudes.length === 0
                 ? `<tr><td colspan="5" class="cero">Sin solicitudes</td></tr>`
                 : solicitudes.map(s => `
                     <tr>
-                        <td>${s.nro}</td>
-                        <td>${s.inicio}</td>
-                        <td>${s.fin}</td>
-                        <td>${fmt(s.dias)} día${s.dias !== 1 ? 's' : ''}</td>
-                        <td>Aprobada</td>
+                        <td>${esc(String(s.nro))}</td>
+                        <td>${esc(s.inicio)}</td>
+                        <td>${esc(s.fin)}</td>
+                        <td>${diasPdf(s.dias)}</td>
+                        <td class="aprobada">Aprobada</td>
                     </tr>`).join('');
             return `
                 <div class="bloque">
-                    <div class="bloque-header">
-                        <span>Gestión ${g}</span>
-                        <span>${solicitudes.length} solicitud${solicitudes.length !== 1 ? 'es' : ''}</span>
-                    </div>
-                    <table>
+                    <div class="subseccion">Gestión ${esc(g)}</div>
+                    <table class="tabla-vac">
                         <thead>
-                            <tr><th>Nro.</th><th>Fecha Inicio</th><th>Fecha Fin</th><th>Días</th><th>Estado</th></tr>
+                            <tr><th>N°</th><th>Fecha Inicio</th><th>Fecha Fin</th><th>Días</th><th>Estado</th></tr>
                         </thead>
                         <tbody>${filas}</tbody>
                     </table>
+                    <div class="totales">Total solicitudes: <b>${solicitudes.length}</b> Total días aprobados: <b>${diasPdf(totalDias)}</b></div>
                 </div>`;
         }).join('');
 
         descargarPDFDesdeHTML(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><style>${PDF_THEME.htmlCss}</style></head><body>
     ${PDF_THEME.htmlEncabezado(esc(areaLabel), `Historial de Vacaciones${rangoLabel}`)}
-    <div class="seccion">I. DATOS DEL FUNCIONARIO</div>
-    <div class="datos">
-        <div class="dato"><span class="dato-label">Funcionario:</span><span class="dato-valor">${esc(data.nombre_completo)}</span></div>
-        <div class="dato"><span class="dato-label">Cargo:</span><span class="dato-valor">${esc(data.cargo)}</span></div>
-        <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${esc(data.fecha_ingreso)}</span></div>
-        <div class="dato"><span class="dato-label">Días disponibles:</span><span class="dato-valor total">${fmt(data.dias_adeudados)} días</span></div>
-    </div>
-    <div class="seccion">II. VACACIONES APROBADAS POR GESTIÓN</div>
+    ${PDF_THEME.htmlDatos([
+        ['Funcionario', esc(data.nombre_completo)],
+        ['Cargo', esc(data.cargo)],
+        ['Fecha de ingreso', esc(data.fecha_ingreso)],
+        ['Días disponibles', diasPdf(data.dias_adeudados)],
+    ])}
+    <div class="seccion">Vacaciones aprobadas por gestión</div>
     ${bloques || '<p class="nota">Sin historial para el rango seleccionado.</p>'}
 </body></html>`, `Historial_${_nombreArchivo(data.nombre_completo)}.pdf`, 'portrait');
     }

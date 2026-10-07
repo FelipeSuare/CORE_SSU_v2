@@ -240,7 +240,7 @@ function generarPlanillaPDF() {
     if (!funcionarioSeleccionado) return;
 
     const f = funcionarioSeleccionado;
-    const dias = n => n > 0 ? `<b>${n}</b> días` : '<span class="cero">0</span>';
+    const total = cargosDelFuncionario.length;
 
     // ── Bloques por cargo ──────────────────────────────────────
     const bloquesPDF = cargosDelFuncionario.map((c, idx) => {
@@ -250,18 +250,18 @@ function generarPlanillaPDF() {
 
         const thSaldoAnt = mostrarSaldoAnt ? '<th>Saldo Anterior</th>' : '';
         const thsG = gestiones.map(g => `<th>${g.anio ? `${g.protegida ? 'Gestión Protegida' : 'Gestión'} ${g.anio}` : 'Gestiones'}</th>`).join('');
-        const tdSaldoAnt = mostrarSaldoAnt ? `<td>${dias(c.saldo_anterior)}</td>` : '';
-        const tdsG = gestiones.map(g => `<td>${dias(g.saldo)}</td>`).join('');
+        const tdSaldoAnt = mostrarSaldoAnt ? `<td class="ant">${c.saldo_anterior} días</td>` : '';
+        const tdsG = gestiones.map(g => `<td>${g.saldo} días</td>`).join('');
 
         return `
         <div class="bloque">
             <div class="bloque-header">
-                <span>${idx + 1}. ${_escHtml(c.cargo)}${c.es_actual ? ' (vigente)' : ''}</span>
-                <span>${formatearFecha(c.fecha_inicio)} — ${fechaFinStr}</span>
+                <div class="bloque-titulo">${idx + 1}.&nbsp; ${_escHtml(c.cargo)}${c.es_actual ? '<span class="badge-actual">Actual · Vigente</span>' : ''}</div>
+                <div class="bloque-periodo">Periodo: ${formatearFecha(c.fecha_inicio)} — ${fechaFinStr}</div>
             </div>
-            <table>
-                <thead><tr>${thSaldoAnt}${thsG}<th>Saldo Total</th></tr></thead>
-                <tbody><tr>${tdSaldoAnt}${tdsG}<td class="total">${c.saldo_total} días</td></tr></tbody>
+            <table class="tabla-cargo">
+                <thead><tr>${thSaldoAnt}${thsG}<th class="col-total">Saldo Total</th></tr></thead>
+                <tbody><tr>${tdSaldoAnt}${tdsG}<td class="col-total${c.es_actual ? ' actual' : ''}">${c.saldo_total} días</td></tr></tbody>
             </table>
         </div>`;
     }).join('');
@@ -269,24 +269,16 @@ function generarPlanillaPDF() {
     const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><style>${PDF_THEME.htmlCss}</style></head>
 <body>
-    ${PDF_THEME.htmlEncabezado(_escHtml(rolLabel), 'Historial de Cargos Anteriores y Actuales')}
-    <div class="seccion">I. DATOS DEL FUNCIONARIO</div>
-    <div class="datos">
-        <div class="dato"><span class="dato-label">Funcionario:</span><span class="dato-valor">${_escHtml(f.nombre_completo)}</span></div>
-        <div class="dato"><span class="dato-label">Cargo Actual:</span><span class="dato-valor">${_escHtml(f.cargo_actual)}</span></div>
-        <div class="dato"><span class="dato-label">Fecha Ingreso:</span><span class="dato-valor">${formatearFecha(f.fecha_ingreso)}</span></div>
-        <div class="dato"><span class="dato-label">Cargos:</span><span class="dato-valor">${cargosDelFuncionario.length}</span></div>
-    </div>
-    <div class="seccion">II. CARGOS Y SALDOS DE VACACIONES</div>
+    ${PDF_THEME.htmlEncabezado(_escHtml(rolLabel), 'Historial de Cargos Anteriores')}
+    ${PDF_THEME.htmlDatos([
+        ['Funcionario', _escHtml(f.nombre_completo)],
+        ['Cargo', _escHtml(f.cargo_actual)],
+        ['Fecha de ingreso', formatearFecha(f.fecha_ingreso)],
+        ['Total de Cargos', `${total} cargo${total !== 1 ? 's' : ''} (${Math.max(total - 1, 0)} anteriores)`],
+    ])}
+    <div class="seccion">Trayectoria de Cargos</div>
     ${bloquesPDF}
-    <p class="nota">
-        El Saldo Total de cada cargo es la suma de sus gestiones; el de los cargos anteriores quedó congelado al cambiar de cargo.<br>
-        El Saldo Anterior es el Saldo Total del cargo previo y se muestra como referencia.
-    </p>
-    <div class="firma">
-        <div class="firma-linea"></div>
-        <div class="firma-cargo">${_escHtml(rolLabel)}</div>
-    </div>
+    <p class="nota">Los saldos por gestión se expresan en días de vacación. Cada cargo muestra solo las gestiones que le corresponden.</p>
 </body></html>`;
 
     descargarPDFDesdeHTML(html, `HC-${nombreArchivoSeguro(f.nombre_completo)}.pdf`, 'portrait');
