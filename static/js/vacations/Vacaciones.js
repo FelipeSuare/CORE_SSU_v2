@@ -214,7 +214,7 @@ function renderizarSaldos(saldos, gestionesConSaldo) {
 
     html += `
     <div class="saldo-card saldo-card-total">
-        <div class="saldo-label">TOTAL ADEUDADO <i class="material-symbols-outlined" title="Suma de las gestiones activas más los días protegidos que aún tenga." style="font-size:14px;cursor:help;vertical-align:middle">info</i></div>
+        <div class="saldo-label">TOTAL ADEUDADO <i class="material-symbols-outlined" title="Suma de las 2 gestiones vigentes. La gestión protegida se suma aparte solo si es una 3ª gestión adicional." style="font-size:14px;cursor:help;vertical-align:middle">info</i></div>
         <div class="saldo-value">${dias_adeudados} <span>días</span></div>
     </div>`;
 

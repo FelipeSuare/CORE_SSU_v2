@@ -168,7 +168,7 @@ function renderizarCargos() {
         const thSaldoAnterior = mostrarSaldoAnt
             ? `<th class="th-saldo-ant">Saldo Anterior</th>` : '';
         const thsGestiones = gestiones.map(g =>
-            `<th class="th-gestion">${g.anio ?? '—'}</th>`
+            `<th class="th-gestion">${g.protegida ? `Protegida ${g.anio}` : (g.anio ?? '—')}</th>`
         ).join('');
 
         const tdSaldoAnterior = mostrarSaldoAnt
@@ -249,7 +249,7 @@ function generarPlanillaPDF() {
         const gestiones       = c.gestiones.length ? c.gestiones : [{ anio: null, saldo: 0 }];
 
         const thSaldoAnt = mostrarSaldoAnt ? '<th>Saldo Anterior</th>' : '';
-        const thsG = gestiones.map(g => `<th>${g.anio ? `Gestión ${g.anio}` : 'Gestiones'}</th>`).join('');
+        const thsG = gestiones.map(g => `<th>${g.anio ? `${g.protegida ? 'Gestión Protegida' : 'Gestión'} ${g.anio}` : 'Gestiones'}</th>`).join('');
         const tdSaldoAnt = mostrarSaldoAnt ? `<td>${dias(c.saldo_anterior)}</td>` : '';
         const tdsG = gestiones.map(g => `<td>${dias(g.saldo)}</td>`).join('');
 

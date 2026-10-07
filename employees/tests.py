@@ -247,3 +247,15 @@ class TestHistorialCargosSaldos(APITestCase):
         self.assertEqual((anterior['saldo_anterior'], anterior['saldo_total']), (0.0, 30.0))
         self.assertEqual([g['anio'] for g in actual['gestiones']], [2024, 2025])
         self.assertEqual((actual['saldo_anterior'], actual['saldo_total']), (30.0, 25.0))
+
+
+class TestPDFVacacionesBaja(APITestCase):
+
+    def test_pdf_baja_gestiones_por_anio(self):
+        from employees.api_views import _generar_pdf_vacaciones_baja
+        f = hacer_funcionario(ci='93000001', fecha_ingreso=date(2015, 1, 1))
+        # Slots desordenados: 1 y 2 no son las 2 gestiones más recientes.
+        gv = GestionVacacion.objects.create(cod_funcionario=f, anio_gestion1=2025, dias_gestion1=Decimal('20'),
+                                            anio_gestion3=2024, dias_gestion3=Decimal('15'))
+        self.assertTrue(_generar_pdf_vacaciones_baja(f, gv, None).startswith(b'%PDF'))
+        self.assertTrue(_generar_pdf_vacaciones_baja(f, None, None).startswith(b'%PDF'))

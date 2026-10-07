@@ -13,6 +13,7 @@ from core.api_permissions import NoCambioPendiente, EsRRHH, EsFuncionarioActivo,
 from employees.models import Persona, Funcionario, HistorialCargo
 from accounts.models import Roles, FuncionarioRol
 from vacations.models import GestionVacacion, JerarquiaAprobacion
+from vacations.utils import anios_protegidos, resumen_saldo
 
 logger = logging.getLogger(__name__)
 
@@ -651,6 +652,7 @@ class HistorialCargosView(APIView):
             HistorialCargo.objects.filter(cod_funcionario=f).order_by('fecha_inicio')
         )
         gv = GestionVacacion.objects.filter(cod_funcionario=f).first()
+        protegidos = anios_protegidos(f.cod_funcionario)
 
         def gestiones_de(obj, anio_attr, dias_attr):
             # Las gestiones pueden estar en cualquiera de los 4 slots (el
@@ -669,6 +671,10 @@ class HistorialCargosView(APIView):
             # Cargo vigente: en tiempo real. Cargos anteriores: congelados al salir.
             gestiones = (gestiones_de(gv, 'anio_gestion{}', 'dias_gestion{}') if hc.es_actual
                          else gestiones_de(hc, 'anio_gestion{}_al_salir', 'saldo_gestion{}_al_salir'))
+            # Cada año aparece una sola vez: el total cumple la regla A/B
+            # (protegida dentro de las 2 normales no se duplica; si es 3ª, se suma).
+            for g in gestiones:
+                g['protegida'] = hc.es_actual and g['anio'] in protegidos
             saldo_total    = round(sum(g['saldo'] for g in gestiones), 1)
             saldo_anterior = cargos[i - 1]['saldo_total'] if i > 0 else 0.0
 
@@ -833,19 +839,16 @@ def _generar_pdf_vacaciones_baja(f, gv, cargo):
 
     elements.append(section_hdr('SALDO DE VACACIONES AL MOMENTO DE LA BAJA'))
 
-    def gest_row(n):
-        if gv:
-            anio = getattr(gv, f'anio_gestion{n}')
-            dias = float(getattr(gv, f'dias_gestion{n}') or 0)
-            label = f'Gestión {anio}:' if anio else f'Gestión {n}:'
-            return label, f'{dias:.1f} días'
-        return f'Gestión {n}:', '0.0 días'
-
-    g = [gest_row(n) for n in range(1, 3)]
+    # Las 2 gestiones más recientes por año + la protegida adicional (caso B),
+    # que es lo que suma dias_adeudados.
+    normales, protegidas = resumen_saldo(gv, anios_protegidos(f.cod_funcionario)) if gv else ([], [])
+    anios_normales = {a for _, a, _ in normales}
+    g = [(f'Gestión {anio}:', dias) for _, anio, dias in normales]
+    g += [(f'Gestión Protegida {anio}:', dias) for _, anio, dias in protegidas if anio not in anios_normales]
     total = f'{float(gv.dias_adeudados or 0):.1f}' if gv else '0.0'
 
     wa, wb = W * 0.40, W * 0.60
-    rows_gest = [[P(label, sLabel), P(val, sVal)] for label, val in g if val != '0.0 días' or True]
+    rows_gest = [[P(label, sLabel), P(f'{float(dias):.1f} días', sVal)] for label, dias in g]
     rows_gest.append([P('TOTAL ADEUDADO:', sLabel), P(f'{total} días', sSmallB)])
 
     t_gest = Table(rows_gest, colWidths=[wa, wb])

@@ -139,6 +139,21 @@ def gestiones_ocupadas(gv, excluir: set = frozenset()) -> list:
     )
 
 
+def resumen_saldo(gv, protegidos: set):
+    """
+    (normales, protegidas) para mostrar el saldo en formularios y reportes.
+
+    normales   = las 2 gestiones más recientes por año (protegidas o no).
+    protegidas = gestiones con acuerdo vigente y días > 0, que se muestran aparte.
+
+    Saldo (gv.dias_adeudados = suma de slots, cada año una sola vez):
+      Caso A: la protegida es una de las 2 normales → no se suma aparte.
+      Caso B: la protegida es una 3ª gestión adicional → se suma (15+15+10).
+    """
+    todas = gestiones_ocupadas(gv)
+    return todas[-LIMITE_GESTIONES_ACTIVAS:], [g for g in todas if g[1] in protegidos and g[2] > 0]
+
+
 def gestion_en_riesgo(gv, fecha_ingreso: date, protegidos: set = frozenset()):
     """
     (slot, anio, dias, fecha_limite) de la gestión no protegida que se

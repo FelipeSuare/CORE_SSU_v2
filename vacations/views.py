@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from html import escape
 from io import BytesIO
 
 from django.contrib.auth.decorators import login_required
@@ -12,7 +13,7 @@ from vacations.models import (
     AnulacionAjuste, AprobacionSolicitud, GestionVacacion,
     JerarquiaAprobacion,
 )
-from vacations.utils import LIMITE_GESTIONES_ACTIVAS, anios_protegidos, gestiones_ocupadas
+from vacations.utils import anios_protegidos, resumen_saldo
 
 _ROLES_HISTORIAL = {'RRHH', 'Administrador'}
 
@@ -219,7 +220,7 @@ def _generar_pdf_solicitud(solicitud):
          P('Días Solicitados:', sLabel), P(str(float(dias_efectivos_pdf)), sVal)],
         [P('Fecha Inicio:', sLabel), P(solicitud.fecha_salida.strftime('%d/%m/%Y'), sVal),
          P('Fecha Final:', sLabel), P(solicitud.fecha_retorno.strftime('%d/%m/%Y'), sVal)],
-        [P('Descripción:', sLabel), P(solicitud.motivo_vacacion or '—', sVal), '', ''],
+        [P('Descripción:', sLabel), P(escape(solicitud.motivo_vacacion or '—'), sVal), '', ''],
     ], colWidths=[w4, w4, w4, w4])
     t_periodo.setStyle(TableStyle([
         ('BOX',           (0, 0), (-1, -1), 0.5, BLACK),
@@ -235,23 +236,29 @@ def _generar_pdf_solicitud(solicitud):
 
     elements.append(section_hdr("DÍAS PENDIENTES DE VACACIONES DESPUÉS DE LA SOLICITUD"))
 
-    # Solo las 2 gestiones normales del funcionario (cada una con su año);
-    # los días protegidos por acuerdo/rechazo se informan aparte si quedan.
-    protegidos = anios_protegidos(f.cod_funcionario) if gv else set()
-    gestiones = gestiones_ocupadas(gv, protegidos)[-LIMITE_GESTIONES_ACTIVAS:] if gv else []
-    dias_prot = sum((d for _, a, d in gestiones_ocupadas(gv) if a in protegidos), Decimal('0')) if gv else 0
+    # Fila 1: las 2 gestiones normales. Fila(s) siguientes: gestión protegida
+    # (solo si existe) y el Saldo a la derecha. Regla A/B en resumen_saldo().
+    normales, protegidas = resumen_saldo(gv, anios_protegidos(f.cod_funcionario)) if gv else ([], [])
     saldo_val = f"{float(gv.dias_adeudados or 0):.1f}" if gv else "0.0"
+    vacio = P('', sVal)
+
+    def celdas(etiqueta, dias):
+        return [P(etiqueta, sLabel), P('Días disponibles:', sLabel), P(f"{float(dias):.1f}", sVal)]
 
     fila_gest = []
-    for _, anio, dias in gestiones:
-        fila_gest += [P(f"Gestión {anio}:", sLabel), P('Días disponibles:', sLabel), P(f"{float(dias):.1f}", sVal)]
-    fila_gest += [P('', sVal)] * (6 - len(fila_gest))
-    fila_saldo = ([P('', sVal), P('Días protegidos:', sLabel), P(f"{float(dias_prot):.1f}", sVal)]
-                  if dias_prot else [P('', sVal)] * 3)
-    fila_saldo += [P('', sVal), P('Saldo:', sLabel), P(saldo_val, sVal)]
+    for _, anio, dias in normales:
+        fila_gest += celdas(f"Gestión {anio}:", dias)
+    fila_gest += [vacio] * (6 - len(fila_gest))
+
+    filas = [fila_gest] + [celdas(f"Gestión Protegida {anio}:", dias) + [vacio] * 3 for _, anio, dias in protegidas]
+    estilo_extra = []
+    if not protegidas:
+        filas.append([vacio] * 6)
+        estilo_extra.append(('SPAN', (0, 1), (3, 1)))
+    filas[-1][4:] = [P('Saldo:', sLabel), P(saldo_val, sVal)]
 
     wa, wb, wc = W * 0.18, W * 0.24, W * 0.08
-    t_dias = Table([fila_gest, fila_saldo], colWidths=[wa, wb, wc, wa, wb, wc])
+    t_dias = Table(filas, colWidths=[wa, wb, wc, wa, wb, wc])
     t_dias.setStyle(TableStyle([
         ('BOX',           (0, 0), (-1, -1), 0.5, BLACK),
         ('INNERGRID',     (0, 0), (-1, -1), 0.25, GRAY),
@@ -259,6 +266,7 @@ def _generar_pdf_solicitud(solicitud):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('LEFTPADDING',   (0, 0), (-1, -1), 5),
         ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        *estilo_extra,
     ]))
     elements.append(t_dias)
     elements.append(Spacer(1, 0.15*cm))
@@ -764,7 +772,7 @@ def _generar_pdf_rechazada(solicitud, apr_rechazo):
          P('Días Solicitados:', sLabel), P(str(float(solicitud.dias_solicitados)), sVal)],
         [P('Fecha Inicio:', sLabel),    P(solicitud.fecha_salida.strftime('%d/%m/%Y'), sVal),
          P('Fecha Final:', sLabel),     P(solicitud.fecha_retorno.strftime('%d/%m/%Y'), sVal)],
-        [P('Descripción:', sLabel),     P(solicitud.motivo_vacacion or '—', sVal), '', ''],
+        [P('Descripción:', sLabel),     P(escape(solicitud.motivo_vacacion or '—'), sVal), '', ''],
     ], colWidths=[w4, w4, w4, w4])
     t_periodo.setStyle(TableStyle([
         ('BOX',           (0, 0), (-1, -1), 0.5, BLACK),

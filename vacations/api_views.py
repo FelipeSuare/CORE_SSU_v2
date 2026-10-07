@@ -33,6 +33,7 @@ from vacations.utils import (
     devolver_dias,
     gestion_en_riesgo,
     gestiones_ocupadas,
+    resumen_saldo,
     siguiente_correlativo,
     sumar_meses,
     DIAS_ANTICIPO_RECHAZO_PROTEGIDO,
@@ -99,21 +100,22 @@ def _estado_display(estado_db):
     return estado_db
 
 
-def _saldos_para_js(gv, excluir=frozenset()):
-    """Saldos por gestión; `excluir` = años protegidos, que se muestran aparte."""
-    gestiones = []
-    for i in range(1, 5):
-        anio = getattr(gv, f'anio_gestion{i}')
-        dias = float(getattr(gv, f'dias_gestion{i}'))
-        if anio in excluir:
-            continue
-        if anio is not None or dias > 0:
-            gestiones.append({
-                'numero': i,
-                'anio': anio,
-                'dias': dias,
-                'label': f'GESTIÓN {anio}' if anio else f'GESTIÓN {i}',
-            })
+def _saldos_para_js(gv):
+    """
+    Las 2 gestiones normales (más reciente primero), incluida la protegida si
+    es una de ellas (caso A); la protegida adicional (caso B) va en
+    dias_protegidos. Slots legado sin año pero con días se siguen mostrando.
+    """
+    normales, _ = resumen_saldo(gv, set())
+    slots = [(i, a, d) for i, a, d in reversed(normales)]
+    slots += [(i, None, getattr(gv, f'dias_gestion{i}')) for i in range(1, 5)
+              if getattr(gv, f'anio_gestion{i}') is None and getattr(gv, f'dias_gestion{i}') > 0]
+    gestiones = [{
+        'numero': i,
+        'anio': anio,
+        'dias': float(dias),
+        'label': f'GESTIÓN {anio}' if anio else f'GESTIÓN {i}',
+    } for i, anio, dias in slots]
     return {
         'gestiones': gestiones,
         'dias_negados': float(gv.dias_negados),
@@ -274,7 +276,7 @@ class DatosFormularioView(APIView):
             })
 
         if gv:
-            saldos = _saldos_para_js(gv, excluir={pr.anio_gestion for pr in protecciones})
+            saldos = _saldos_para_js(gv)
         else:
             saldos = {'gestiones': [], 'dias_negados': 0.0, 'dias_adeudados': 0.0}
 

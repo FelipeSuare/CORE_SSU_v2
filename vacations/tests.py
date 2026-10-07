@@ -12,6 +12,7 @@ from vacations.utils import (
     calcular_gestioneS_pendientes,
     dias_por_antiguedad,
     aplicar_limite_gestiones_activas,
+    resumen_saldo,
 )
 from vacations.api_views import _calcular_retorno
 from core.models import Feriado
@@ -22,6 +23,39 @@ from core.test_utils import hacer_usuario_y_funcionario, hacer_gestion, hacer_ca
 # ══════════════════════════════════════════════════════════════════════════════
 #  Funciones puras — no usan DB
 # ══════════════════════════════════════════════════════════════════════════════
+
+class TestResumenSaldo(TestCase):
+    """Regla A/B del saldo con gestión protegida."""
+
+    def _gv(self, *gestiones):
+        from types import SimpleNamespace
+        gv = SimpleNamespace(**{f'anio_gestion{i}': None for i in range(1, 5)},
+                             **{f'dias_gestion{i}': Decimal('0') for i in range(1, 5)})
+        for i, (anio, dias) in enumerate(gestiones, 1):
+            setattr(gv, f'anio_gestion{i}', anio)
+            setattr(gv, f'dias_gestion{i}', Decimal(dias))
+        return gv
+
+    def _saldo(self, normales, protegidas):
+        anios = {a for _, a, _ in normales}
+        return sum(d for *_, d in normales) + sum(d for _, a, d in protegidas if a not in anios)
+
+    def test_caso_a_protegida_es_una_de_las_normales(self):
+        normales, protegidas = resumen_saldo(self._gv((2024, '15'), (2025, '15')), {2024})
+        self.assertEqual([a for _, a, _ in normales], [2024, 2025])
+        self.assertEqual([a for _, a, _ in protegidas], [2024])
+        self.assertEqual(self._saldo(normales, protegidas), Decimal('30'))
+
+    def test_caso_b_protegida_adicional_se_suma(self):
+        normales, protegidas = resumen_saldo(self._gv((2026, '15'), (2024, '10'), (2025, '15')), {2024})
+        self.assertEqual([a for _, a, _ in normales], [2025, 2026])
+        self.assertEqual([a for _, a, _ in protegidas], [2024])
+        self.assertEqual(self._saldo(normales, protegidas), Decimal('40'))
+
+    def test_sin_protegida_o_agotada_no_se_muestra(self):
+        self.assertEqual(resumen_saldo(self._gv((2024, '15'), (2025, '15')), set())[1], [])
+        self.assertEqual(resumen_saldo(self._gv((2024, '0'), (2025, '15')), {2024})[1], [])
+
 
 class TestCalcularAniosAntiguedad(TestCase):
     """Años completos de servicio, incluyendo bordes de aniversario."""
@@ -964,6 +998,16 @@ class TestAcuerdosProteccion(TestCase):
         self.assertEqual([e['anio'] for e in evictadas], [2023])
         self.assertEqual(gv.dias_perdidos, Decimal('15'))
 
+    def test_pdf_solicitud_con_y_sin_gestion_protegida(self):
+        from vacations.views import _generar_pdf_solicitud
+        f, gv = self._gv_tres_gestiones()
+        gv.save()
+        sol = SolicitudVacacion.objects.create(cod_funcionario=f, fecha_salida=date.today(),
+                                               fecha_retorno=date.today(), dias_solicitados=Decimal('1'))
+        self.assertTrue(_generar_pdf_solicitud(sol).startswith(b'%PDF'))   # sin protegida
+        _proteger(f, 2023, date.today() + timedelta(days=30))
+        self.assertTrue(_generar_pdf_solicitud(sol).startswith(b'%PDF'))   # caso B
+
     def test_poblar_no_reacredita_anios_ya_evictados(self):
         # Regresión: con las 2 gestiones más recientes ya registradas, el
         # poblado diario re-acreditaba los años viejos y los volvía a evictar,
@@ -1227,8 +1271,10 @@ class TestAcuerdosAPI(APITestCase):
             [('Días protegidos por solicitud rechazada al límite de vencimiento', 2024, 18.0),
              (f"Días protegidos por Acuerdo N.° {data['nro']}", 2025, 20.0)],
         )
-        # Las gestiones protegidas no se repiten entre las normales.
-        self.assertEqual(r['saldos']['gestiones'], [])
+        # Caso A: las protegidas siguen siendo las 2 normales → se muestran en
+        # ambas secciones, pero el saldo no las suma dos veces.
+        self.assertEqual([g['anio'] for g in r['saldos']['gestiones']], [2025, 2024])
+        self.assertEqual(r['saldos']['dias_adeudados'], 38.0)
 
         # Agotados los días protegidos, la sección desaparece.
         GestionVacacion.objects.filter(cod_funcionario=self.f).update(dias_gestion2=Decimal('0'))
