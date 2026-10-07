@@ -519,11 +519,11 @@ Comando operacional (manual/periódico) que **acredita los días de vacación a 
 
 ### vacations/management/commands/diagnosticar_dias_perdidos.py
 
-Comando de **solo lectura** para detectar el bug del signal `_auto_poblar_vacaciones` (reset+repoblar repetido que infla `dias_perdidos` en cada reinicio). Excluye funcionarios con alguna `SolicitudVacacion` `APROBADA` (el bug nunca los tocó). Para el resto, recalcula desde cero el valor correcto de `dias_perdidos` y compara contra el valor actual, reportando discrepancias. Sin argumentos CLI adicionales. Paso previo de auditoría antes de `corregir_dias_perdidos`.
+Comando de **solo lectura** para detectar `dias_perdidos` inflado por el bug del signal `_auto_poblar_vacaciones` (reset+repoblar repetido en cada reinicio). Equivale a `corregir_dias_perdidos --dry-run`. Sin argumentos CLI adicionales.
 
 ### vacations/management/commands/corregir_dias_perdidos.py
 
-Comando **destructivo pero acotado** que aplica la corrección detectada por `diagnosticar_dias_perdidos`. Argumento: `--dry-run`. Excluye funcionarios con solicitud `APROBADA`. Para el resto, si hay discrepancia, **resetea los 4 slots** y los reescribe con las gestiones activas correctas, y **fija (no suma)** `dias_perdidos` al valor absoluto correcto (a diferencia de `aplicar_limite_gestiones_activas`, que acumula). Reconfigura stdout/stderr a UTF-8 para evitar errores de consola en Windows.
+Corrige `dias_perdidos` inflado. Argumento: `--dry-run`. Calcula el valor esperado por **conservación de días**: lo asignado desde la ventana de 4 años vigente al introducirse el tope de 2 gestiones (02/07/2026) hasta la gestión más reciente, menos el saldo activo, menos lo consumido neto (solicitudes no rechazadas menos lo devuelto por `AnulacionAjuste`). **Solo baja** `dias_perdidos` cuando supera ese valor; nunca toca los saldos de las gestiones activas ni excluye a funcionarios con solicitudes aprobadas. Reconfigura stdout/stderr a UTF-8 para evitar errores de consola en Windows.
 
 ### vacations/management/commands/migrar_dias_perdidos.py
 

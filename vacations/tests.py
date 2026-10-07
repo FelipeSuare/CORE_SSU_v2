@@ -536,6 +536,32 @@ class TestCrearSolicitudAPI(APITestCase):
         self.assertEqual((self.gv.dias_gestion1, self.gv.dias_gestion2), (Decimal('5'), Decimal('20')))
 
 
+class TestCorregirDiasPerdidos(TestCase):
+    def test_baja_inflado_y_no_toca_valores_validos(self):
+        from django.core.management import call_command
+        # Ingreso 01/07/2017: ventana al 02/07/2026 = 2023..2026 (20 c/u) → 80 asignados.
+        f = hacer_funcionario(ci='97000001', fecha_ingreso=date(2017, 7, 1))
+        GestionVacacion.objects.create(
+            cod_funcionario=f, anio_gestion1=2025, dias_gestion1=Decimal('20'),
+            anio_gestion2=2026, dias_gestion2=Decimal('15'), dias_perdidos=Decimal('396'),
+        )
+        SolicitudVacacion.objects.create(
+            cod_funcionario=f, fecha_salida=date(2026, 7, 6), fecha_retorno=date(2026, 7, 8),
+            dias_solicitados=Decimal('5'), estado='APROBADA',
+        )
+        call_command('corregir_dias_perdidos', stdout=StringIO())
+        gv = GestionVacacion.objects.get(cod_funcionario=f)
+        # 80 − 35 activos − 5 consumidos; los saldos activos no cambian.
+        self.assertEqual(gv.dias_perdidos, Decimal('40'))
+        self.assertEqual((gv.dias_gestion1, gv.dias_gestion2), (Decimal('20'), Decimal('15')))
+
+        # Un valor menor al esperado no se sube.
+        GestionVacacion.objects.filter(pk=gv.pk).update(dias_perdidos=Decimal('10'))
+        call_command('corregir_dias_perdidos', stdout=StringIO())
+        gv.refresh_from_db()
+        self.assertEqual(gv.dias_perdidos, Decimal('10'))
+
+
 class TestMisSolicitudesAPI(APITestCase):
     """GET /api/vacaciones/mis-solicitudes/ — lista solicitudes del funcionario."""
 
