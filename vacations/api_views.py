@@ -438,6 +438,30 @@ class CrearSolicitudView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # El retorno se recalcula en servidor: no se confía en el enviado por el cliente.
+        feriados_set  = set(Feriado.objects.values_list('fecha', flat=True))
+        fecha_retorno = _calcular_retorno(fecha_salida, dias, feriados_set)['fecha_retorno']
+
+        # Choque de fechas: el período ocupa [salida, retorno). Una Ajustada ya
+        # tiene sus fechas recortadas al período restante; Rechazada/Anulada no ocupan.
+        choque = SolicitudVacacion.objects.filter(
+            cod_funcionario=f,
+            estado__in=(*_ESTADOS_PENDIENTE, 'APROBADA'),
+            fecha_salida__lt=fecha_retorno,
+            fecha_retorno__gt=fecha_salida,
+        ).order_by('fecha_salida').first()
+        if choque:
+            ajustada = AnulacionAjuste.objects.filter(id_formulario=choque, tipo_anulacion='AJUSTE').exists()
+            estado_txt = 'Ajustada' if choque.estado == 'APROBADA' and ajustada else _estado_display(choque.estado)
+            fin = choque.fecha_retorno - timedelta(days=1)
+            return Response(
+                {'error': (
+                    f'Ya tienes una solicitud {estado_txt} del {choque.fecha_salida:%d/%m/%Y} '
+                    f'al {fin:%d/%m/%Y} que incluye estas fechas.'
+                )},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             with transaction.atomic():
                 tiene_niveles = JerarquiaAprobacion.objects.filter(

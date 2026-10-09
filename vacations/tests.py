@@ -532,6 +532,47 @@ class TestCrearSolicitudAPI(APITestCase):
         self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('pendiente', r2.json()['error'])
 
+    def test_no_permite_fechas_que_chocan_con_otra_solicitud(self):
+        lunes = date.today() + timedelta(days=28 - date.today().weekday())
+        sol = SolicitudVacacion.objects.create(
+            cod_funcionario=self.func, fecha_salida=lunes, fecha_retorno=lunes + timedelta(days=7),
+            dias_solicitados=Decimal('5'), estado='APROBADA',
+        )
+        pedir = lambda salida: self.client.post(self.url, {
+            'fecha_salida': salida.isoformat(), 'fecha_retorno': salida.isoformat(),
+            'dias_solicitados': '1', 'motivo_vacacion': 'Trámite',
+        })
+
+        # Viernes de esa semana: choca aunque el cliente mande un retorno falso.
+        r = pedir(lunes + timedelta(days=4))
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+        fin = lunes + timedelta(days=6)
+        self.assertEqual(r.json()['error'],
+                         f'Ya tienes una solicitud Aprobada del {lunes:%d/%m/%Y} al {fin:%d/%m/%Y} que incluye estas fechas.')
+
+        # Ajustada: el período quedó recortado a lun-mié; el jueves liberado se puede pedir.
+        AnulacionAjuste.objects.create(id_formulario=sol, tipo_anulacion='AJUSTE', motivo_anulacion='x',
+                                       observaciones='x', dias_devolver=Decimal('2'))
+        SolicitudVacacion.objects.filter(pk=sol.pk).update(fecha_retorno=lunes + timedelta(days=3))
+        self.assertIn('Ajustada', pedir(lunes + timedelta(days=2)).json()['error'])
+        r = pedir(lunes + timedelta(days=3))
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.content)
+        nueva = SolicitudVacacion.objects.get(id_formulario=r.json()['id_formulario'])
+        self.assertEqual(nueva.fecha_retorno, lunes + timedelta(days=4))  # retorno recalculado en servidor
+
+    def test_rechazada_o_anulada_no_ocupan_fechas(self):
+        lunes = date.today() + timedelta(days=28 - date.today().weekday())
+        for estado in ('RECHAZADA', 'ANULADA'):
+            SolicitudVacacion.objects.create(
+                cod_funcionario=self.func, fecha_salida=lunes, fecha_retorno=lunes + timedelta(days=7),
+                dias_solicitados=Decimal('5'), estado=estado,
+            )
+        r = self.client.post(self.url, {
+            'fecha_salida': lunes.isoformat(), 'fecha_retorno': (lunes + timedelta(days=1)).isoformat(),
+            'dias_solicitados': '1', 'motivo_vacacion': 'Trámite',
+        })
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.content)
+
     def test_sin_gestion_vacacion_devuelve_400(self):
         self.gv.delete()
         r = self.client.post(self.url, self._payload_valido())
