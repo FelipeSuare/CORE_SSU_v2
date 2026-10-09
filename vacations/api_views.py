@@ -520,6 +520,16 @@ class MisSolicitudesView(APIView):
             ).values('id_formulario').annotate(total=Sum('dias_devolver'))
         }
 
+        # Observación del último ajuste/anulación por (solicitud, tipo); registros
+        # viejos sin observaciones caen al motivo.
+        obs_anulacion = {
+            (row['id_formulario'], row['tipo_anulacion']):
+                (row['observaciones'] or '').strip() or row['motivo_anulacion']
+            for row in AnulacionAjuste.objects.filter(id_formulario__in=ids)
+            .order_by('fecha_registro', 'pk')
+            .values('id_formulario', 'tipo_anulacion', 'observaciones', 'motivo_anulacion')
+        }
+
         # Estado actual de jerarquía (para solicitudes pendientes sin AprobacionSolicitud)
         sin_jefe_ahora = _sin_jefe_area(f)
         niveles_sem    = _niveles_semanticos(f.tipo_funcionario)
@@ -538,8 +548,21 @@ class MisSolicitudesView(APIView):
         resultado = []
         for s in solicitudes_qs:
             aprs       = aprs_por_sol.get(s.id_formulario, {})
-            todas_obs  = [ap.observacion for ap in aprs.values() if ap.observacion]
+            todas_obs  = [ap.observacion.strip() for ap in aprs.values() if (ap.observacion or '').strip()]
             dias_ajust = ajustes_parciales.get(s.id_formulario, 0.0)
+            # Aprobada con anulación parcial = Ajustada.
+            estado     = 'Ajustada' if s.estado == 'APROBADA' and dias_ajust else _estado_display(s.estado)
+            ultima_obs = todas_obs[-1] if todas_obs else None
+            if estado == 'Pendiente':
+                obs = 'En evaluación por nivel correspondiente'
+            elif estado == 'Aprobada':
+                obs = ultima_obs or 'Vacaciones autorizadas'
+            elif estado == 'Ajustada':
+                obs = obs_anulacion.get((s.id_formulario, 'AJUSTE')) or ultima_obs
+            elif estado == 'Anulada Totalmente':
+                obs = obs_anulacion.get((s.id_formulario, 'ANULACION')) or ultima_obs
+            else:
+                obs = ultima_obs
 
             # La BD numera los niveles desde 1 para todos; el mapeo a nivel
             # semántico depende del tipo de funcionario (un Jefe de Área no
@@ -567,12 +590,11 @@ class MisSolicitudesView(APIView):
                 'fecha_retorno':   s.fecha_retorno.strftime('%Y-%m-%d'),
                 'dias':            float(s.dias_solicitados) - dias_ajust,
                 'motivo':          s.motivo_vacacion or '',
-                # Aprobada con anulación parcial = Ajustada.
-                'estado':          'Ajustada' if s.estado == 'APROBADA' and dias_ajust else _estado_display(s.estado),
+                'estado':          estado,
                 'nivel1':          niveles.get(1),
                 'nivel2':          niveles.get(2),
                 'nivel3':          niveles.get(3),
-                'observaciones':   todas_obs[-1] if todas_obs else None,
+                'observaciones':   obs,
             })
 
         try:

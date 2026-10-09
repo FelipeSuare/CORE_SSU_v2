@@ -630,6 +630,20 @@ class TestMisSolicitudesAPI(APITestCase):
         data = r.json()
         self.assertEqual(data['resumen']['total'], 1)
         self.assertEqual(data['solicitudes'][0]['estado'], 'Aprobada')
+        # Sin comentario del aprobador: texto por defecto.
+        self.assertEqual(data['solicitudes'][0]['observaciones'], 'Vacaciones autorizadas')
+
+    def test_pendiente_muestra_en_evaluacion(self):
+        _, jefe = hacer_usuario_y_funcionario(ci='33333334', nombre='Jefe')
+        JerarquiaAprobacion.objects.create(
+            cod_funcionario=self.func, cod_aprobador=jefe, nivel_aprobacion=1, activo=True,
+        )
+        SolicitudVacacion.objects.create(
+            cod_funcionario=self.func, fecha_salida=date(2025, 2, 3), fecha_retorno=date(2025, 2, 10),
+            dias_solicitados=Decimal('5'), estado='PENDIENTE_JEFE',
+        )
+        obs = self.client.get(self.url).json()['solicitudes'][0]['observaciones']
+        self.assertEqual(obs, 'En evaluación por nivel correspondiente')
 
 
 class TestHistorialRRHHAPI(APITestCase):
@@ -1385,7 +1399,7 @@ class TestAnulacionParcialPorFechas(APITestCase):
 
         # Mis solicitudes la muestra como Ajustada con los días restantes.
         mis = self._mi_solicitud()
-        self.assertEqual((mis['estado'], mis['dias']), ('Ajustada', 3.0))
+        self.assertEqual((mis['estado'], mis['dias'], mis['observaciones']), ('Ajustada', 3.0, 'Retorna antes'))
 
     def test_fechas_fuera_del_periodo_o_sin_cambio(self):
         fuera = self._anular(nueva_fecha_inicio=(self.lunes - timedelta(days=1)).isoformat(),
@@ -1402,5 +1416,6 @@ class TestAnulacionParcialPorFechas(APITestCase):
             'motivo_anulacion': 'error_registro', 'observaciones': 'Error',
         }, format='json')
         self.assertEqual(r.status_code, status.HTTP_200_OK, r.content)
-        self.assertEqual(self._mi_solicitud()['estado'], 'Anulada Totalmente')
+        mis = self._mi_solicitud()
+        self.assertEqual((mis['estado'], mis['observaciones']), ('Anulada Totalmente', 'Error'))
 
