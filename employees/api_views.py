@@ -839,12 +839,13 @@ def _generar_pdf_vacaciones_baja(f, gv, cargo):
 
     elements.append(section_hdr('SALDO DE VACACIONES AL MOMENTO DE LA BAJA'))
 
-    # Las 2 gestiones más recientes por año + la protegida adicional (caso B),
-    # que es lo que suma dias_adeudados.
+    # Igual que el formulario de solicitud: las 2 gestiones normales + la(s)
+    # protegida(s) por acuerdo vigente, siempre visibles. El total
+    # (dias_adeudados) aplica la regla A/B de resumen_saldo(): la protegida
+    # solo se suma si es una 3ª gestión acreditada.
     normales, protegidas = resumen_saldo(gv, anios_protegidos(f.cod_funcionario)) if gv else ([], [])
-    anios_normales = {a for _, a, _ in normales}
     g = [(f'Gestión {anio}:', dias) for _, anio, dias in normales]
-    g += [(f'Gestión Protegida {anio}:', dias) for _, anio, dias in protegidas if anio not in anios_normales]
+    g += [(f'Gestión Protegida {anio}:', dias) for _, anio, dias in protegidas]
     total = f'{float(gv.dias_adeudados or 0):.1f}' if gv else '0.0'
 
     wa, wb = W * 0.40, W * 0.60

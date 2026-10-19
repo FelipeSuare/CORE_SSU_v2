@@ -259,3 +259,30 @@ class TestPDFVacacionesBaja(APITestCase):
                                             anio_gestion3=2024, dias_gestion3=Decimal('15'))
         self.assertTrue(_generar_pdf_vacaciones_baja(f, gv, None).startswith(b'%PDF'))
         self.assertTrue(_generar_pdf_vacaciones_baja(f, None, None).startswith(b'%PDF'))
+
+    def test_pdf_baja_con_gestion_protegida(self):
+        from employees.api_views import _generar_pdf_vacaciones_baja
+        from vacations.models import AcuerdoVacacion, AcuerdoVacacionFuncionario
+        from vacations.utils import anios_protegidos, resumen_saldo
+        f = hacer_funcionario(ci='93000002', fecha_ingreso=date(2015, 1, 1))
+        gv = GestionVacacion.objects.create(cod_funcionario=f, anio_gestion1=2024, dias_gestion1=Decimal('15'),
+                                            anio_gestion2=2025, dias_gestion2=Decimal('20'))
+        ac = AcuerdoVacacion.objects.create(tipo='INDIVIDUAL', motivo='x', fecha_acuerdo=date.today(),
+                                            fecha_hasta=date(2099, 1, 1))
+        AcuerdoVacacionFuncionario.objects.create(id_acuerdo=ac, cod_funcionario=f, anio_gestion=2024,
+                                                  dias_protegidos=Decimal('15'))
+        # Caso A: protegida dentro de las 2 normales → se muestra, no se suma.
+        gv.refresh_from_db()
+        normales, protegidas = resumen_saldo(gv, anios_protegidos(f.cod_funcionario))
+        self.assertEqual(([a for _, a, _ in normales], [a for _, a, _ in protegidas]), ([2024, 2025], [2024]))
+        self.assertEqual(gv.dias_adeudados, Decimal('35'))
+        self.assertTrue(_generar_pdf_vacaciones_baja(f, gv, None).startswith(b'%PDF'))
+        # Caso B: 3ª gestión acreditada y protegida → se suman las 3.
+        gv.anio_gestion3, gv.dias_gestion3 = 2023, Decimal('10')
+        gv.save()
+        ac.afectados.update(anio_gestion=2023)
+        gv.refresh_from_db()
+        normales, protegidas = resumen_saldo(gv, anios_protegidos(f.cod_funcionario))
+        self.assertEqual(([a for _, a, _ in normales], [a for _, a, _ in protegidas]), ([2024, 2025], [2023]))
+        self.assertEqual(gv.dias_adeudados, Decimal('45'))
+        self.assertTrue(_generar_pdf_vacaciones_baja(f, gv, None).startswith(b'%PDF'))
