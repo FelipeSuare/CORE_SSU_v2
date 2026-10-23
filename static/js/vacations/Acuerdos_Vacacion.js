@@ -40,7 +40,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const f = _funcionarios.find(x => x.cod === t.value);
             if (!t.checked) _seleccion.delete(f.cod);
             else {
-                if (tipoActual() === 'INDIVIDUAL') _seleccion = new Map();
+                // Al editar, sumar funcionarios a un individual lo vuelve colectivo
+                // en vez de reemplazar al que ya estaba.
+                if (tipoActual() === 'INDIVIDUAL' && _seleccion.size) {
+                    if (_modificaId) document.querySelector('input[name=tipo][value=COLECTIVO]').checked = true;
+                    else _seleccion = new Map();
+                }
                 seleccionar(f);
             }
             renderFuncionarios();
